@@ -529,7 +529,9 @@ export function ModelCalculator({
   }
 
   // Auto-derive method from inputs — ou < tu means physical occupancy
-  const effectiveMethod = (inputs.ou > 0 && inputs.ou < inputs.tu) ? 'physical' : 'om'
+  // OM As-Presented (is_default) always forced to 'om' regardless of ou/tu
+  const isDefaultOM = omScenario?.id === currentScenarioId
+  const effectiveMethod = isDefaultOM ? 'om' : (inputs.ou > 0 && inputs.ou < inputs.tu) ? 'physical' : 'om'
   // Current scenario outputs
   const d   = calculate(inputs, effectiveMethod === 'om')
 
