@@ -6,7 +6,7 @@ export const OM_DEFAULTS: ModelInputs = {
   price: 0, ir: 0, lev: 0, am: 0, lf: 0, cc: 0,
   tax: 0, ins: 0, util: 0, rm: 0, cs: 0,
   ga: 0, res: 0, pm: 0, expCollapse: false, expPct: 0,
-  brk: 0, land: 0, costSeg: 0, is1031: false, basis1031: 0,
+  brk: 0, land: 0, costSeg: 0, is1031: false, basis1031: 0, equity1031: 0,
   otherIncome: [],
   otherExpenses: [],
 }

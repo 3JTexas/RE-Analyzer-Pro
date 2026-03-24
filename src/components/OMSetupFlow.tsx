@@ -25,6 +25,7 @@ export interface OmConfirmMeta {
   scenarioName: string
   propertyName?: string
   propertyAddress?: string
+  propertyYearBuilt?: number
 }
 
 type Mode = 'choose' | 'manual' | 'pdf'
@@ -46,10 +47,18 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
   const [scenarioName, setScenarioName] = useState(defaultScenarioName)
   const [propertyName, setPropertyName] = useState('')
   const [propertyAddress, setPropertyAddress] = useState('')
+  const [propertyYearBuilt, setPropertyYearBuilt] = useState<number | undefined>(undefined)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const set = (key: keyof ModelInputs, val: number) =>
     setInputs(prev => ({ ...prev, [key]: val }))
+
+  const addOtherIncome = () =>
+    setInputs(prev => ({ ...prev, otherIncome: [...(prev.otherIncome ?? []), { label: 'Other income', amount: 0 }] }))
+  const updateOtherIncome = (i: number, key: 'label' | 'amount', val: string | number) =>
+    setInputs(prev => { const arr = [...(prev.otherIncome ?? [])]; arr[i] = { ...arr[i], [key]: val }; return { ...prev, otherIncome: arr } })
+  const removeOtherIncome = (i: number) =>
+    setInputs(prev => ({ ...prev, otherIncome: (prev.otherIncome ?? []).filter((_, idx) => idx !== i) }))
 
   const toBase64 = (file: File): Promise<string> =>
     new Promise((res, rej) => {
@@ -63,6 +72,7 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
     scenarioName: scenarioName.trim() || defaultScenarioName,
     propertyName: showPropertyFields ? propertyName.trim() : undefined,
     propertyAddress: showPropertyFields ? propertyAddress.trim() : undefined,
+    propertyYearBuilt: showPropertyFields ? propertyYearBuilt : undefined,
   })
 
   const extractFromPdfs = async () => {
@@ -101,6 +111,7 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
       // Auto-populate property name/address from extraction
       if (parsed.propertyName && typeof parsed.propertyName === 'string') setPropertyName(parsed.propertyName)
       if (parsed.propertyAddress && typeof parsed.propertyAddress === 'string') setPropertyAddress(parsed.propertyAddress)
+      if (parsed.yearBuilt && typeof parsed.yearBuilt === 'number') setPropertyYearBuilt(parsed.yearBuilt)
 
       setInputs(merged)
       setPdfStatus('done')
@@ -115,6 +126,39 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
     setPdfFiles(files)
     setPdfStatus('idle')
   }
+
+
+  // ── Other income rows ────────────────────────────────────────────────
+  const OtherIncomeSection = () => (
+    <div className="mb-3">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide">Additional income</span>
+        <button onClick={addOtherIncome}
+          className="text-[9px] text-blue-500 hover:text-blue-700 font-medium flex items-center gap-0.5">
+          <span className="text-sm leading-none">+</span> Add
+        </button>
+      </div>
+      {(inputs.otherIncome ?? []).length === 0 ? (
+        <p className="text-[9px] text-gray-400 italic">No additional income — tap + Add to include laundry, parking, etc.</p>
+      ) : (
+        <div className="space-y-1">
+          {(inputs.otherIncome ?? []).map((item, i) => (
+            <div key={i} className="flex gap-1 items-center">
+              <input value={item.label} onChange={e => updateOtherIncome(i, 'label', e.target.value)}
+                placeholder="Label"
+                className="flex-1 text-xs border border-gray-200 rounded-md px-2 py-1 bg-white focus:outline-none focus:border-navy" />
+              <div className="relative w-24">
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
+                <input type="number" value={item.amount} onChange={e => updateOtherIncome(i, 'amount', +e.target.value)}
+                  className="w-full text-xs border border-gray-200 rounded-md pl-5 pr-2 py-1 bg-white focus:outline-none focus:border-navy text-right" />
+              </div>
+              <button onClick={() => removeOtherIncome(i)} className="text-gray-300 hover:text-red-400 font-bold text-sm px-0.5">×</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 
   // ── Property + scenario name fields (shown in all modes) ─────────────
   const MetaFields = () => (
@@ -146,7 +190,7 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
 
   // ── Choose mode ───────────────────────────────────────────────────────
   if (mode === 'choose') return (
-    <div className="mx-4 mt-3 p-4 border border-gray-200 rounded-xl bg-white shadow-sm flex flex-col max-h-[calc(100dvh-8rem)] overflow-hidden">
+    <div className="mx-4 mt-3 p-4 border border-gray-200 rounded-xl bg-white shadow-sm">
       <p className="text-xs font-semibold text-gray-700 mb-1">
         {showPropertyFields ? 'Add new property' : 'Add scenario'}
       </p>
@@ -175,7 +219,7 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
 
   // ── PDF mode ──────────────────────────────────────────────────────────
   if (mode === 'pdf') return (
-    <div className="mx-4 mt-3 p-4 border border-amber-200 rounded-xl bg-amber-50 shadow-sm">
+    <div className="mx-4 mt-3 p-4 border border-amber-200 rounded-xl bg-amber-50 shadow-sm flex flex-col max-h-[calc(100dvh-8rem)] overflow-y-auto">
       <div className="flex items-center justify-between mb-3">
         <p className="text-xs font-semibold text-amber-800">AI PDF extraction</p>
         <button onClick={() => { setMode('choose'); setPdfFiles([]); setPdfStatus('idle') }}>
@@ -217,6 +261,7 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
             <CheckCircle size={13} /> Extracted — review details then confirm
           </div>
           <MetaFields />
+          <OtherIncomeSection />
           <button onClick={() => setMode('manual')}
             className="w-full mb-2 border border-amber-300 text-amber-700 text-xs font-medium py-2 rounded-lg hover:bg-amber-100">
             Review / edit all fields
@@ -236,7 +281,7 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
 
   // ── Manual mode ───────────────────────────────────────────────────────
   return (
-    <div className="mx-4 mt-3 p-4 border border-gray-200 rounded-xl bg-white shadow-sm flex flex-col max-h-[calc(100dvh-8rem)] overflow-hidden">
+    <div className="mx-4 mt-3 p-4 border border-gray-200 rounded-xl bg-white shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <p className="text-xs font-semibold text-gray-700">
           {showPropertyFields ? 'New property — OM figures' : 'Enter OM figures'}
@@ -244,7 +289,7 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
         <button onClick={() => setMode('choose')}><X size={14} className="text-gray-400" /></button>
       </div>
       <MetaFields />
-      <div className="grid grid-cols-2 gap-2 mb-3 flex-1 overflow-y-auto pr-1 min-h-0">
+      <div className="grid grid-cols-2 gap-2 mb-3 max-h-64 overflow-y-auto pr-1">
         {FIELDS.map(f => (
           <div key={f.key}>
             <label className="block text-[9px] text-gray-400 mb-0.5">{f.label}</label>
@@ -259,6 +304,7 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
           </div>
         ))}
       </div>
+      <OtherIncomeSection />
       <div className="flex gap-2">
         <button onClick={confirm}
           disabled={showPropertyFields && !propertyName.trim()}

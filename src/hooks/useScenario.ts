@@ -18,12 +18,12 @@ export function useProperties() {
 
   useEffect(() => { fetch() }, [fetch])
 
-  const createProperty = async (name: string, address?: string) => {
+  const createProperty = async (name: string, address?: string, yearBuilt?: number) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
     const { data, error } = await supabase
       .from('properties')
-      .insert({ name, address, user_id: user.id })
+      .insert({ name, address, user_id: user.id, ...(yearBuilt ? { year_built: yearBuilt } : {}) })
       .select()
       .single()
     if (!error) await fetch()

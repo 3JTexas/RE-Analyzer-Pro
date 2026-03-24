@@ -175,6 +175,213 @@ function CompareTab({ compareA, setCompareA, compareB, setCompareB,
   )
 }
 
+
+// ── Flags helpers ────────────────────────────────────────────────────────
+interface Flag {
+  severity: 'red' | 'amber' | 'info'
+  title: string
+  detail: string
+  omVal: string
+  benchmark: string
+  noImpact?: string
+}
+
+function computeFlags(inputs: ModelInputs, d: ReturnType<typeof calculate>, yearBuilt?: number | null): Flag[] {
+  const flags: Flag[] = []
+  const age = yearBuilt ? new Date().getFullYear() - yearBuilt : null
+
+  // 1. Property tax reassessment risk
+  if (inputs.price > 0 && inputs.tax > 0) {
+    const effectiveRate = (inputs.tax / inputs.price) * 100
+    if (effectiveRate < 1.8) {
+      const projectedTax = inputs.price * 0.020
+      const delta = projectedTax - inputs.tax
+      flags.push({
+        severity: effectiveRate < 1.2 ? 'red' : 'amber',
+        title: 'Property taxes likely understated (pre-sale assessment)',
+        detail: `Effective tax rate is ${effectiveRate.toFixed(2)}% of purchase price. Florida reassesses to market value upon sale with no cap for investment properties. At ~2.0% millage, post-purchase taxes will be ~$${Math.round(projectedTax).toLocaleString()}/yr.`,
+        omVal: `$${inputs.tax.toLocaleString()} (${effectiveRate.toFixed(2)}% of price)`,
+        benchmark: `~$${Math.round(projectedTax).toLocaleString()} (~2.0% of purchase price)`,
+        noImpact: `($${Math.round(delta).toLocaleString()}) NOI`,
+      })
+    }
+  }
+
+  // 2. Physical vacancy vs stated vacancy
+  if (inputs.tu > 0 && inputs.ou > 0 && inputs.ou < inputs.tu) {
+    const physicalVacPct = ((inputs.tu - inputs.ou) / inputs.tu) * 100
+    if (physicalVacPct > inputs.vp) {
+      const gsr = inputs.rent * inputs.tu * 12
+      const understatedVacancy = gsr * (physicalVacPct - inputs.vp) / 100
+      flags.push({
+        severity: 'red',
+        title: 'Physical vacancy exceeds stated vacancy rate',
+        detail: `Rent roll shows ${inputs.tu - inputs.ou} of ${inputs.tu} units vacant (${physicalVacPct.toFixed(1)}% physical vacancy). OM applies only ${inputs.vp}% vacancy to a full ${inputs.tu}-unit GSR, overstating effective income.`,
+        omVal: `${inputs.vp}% vacancy on ${inputs.tu}-unit GSR`,
+        benchmark: `${physicalVacPct.toFixed(1)}% physical vacancy (${inputs.tu - inputs.ou} unit${inputs.tu - inputs.ou > 1 ? 's' : ''} vacant)`,
+        noImpact: `($${Math.round(understatedVacancy).toLocaleString()}) EGI vs. in-place`,
+      })
+    }
+  }
+
+  // 3. Insurance benchmark (South FL)
+  if (inputs.tu > 0 && inputs.ins > 0) {
+    const benchmarkPerDoor = age && age > 60 ? 3000 : age && age > 40 ? 2500 : 2000
+    if (inputs.ins < benchmarkPerDoor) {
+      const delta = (benchmarkPerDoor - inputs.ins) * inputs.tu
+      flags.push({
+        severity: inputs.ins < 2000 ? 'red' : 'amber',
+        title: 'Insurance may be understated for South FL market',
+        detail: `At $${inputs.ins.toLocaleString()}/door, this is below current market rates for${age && age > 60 ? ' a pre-1965 wood-frame flat-roof' : ''} South Florida multifamily. New owner policies are repriced from scratch at sale — seller's grandfathered rate does not transfer.`,
+        omVal: `$${inputs.ins.toLocaleString()}/door ($${(inputs.ins * inputs.tu).toLocaleString()} total)`,
+        benchmark: `$${benchmarkPerDoor.toLocaleString()}+/door for this asset type`,
+        noImpact: `($${delta.toLocaleString()}+) NOI at benchmark`,
+      })
+    }
+  }
+
+  // 4. R&M benchmark (age-adjusted)
+  if (inputs.tu > 0 && inputs.rm >= 0) {
+    const rmBenchmark = age && age > 60 ? 900 : age && age > 40 ? 700 : 500
+    if (inputs.rm < rmBenchmark) {
+      const delta = (rmBenchmark - inputs.rm) * inputs.tu
+      flags.push({
+        severity: inputs.rm < rmBenchmark * 0.6 ? 'red' : 'amber',
+        title: `R&M understated for ${age ? age + '-year-old' : 'older'} building`,
+        detail: `$${inputs.rm}/unit/yr is below the age-adjusted benchmark for this vintage. Older construction with plaster walls, hardwood floors, and flat roofs typically runs higher.`,
+        omVal: `$${inputs.rm}/unit/yr ($${(inputs.rm * inputs.tu).toLocaleString()} total)`,
+        benchmark: `$${rmBenchmark}+/unit/yr for this building age`,
+        noImpact: `($${delta.toLocaleString()}+) NOI at benchmark`,
+      })
+    }
+  }
+
+  // 5. Reserves benchmark (age-adjusted)
+  if (inputs.tu > 0 && inputs.res >= 0) {
+    const resBenchmark = age && age > 60 ? 700 : age && age > 40 ? 500 : 350
+    if (inputs.res < resBenchmark) {
+      const delta = (resBenchmark - inputs.res) * inputs.tu
+      flags.push({
+        severity: inputs.res < resBenchmark * 0.5 ? 'red' : 'amber',
+        title: `Reserves understated for ${age ? age + '-year-old' : 'older'} building`,
+        detail: `$${inputs.res}/unit/yr in reserves is below recommended levels for a building of this age. Flat roof replacement, exterior remediation, and system replacements are capital-intensive on pre-war construction.`,
+        omVal: `$${inputs.res}/unit/yr ($${(inputs.res * inputs.tu).toLocaleString()} total)`,
+        benchmark: `$${resBenchmark}+/unit/yr for this building age`,
+        noImpact: `($${delta.toLocaleString()}+) NOI at benchmark`,
+      })
+    }
+  }
+
+  return flags
+}
+
+function FlagsTab({ inputs, d, propertyYearBuilt }: {
+  inputs: ModelInputs
+  d: ReturnType<typeof calculate>
+  propertyYearBuilt?: number | null
+}) {
+  const flags = computeFlags(inputs, d, propertyYearBuilt)
+
+  // Stressed scenario: apply projected tax + insurance benchmarks
+  const age = propertyYearBuilt ? new Date().getFullYear() - propertyYearBuilt : null
+  const projectedTax = inputs.price > 0 ? inputs.price * 0.020 : inputs.tax
+  const insBenchmark = age && age > 60 ? 3000 : age && age > 40 ? 2500 : 2000
+  const rmBenchmark = age && age > 60 ? 900 : age && age > 40 ? 700 : 500
+  const resBenchmark = age && age > 60 ? 700 : age && age > 40 ? 500 : 350
+  const stressedInputs: ModelInputs = {
+    ...inputs,
+    tax: Math.max(inputs.tax, projectedTax),
+    ins: Math.max(inputs.ins, insBenchmark),
+    rm: Math.max(inputs.rm, rmBenchmark),
+    res: Math.max(inputs.res, resBenchmark),
+  }
+  const ds = calculate(stressedInputs, true)
+
+  const sevColor = (s: Flag['severity']) =>
+    s === 'red' ? 'border-red-200 bg-red-50' : s === 'amber' ? 'border-amber-200 bg-amber-50' : 'border-blue-200 bg-blue-50'
+  const sevBadge = (s: Flag['severity']) =>
+    s === 'red' ? 'bg-red-100 text-red-700' : s === 'amber' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+  const sevLabel = (s: Flag['severity']) =>
+    s === 'red' ? '⚠ High' : s === 'amber' ? '△ Watch' : 'ℹ Info'
+
+  return (
+    <div className="mt-3">
+      {flags.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="text-4xl mb-3">✅</div>
+          <p className="text-sm font-semibold text-green-700">No flags detected</p>
+          <p className="text-xs text-gray-400 mt-1">All inputs are within expected benchmarks</p>
+        </div>
+      ) : (
+        <>
+          <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-xs font-semibold text-red-800">{flags.filter(f => f.severity === 'red').length} high-risk · {flags.filter(f => f.severity === 'amber').length} watch items</p>
+            <p className="text-[10px] text-red-600 mt-0.5">Figures below are based on OM inputs — verify each before proceeding</p>
+          </div>
+
+          <div className="space-y-3 mb-4">
+            {flags.map((flag, i) => (
+              <div key={i} className={`border rounded-lg p-3 ${sevColor(flag.severity)}`}>
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <p className="text-xs font-semibold text-gray-900 leading-snug flex-1">{flag.title}</p>
+                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${sevBadge(flag.severity)}`}>
+                    {sevLabel(flag.severity)}
+                  </span>
+                </div>
+                <p className="text-[10px] text-gray-600 leading-relaxed mb-2">{flag.detail}</p>
+                <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                  <div className="bg-white/70 rounded px-2 py-1">
+                    <div className="text-gray-400 mb-0.5">OM figure</div>
+                    <div className="font-semibold text-gray-700">{flag.omVal}</div>
+                  </div>
+                  <div className="bg-white/70 rounded px-2 py-1">
+                    <div className="text-gray-400 mb-0.5">Benchmark</div>
+                    <div className="font-semibold text-gray-700">{flag.benchmark}</div>
+                  </div>
+                </div>
+                {flag.noImpact && (
+                  <div className="mt-1.5 text-[10px] font-semibold text-red-700">
+                    NOI impact: {flag.noImpact}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="border border-gray-200 rounded-lg overflow-hidden mb-3">
+            <div className="bg-gray-800 px-3 py-2">
+              <p className="text-xs font-semibold text-white">Stressed scenario — benchmarks applied</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">Tax, insurance, R&M, reserves floored to age-adjusted benchmarks</p>
+            </div>
+            <div className="bg-gray-50 p-3 grid grid-cols-2 gap-2">
+              <div className="bg-white rounded p-2 text-center">
+                <div className="text-[10px] text-gray-500">Stressed NOI</div>
+                <div className="text-base font-semibold text-gray-900">{fmtDollar(ds.NOI)}</div>
+                <div className="text-[9px] text-red-600">{fmtDelta(ds.NOI - d.NOI)} vs OM</div>
+              </div>
+              <div className="bg-white rounded p-2 text-center">
+                <div className="text-[10px] text-gray-500">Stressed Cap Rate</div>
+                <div className="text-base font-semibold text-gray-900">{fmtPct(ds.cap)}</div>
+                <div className="text-[9px] text-red-600">{fmtDeltaPct(ds.cap - d.cap)} vs OM</div>
+              </div>
+              <div className="bg-white rounded p-2 text-center">
+                <div className="text-[10px] text-gray-500">Stressed DCR</div>
+                <div className={`text-base font-semibold ${ds.dcr < 1.2 ? 'text-red-600' : 'text-green-700'}`}>{fmtX(ds.dcr)}</div>
+                <div className="text-[9px] text-red-600">{((ds.dcr - d.dcr) >= 0 ? '+' : '') + (ds.dcr - d.dcr).toFixed(2)}× vs OM</div>
+              </div>
+              <div className="bg-white rounded p-2 text-center">
+                <div className="text-[10px] text-gray-500">Stressed CoC</div>
+                <div className="text-base font-semibold text-gray-900">{fmtPct(ds.coc)}</div>
+                <div className="text-[9px] text-red-600">{fmtDeltaPct(ds.coc - d.coc)} vs OM</div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 interface ModelProps {
   initialInputs?: Partial<ModelInputs>
   initialMethod?: Method
@@ -206,14 +413,16 @@ export function ModelCalculator({
     costSeg: (initialInputs as any)?.costSeg ?? 23,
     is1031: (initialInputs as any)?.is1031 ?? false,
     basis1031: (initialInputs as any)?.basis1031 ?? 0,
+    equity1031: (initialInputs as any)?.equity1031 ?? 0,
     otherIncome: (initialInputs as any)?.otherIncome ?? [],
     otherExpenses: (initialInputs as any)?.otherExpenses ?? [],
   })
   const [method, setMethod] = useState<Method>(initialMethod)
   const [name, setName] = useState(scenarioName)
-  const [activeTab, setActiveTab] = useState<'inputs'|'pl'|'tax'|'om'|'compare'>('inputs')
+  const [activeTab, setActiveTab] = useState<'inputs'|'pl'|'tax'|'om'|'flags'|'compare'>('inputs')
   const [omLocked, setOmLocked] = useState(true)
   const [omSnapshot, setOmSnapshot] = useState<ModelInputs | null>(null)
+  const [targetCap, setTargetCap] = useState<number>(0)
 
   // Compare tab: which two scenarios to diff
   const [compareA, setCompareA] = useState<string>(currentScenarioId ?? 'current')
@@ -252,8 +461,10 @@ export function ModelCalculator({
     return { badge: 'changed', badgeColor: 'amber' as const }
   }
 
+  // Auto-derive method from inputs — ou < tu means physical occupancy
+  const effectiveMethod = (inputs.ou > 0 && inputs.ou < inputs.tu) ? 'physical' : 'om'
   // Current scenario outputs
-  const d   = calculate(inputs, method === 'om')
+  const d   = calculate(inputs, effectiveMethod === 'om')
 
   // OM tab always uses the is_default scenario inputs, forced to OM method
   const omInputs = omScenario ? omScenario.inputs : inputs
@@ -261,10 +472,12 @@ export function ModelCalculator({
 
   // Resolve scenario inputs for compare
   const resolveInputs = (sid: string): { inputs: ModelInputs; method: Method; label: string } => {
-    if (sid === 'current') return { inputs, method: initialMethod, label: name }
+    if (sid === 'current') return { inputs, method: effectiveMethod, label: name }
     const s = siblings.find(x => x.id === sid)
-    if (!s) return { inputs, method, label: name }
-    return { inputs: s.inputs, method: s.method as Method, label: s.name }
+    if (!s) return { inputs, method: effectiveMethod, label: name }
+    const sIsOM = s.is_default === true
+    const sEffective = sIsOM ? 'om' : (s.inputs.ou > 0 && s.inputs.ou < s.inputs.tu) ? 'physical' : 'om'
+    return { inputs: s.inputs, method: sEffective as Method, label: s.name }
   }
 
   const compA = resolveInputs(compareA)
@@ -292,15 +505,26 @@ export function ModelCalculator({
     : { type: 'green' as const, msg: `DCR OK: ${fmtX(d.dcr)} — Clears 1.20× minimum. Cushion: ${fmtDollar(d.NOI - d.ds)}/yr.` }
 
   const handleSave = async () => { if (onSave) await onSave(name, method, inputs) }
-  const handlePDF = () => generatePDF(
-    inputs,
-    method,
-    propertyName,
-    propertyAddress,
-    propertyUnits ?? inputs.tu,
-    propertyYearBuilt ?? 0,
-    name,
-  )
+  const handlePDF = () => {
+    // Build cols in Compare tab order: A, B, then any extra C/D cols
+    const compareOrder = [compareA, compareB, ...compareCols]
+    const cols = compareOrder
+      .map(sid => {
+        const r = resolveInputs(sid)
+        return { label: r.label, inputs: r.inputs, method: r.method as Method }
+      })
+      .filter((col, i, arr) => arr.findIndex(c => c.label === col.label) === i) // dedupe
+    generatePDF(
+      inputs,
+      effectiveMethod,
+      propertyName,
+      propertyAddress,
+      propertyUnits ?? inputs.tu,
+      propertyYearBuilt ?? 0,
+      name,
+      cols,
+    )
+  }
   const handleScenarioSwitch = (sid: string) => {
     const s = siblings.find(x => x.id === sid)
     if (s) window.location.href = `/scenario/${s.id}`
@@ -330,8 +554,9 @@ export function ModelCalculator({
     ]
   }
 
-  const tabs: { id: typeof activeTab; label: string }[] = [
+  const tabs: { id: typeof activeTab; label: string; dot?: boolean }[] = [
     { id: 'om',      label: 'OM'       },
+    { id: 'flags',   label: 'Flags',   dot: computeFlags(inputs, d, propertyYearBuilt).some(f => f.severity === 'red') },
     { id: 'inputs',  label: 'Inputs'   },
     { id: 'pl',      label: 'P&L'      },
     { id: 'tax',     label: 'Tax'      },
@@ -373,13 +598,16 @@ export function ModelCalculator({
       <div className="flex border-b border-gray-100 bg-gray-50">
         {tabs.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 py-2.5 text-xs font-medium transition-colors
+            className={`flex-1 py-2.5 text-xs font-medium transition-colors relative
               ${activeTab === tab.id
                 ? tab.id === 'om'
                   ? 'text-blue-700 border-b-2 border-blue-600 bg-blue-50'
+                  : tab.id === 'flags'
+                  ? 'text-red-700 border-b-2 border-red-500 bg-red-50'
                   : 'text-navy border-b-2 border-navy bg-white'
                 : 'text-gray-400 hover:text-gray-600'}`}>
             {tab.label}
+            {tab.dot && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full" />}
           </button>
         ))}
       </div>
@@ -418,7 +646,7 @@ export function ModelCalculator({
               <InputField label="Total units" type="number" value={inputs.tu} min={1} max={100} step={1}
                 badge="OM" onChange={e => set('tu', +e.target.value)} />
               <InputField label="Units occupied" type="number" value={inputs.ou} min={0} max={inputs.tu} step={1}
-                badge="OM" disabled={method === 'om'} onChange={e => set('ou', +e.target.value)} />
+                badge="OM" onChange={e => set('ou', +e.target.value)} />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <InputField label="Avg rent / unit / mo ($)" type="number" value={inputs.rent} min={500} step={25}
@@ -539,9 +767,10 @@ export function ModelCalculator({
               <InputField label="Cost seg % (5/7/15yr)" type="number" value={inputs.costSeg} step={1}
                 badgeColor="amber" badge="estimated" onChange={e => set('costSeg', +e.target.value)} />
             </div>
+            {omScenario?.id !== currentScenarioId && (
             <div className="mt-3 flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-100">
               <div>
-                <p className="text-xs font-medium text-gray-700">1031 Exchange</p>
+                <p className="text-xs font-medium text-gray-700">1031 Exchange — buyer tax structuring</p>
                 <p className="text-[10px] text-gray-400">Use carryover basis for depreciation</p>
               </div>
               <button
@@ -554,12 +783,15 @@ export function ModelCalculator({
                 </div>
               </button>
             </div>
-            {inputs.is1031 && (
-              <div className="mt-2">
-                <InputField label="Carryover adjusted basis ($)" type="number" value={inputs.basis1031} step={10000}
-                  badgeColor="amber" badge="verify w/ CPA" onChange={e => set('basis1031', +e.target.value)} />
-                <p className="text-[10px] text-amber-700 mt-1 px-1">
-                  ⚠ Bonus dep applies to carryover basis, NOT purchase price. Verify with CPA.
+            )}
+            {omScenario?.id !== currentScenarioId && inputs.is1031 && (
+              <div className="mt-2 space-y-2">
+                <InputField label="1031 equity rolling in ($)" type="number" value={inputs.equity1031} step={10000}
+                  badgeColor="amber" badge="from relinquished sale" onChange={e => set('equity1031', +e.target.value)} />
+                <InputField label="Est. carryover adjusted basis ($)" type="number" value={inputs.basis1031} step={10000} min={0}
+                  badgeColor="amber" badge="verify w/ CPA" onChange={e => set('basis1031', Math.max(0, +e.target.value))} />
+                <p className="text-[10px] text-amber-700 px-1">
+                  ⚠ Carryover basis determines bonus dep — NOT purchase price. Equity rolling in reduces cash to close. Verify both with CPA.
                 </p>
               </div>
             )}
@@ -589,7 +821,7 @@ export function ModelCalculator({
               <MetricCard label="Loan amount" value={fmtDollar(d.loan)} sub={`${d.lev.toFixed(0)}% LTV`} />
               <MetricCard label="Annual debt service" value={fmtDollar(d.ds)} sub={`${fmtDollar(d.mp)}/mo`} />
               <MetricCard label="Equity required" value={fmtDollar(d.eq)} sub="down + lender fee" />
-              <MetricCard label="Cash to close" value={fmtDollar(d.eq + d.ccAmt)} sub={inputs.cc > 0 ? `incl. ${inputs.cc}% closing costs` : "closing costs not set"} />
+              <MetricCard label="Cash to close" value={fmtDollar(Math.max(0, d.eq + d.ccAmt - (inputs.equity1031 ?? 0)))} sub={inputs.is1031 && inputs.equity1031 > 0 ? `after $${Math.round(inputs.equity1031).toLocaleString()} 1031 equity` : inputs.cc > 0 ? `incl. ${inputs.cc}% closing costs` : "closing costs not set"} valueColor={inputs.equity1031 > d.eq + d.ccAmt ? "text-amber-600" : undefined} />
             </div>
             <SectionHeader title="Income & expense statement" />
             <div className="border border-gray-100 rounded-lg p-3 mb-3">
@@ -625,6 +857,85 @@ export function ModelCalculator({
               <strong>Prepayment penalty (3/2/1)</strong><br />
               Yr 1: {fmtDollar(d.loan * 0.03)} · Yr 2: {fmtDollar(d.loan * 0.02)} · Yr 3: {fmtDollar(d.loan * 0.01)}
             </div>
+
+            {/* Offer calculator */}
+            {omScenario?.id !== currentScenarioId && d.NOI > 0 && (() => {
+              const offerPrice = targetCap > 0 ? d.NOI / (targetCap / 100) : 0
+              const delta = offerPrice - inputs.price
+              const deltaPct = inputs.price > 0 ? (delta / inputs.price) * 100 : 0
+              const offerLoan = offerPrice * inputs.lev / 100
+              const offerDown = offerPrice - offerLoan
+              const offerDS = (() => {
+                const r = inputs.ir / 100 / 12
+                const n = inputs.am * 12
+                if (r === 0 || n === 0) return 0
+                const mp = (offerLoan * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1)
+                return mp * 12
+              })()
+              const offerDCR = offerDS > 0 ? d.NOI / offerDS : 0
+              return (
+                <div className="mt-3 border border-green-200 rounded-lg overflow-hidden">
+                  <div className="bg-green-800 px-3 py-2 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-white">Offer calculator</p>
+                      <p className="text-[10px] text-green-300 mt-0.5">Enter target cap rate → get implied offer price</p>
+                    </div>
+                  </div>
+                  <div className="bg-green-50 px-3 pt-3 pb-2">
+                    <div className="flex items-center gap-2 mb-3">
+                      <label className="text-xs text-gray-600 whitespace-nowrap">Target cap rate</label>
+                      <div className="relative flex-1">
+                        <input
+                          type="number" step={0.01} min={0} max={20}
+                          value={targetCap || ''}
+                          placeholder="e.g. 6.5"
+                          onChange={e => setTargetCap(+e.target.value)}
+                          className="w-full text-sm font-semibold border border-green-300 rounded-lg px-3 py-1.5 pr-7 focus:outline-none focus:border-green-500 bg-white"
+                        />
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
+                      </div>
+                    </div>
+                    {targetCap > 0 && offerPrice > 0 ? (
+                      <>
+                        <div className="grid grid-cols-2 gap-2 mb-2">
+                          <div className="bg-white rounded-lg p-2.5 border border-green-200">
+                            <div className="text-[10px] text-gray-500 mb-0.5">Implied offer price</div>
+                            <div className="text-lg font-bold text-green-800">{fmtDollar(offerPrice)}</div>
+                            <div className={`text-[10px] font-semibold mt-0.5 ${delta < 0 ? 'text-green-700' : 'text-red-600'}`}>
+                              {delta < 0 ? '▼' : '▲'} {fmtDollar(Math.abs(delta))} ({Math.abs(deltaPct).toFixed(1)}%) vs. asking
+                            </div>
+                          </div>
+                          <div className="bg-white rounded-lg p-2.5 border border-green-200">
+                            <div className="text-[10px] text-gray-500 mb-0.5">Price / unit</div>
+                            <div className="text-lg font-bold text-gray-800">{inputs.tu > 0 ? fmtDollar(offerPrice / inputs.tu) : '—'}</div>
+                            <div className="text-[10px] text-gray-400 mt-0.5">asking: {inputs.tu > 0 ? fmtDollar(inputs.price / inputs.tu) : '—'}/unit</div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          <div className="bg-white rounded-lg p-2 text-center border border-green-200">
+                            <div className="text-[9px] text-gray-500">Down payment</div>
+                            <div className="text-xs font-semibold text-gray-800">{fmtDollar(offerDown)}</div>
+                            <div className="text-[9px] text-gray-400">{inputs.lev.toFixed(0)}% LTV</div>
+                          </div>
+                          <div className="bg-white rounded-lg p-2 text-center border border-green-200">
+                            <div className="text-[9px] text-gray-500">Loan amount</div>
+                            <div className="text-xs font-semibold text-gray-800">{fmtDollar(offerLoan)}</div>
+                            <div className="text-[9px] text-gray-400">{inputs.ir}% / {inputs.am}yr</div>
+                          </div>
+                          <div className="bg-white rounded-lg p-2 text-center border border-green-200">
+                            <div className="text-[9px] text-gray-500">DCR at offer</div>
+                            <div className={`text-xs font-semibold ${offerDCR < 1 ? 'text-red-600' : offerDCR < 1.2 ? 'text-amber-600' : 'text-green-700'}`}>{fmtX(offerDCR)}</div>
+                            <div className="text-[9px] text-gray-400">min 1.20×</div>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-[10px] text-gray-400 text-center py-2">Enter a target cap rate above to see your implied offer price</p>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         )}
 
@@ -726,7 +1037,7 @@ export function ModelCalculator({
               <MetricCard label="Loan amount" value={fmtDollar(omTabD.loan)} sub={`${omTabD.lev.toFixed(0)}% LTV`} />
               <MetricCard label="Annual debt service" value={fmtDollar(omTabD.ds)} sub={`${fmtDollar(omTabD.mp)}/mo`} />
               <MetricCard label="Equity required" value={fmtDollar(omTabD.eq)} sub="down + lender fee" />
-              <MetricCard label="Cash to close" value={fmtDollar(omTabD.eq + omTabD.ccAmt)} sub={omInputs.cc > 0 ? `incl. ${omInputs.cc}% closing costs` : "closing costs not set"} />
+              <MetricCard label="Cash to close" value={fmtDollar(Math.max(0, omTabD.eq + omTabD.ccAmt - (omInputs.equity1031 ?? 0)))} sub={omInputs.is1031 && (omInputs.equity1031 ?? 0) > 0 ? `after $${Math.round(omInputs.equity1031).toLocaleString()} 1031 equity` : omInputs.cc > 0 ? `incl. ${omInputs.cc}% closing costs` : "closing costs not set"} />
             </div>
             <SectionHeader title="OM income & expense statement" />
             <div className="border border-blue-100 rounded-lg p-3 mb-3 bg-blue-50/30">
@@ -772,6 +1083,11 @@ export function ModelCalculator({
               ))}
             </div>
           </div>
+        )}
+
+        {/* ── FLAGS TAB ────────────────────────────────────────────── */}
+        {activeTab === 'flags' && (
+          <FlagsTab inputs={inputs} d={d} propertyYearBuilt={propertyYearBuilt} />
         )}
 
         {/* ── COMPARE TAB ───────────────────────────────────────────────── */}

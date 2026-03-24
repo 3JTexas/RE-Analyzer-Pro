@@ -12,7 +12,7 @@ export function AppShell() {
   ]
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 max-w-md mx-auto relative shadow-xl">
+    <div className="flex flex-col h-screen bg-gray-50 max-w-3xl mx-auto relative shadow-xl">
 
       {/* Top bar */}
       <header className="flex items-center justify-between px-4 py-3 bg-navy text-white flex-shrink-0">

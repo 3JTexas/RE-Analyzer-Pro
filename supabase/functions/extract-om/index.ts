@@ -56,6 +56,7 @@ Extract these exact fields (use null if not found):
   "ga": number (general and administrative annual total),
   "res": number (reserves per unit per year),
   "pm": number (property management percentage of EGI),
+  "yearBuilt": number (year the property was built, e.g. 1935. Look in property details or site description section),
   "otherIncome": array of objects with "label" (string) and "amount" (number, annual dollars) for each additional income line item the seller lists beyond base rent (e.g. laundry income, parking income, storage income, RUBS, pet fees). Return empty array [] if none found.
 }
 

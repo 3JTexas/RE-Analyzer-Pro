@@ -18,7 +18,8 @@ export function PropertiesPage() {
     // Create property first
     const prop = await createProperty(
       meta.propertyName || 'New Property',
-      meta.propertyAddress || undefined
+      meta.propertyAddress || undefined,
+      meta.propertyYearBuilt || undefined
     )
     if (!prop) return
     // Then create OM scenario

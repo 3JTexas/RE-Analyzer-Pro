@@ -99,6 +99,12 @@ function PLRowComp({ label, value, variant = 'normal', indent = false }:
 }
 
 // ── PDF Document ──────────────────────────────────────────────────────────
+interface ScenarioCol {
+  label: string
+  inputs: ModelInputs
+  method: Method
+}
+
 interface ReportProps {
   inputs: ModelInputs
   method: Method
@@ -107,18 +113,20 @@ interface ReportProps {
   units: number
   yearBuilt: number
   scenarioName: string
+  scenarioCols?: ScenarioCol[]
 }
 
-function ReportDocument({ inputs, method, propertyName, address, units, yearBuilt, scenarioName }: ReportProps) {
+function ReportDocument({ inputs, method, propertyName, address, units, yearBuilt, scenarioName, scenarioCols = [] }: ReportProps) {
   const isOM = method === 'om'
   const d    = calculate(inputs, isOM)
-  const dom  = calculate(inputs, true)
-  const dph  = calculate(inputs, false)
   const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
   const methodLabel = isOM ? 'OM Method' : 'Physical Occupancy'
   const dcrColor = d.dcr < 1 ? '#A32D2D' : d.dcr < 1.2 ? '#854F0B' : '#1D6B3E'
 
   const safeName = (propertyName || 'Investment Property').trim()
+  
+  // Build scenario columns for side-by-side — current scenario + siblings
+  const allCols: ScenarioCol[] = scenarioCols.length > 0 ? scenarioCols : [{ label: scenarioName, inputs, method }]
 
   return (
     <Document title={`${propertyName} — ${scenarioName} — Investment Analysis`}>
@@ -267,44 +275,64 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
         </View>
       </Page>
 
-      {/* ── Side by side ───────────────────────────────────────────────── */}
+      {/* ── Side by side: actual scenarios ──────────────────────────────── */}
+      {allCols.length > 1 && (
       <Page size="LETTER" style={s.page}>
         <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} />
-        <SectionHdr title="Side-by-side: OM method vs physical occupancy" />
+        <SectionHdr title="Side-by-side: scenario comparison" />
         <View style={s.table}>
           <View style={s.tableHdrRow}>
             <Text style={[s.tableHdrCell, { flex: 2.5 }]}>Line item</Text>
-            <Text style={[s.tableHdrCell, { color: '#A8C4E0', textAlign: 'right' }]}>OM method</Text>
-            <Text style={[s.tableHdrCell, { color: '#F4C87A', textAlign: 'right' }]}>Physical occ.</Text>
-            <Text style={[s.tableHdrCell, { textAlign: 'right' }]}>Delta</Text>
+            {allCols.map((col, i) => (
+              <Text key={i} style={[s.tableHdrCell, { 
+                color: i === 0 ? '#A8C4E0' : i === 1 ? '#F4C87A' : i === 2 ? '#90EE90' : '#DDA0DD',
+                textAlign: 'right', flex: 1 }]}>
+                {col.label}
+              </Text>
+            ))}
+            {allCols.length > 1 && <Text style={[s.tableHdrCell, { textAlign: 'right', flex: 0.8 }]}>vs A</Text>}
           </View>
-          {[
-            { label: 'Gross scheduled / potential rent', om: fmtDollar(dom.GSR), ph: fmtDollar(dph.GSR), d: dph.GSR - dom.GSR },
-            { label: '  Less: vacancy deduction', om: `(${fmtDollar(dom.vac)})`, ph: `(${fmtDollar(dph.vac)})`, d: dom.vac - dph.vac },
-            { label: '  Collected rental income', om: fmtDollar(dom.col), ph: fmtDollar(dph.col), d: dph.col - dom.col },
-            { label: 'Effective gross income', om: fmtDollar(dom.EGI), ph: fmtDollar(dph.EGI), d: dph.EGI - dom.EGI, bold: true },
-            { label: 'Total expenses', om: `(${fmtDollar(dom.exp)})`, ph: `(${fmtDollar(dph.exp)})`, d: dom.exp - dph.exp },
-            { label: 'NOI', om: fmtDollar(dom.NOI), ph: fmtDollar(dph.NOI), d: dph.NOI - dom.NOI, bold: true },
-            { label: 'Pre-tax cash flow', om: fmtNeg(dom.CF), ph: fmtNeg(dph.CF), d: dph.CF - dom.CF },
-            { label: 'After-tax cash flow', om: fmtNeg(dom.at), ph: fmtNeg(dph.at), d: dph.at - dom.at },
-            { label: 'Year 1 total ROE', om: fmtPct(dom.r1), ph: fmtPct(dph.r1), dStr: fmtDeltaPct(dph.r1 - dom.r1), d: dph.r1 - dom.r1 },
-          ].map((row, i) => (
-            <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
-              <Text style={[s.tableCell, { flex: 2.5,
-                fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica',
-                paddingLeft: row.label.startsWith('  ') ? 16 : 6,
-                color: row.label.startsWith('  ') ? '#5F5E5A' : '#111' }]}>
-                {row.label.trim()}
-              </Text>
-              <Text style={[s.tableCellR, { color: '#185FA5' }]}>{row.om}</Text>
-              <Text style={[s.tableCellR, { color: '#854F0B' }]}>{row.ph}</Text>
-              <Text style={[s.tableCellR, {
-                color: row.d > 50 ? '#1D6B3E' : row.d < -50 ? '#A32D2D' : '#888',
-                fontFamily: 'Helvetica-Bold' }]}>
-                {'dStr' in row ? row.dStr : fmtDelta(row.d)}
-              </Text>
-            </View>
-          ))}
+          {(() => {
+            const calcs = allCols.map(col => calculate(col.inputs, col.method === 'om'))
+            const base = calcs[0]
+            const rows = [
+              { label: 'Gross potential rent', get: (d: typeof base) => fmtDollar(d.GSR), delta: (d: typeof base) => d.GSR - base.GSR },
+              { label: '  Less: vacancy', get: (d: typeof base) => `(${fmtDollar(d.vac)})`, delta: (d: typeof base) => base.vac - d.vac },
+              { label: '  Collected rental income', get: (d: typeof base) => fmtDollar(d.col), delta: (d: typeof base) => d.col - base.col },
+              { label: 'Effective gross income', get: (d: typeof base) => fmtDollar(d.EGI), delta: (d: typeof base) => d.EGI - base.EGI, bold: true },
+              { label: 'Total expenses', get: (d: typeof base) => `(${fmtDollar(d.exp)})`, delta: (d: typeof base) => base.exp - d.exp },
+              { label: 'NOI', get: (d: typeof base) => fmtDollar(d.NOI), delta: (d: typeof base) => d.NOI - base.NOI, bold: true },
+              { label: 'Annual debt service', get: (d: typeof base) => `(${fmtDollar(d.ds)})`, delta: () => 0, noD: true },
+              { label: 'Pre-tax cash flow', get: (d: typeof base) => fmtNeg(d.CF), delta: (d: typeof base) => d.CF - base.CF },
+              { label: 'After-tax cash flow', get: (d: typeof base) => fmtNeg(d.at), delta: (d: typeof base) => d.at - base.at },
+              { label: 'Cap rate', get: (d: typeof base) => fmtPct(d.cap), delta: (d: typeof base) => d.cap - base.cap, pct: true },
+              { label: 'DCR', get: (d: typeof base) => fmtX(d.dcr), delta: (d: typeof base) => d.dcr - base.dcr, x: true },
+              { label: 'Y1 total ROE', get: (d: typeof base) => fmtPct(d.r1), delta: (d: typeof base) => d.r1 - base.r1, pct: true, bold: true },
+            ]
+            return rows.map((row, i) => (
+              <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
+                <Text style={[s.tableCell, { flex: 2.5,
+                  fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica',
+                  paddingLeft: row.label.startsWith('  ') ? 16 : 6,
+                  color: row.label.startsWith('  ') ? '#5F5E5A' : '#111' }]}>
+                  {row.label.trim()}
+                </Text>
+                {calcs.map((calc, ci) => (
+                  <Text key={ci} style={[s.tableCellR, { flex: 1,
+                    color: ci === 0 ? '#185FA5' : ci === 1 ? '#854F0B' : ci === 2 ? '#1D6B3E' : '#6B21A8' }]}>
+                    {row.get(calc)}
+                  </Text>
+                ))}
+                {allCols.length > 1 && (
+                  <Text style={[s.tableCellR, { flex: 0.8,
+                    color: row.noD ? '#888' : row.delta(calcs[calcs.length-1]) > 50 ? '#1D6B3E' : row.delta(calcs[calcs.length-1]) < -50 ? '#A32D2D' : '#888',
+                    fontFamily: 'Helvetica-Bold' }]}>
+                    {row.noD ? '—' : row.pct ? fmtDeltaPct(row.delta(calcs[calcs.length-1])) : row.x ? ((row.delta(calcs[calcs.length-1]) >= 0 ? '+' : '') + row.delta(calcs[calcs.length-1]).toFixed(2) + '×') : fmtDelta(row.delta(calcs[calcs.length-1]))}
+                  </Text>
+                )}
+              </View>
+            ))
+          })()}
         </View>
 
         <Text style={s.disclaimer}>
@@ -314,6 +342,7 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
           Property tax estimate reflects post-sale Florida reassessment — verify with county Property Appraiser.
         </Text>
       </Page>
+      )}
 
     </Document>
   )
@@ -327,7 +356,8 @@ export async function generatePDF(
   address: string,
   units: number,
   yearBuilt: number,
-  scenarioName: string
+  scenarioName: string,
+  scenarioCols?: ScenarioCol[]
 ): Promise<void> {
   const blob = await pdf(
     <ReportDocument
@@ -338,6 +368,7 @@ export async function generatePDF(
       units={units}
       yearBuilt={yearBuilt}
       scenarioName={scenarioName}
+      scenarioCols={scenarioCols}
     />
   ).toBlob()
   const url = URL.createObjectURL(blob)
