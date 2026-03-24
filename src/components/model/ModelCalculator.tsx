@@ -1041,9 +1041,20 @@ export function ModelCalculator({
 
             {/* Offer calculator */}
             {omScenario?.id !== currentScenarioId && d.NOI > 0 && (() => {
-              const offerPrice = targetCap > 0 ? d.NOI / (targetCap / 100) : 0
-              const delta = offerPrice - inputs.price
-              const deltaPct = inputs.price > 0 ? (delta / inputs.price) * 100 : 0
+              const mode = inputs.offerCalcMode ?? 'cap'
+              const setMode = (m: 'cap' | 'price') => setInputs(prev => ({ ...prev, offerCalcMode: m }))
+              const targetPrice = inputs.targetOfferPrice ?? 0
+              const setTargetPrice = (v: number) => setInputs(prev => ({ ...prev, targetOfferPrice: v }))
+
+              // Compute offer price and implied cap based on mode
+              const offerPrice = mode === 'cap'
+                ? (targetCap > 0 ? d.NOI / (targetCap / 100) : 0)
+                : targetPrice
+              const impliedCap = mode === 'price' && targetPrice > 0
+                ? (d.NOI / targetPrice) * 100 : 0
+              const hasResult = offerPrice > 0
+
+              // Financing at offer price
               const offerLoan = offerPrice * inputs.lev / 100
               const offerDown = offerPrice - offerLoan
               const offerDS = (() => {
@@ -1054,64 +1065,95 @@ export function ModelCalculator({
                 return mp * 12
               })()
               const offerDCR = offerDS > 0 ? d.NOI / offerDS : 0
+              const delta = offerPrice - inputs.price
+              const deltaPct = inputs.price > 0 ? (delta / inputs.price) * 100 : 0
+
               return (
                 <div className="mt-3 border border-green-200 rounded-lg overflow-hidden">
                   <div className="bg-green-800 px-3 py-2 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-semibold text-white">Offer calculator</p>
-                      <p className="text-[10px] text-green-300 mt-0.5">Enter target cap rate → get implied offer price</p>
+                    <p className="text-xs font-semibold text-white">Offer calculator</p>
+                    <div className="flex bg-green-900/50 rounded-md overflow-hidden">
+                      <button onClick={() => setMode('cap')}
+                        className={`text-[9px] font-medium px-2.5 py-1 transition-colors ${mode === 'cap' ? 'bg-white/20 text-white' : 'text-green-400 hover:text-white'}`}>
+                        Target cap rate
+                      </button>
+                      <button onClick={() => setMode('price')}
+                        className={`text-[9px] font-medium px-2.5 py-1 transition-colors ${mode === 'price' ? 'bg-white/20 text-white' : 'text-green-400 hover:text-white'}`}>
+                        Target price
+                      </button>
                     </div>
                   </div>
                   <div className="bg-green-50 px-3 pt-3 pb-2">
-                    <div className="flex items-center gap-2 mb-3">
-                      <label className="text-xs text-gray-600 whitespace-nowrap">Target cap rate</label>
-                      <div className="relative flex-1">
-                        <input
-                          type="number" step={0.01} min={0} max={20}
-                          value={targetCap || ''}
-                          placeholder="e.g. 6.5"
-                          onChange={e => setTargetCap(+e.target.value)}
-                          className="w-full text-sm font-semibold border border-green-300 rounded-lg px-3 py-1.5 pr-7 focus:outline-none focus:border-green-500 bg-white"
-                        />
-                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
+                    {mode === 'cap' ? (
+                      <div className="flex items-center gap-2 mb-3">
+                        <label className="text-xs text-gray-600 whitespace-nowrap">Target cap rate</label>
+                        <div className="relative flex-1">
+                          <input type="number" step={0.01} min={0} max={20}
+                            value={targetCap || ''} placeholder="e.g. 6.5"
+                            onChange={e => setTargetCap(+e.target.value)}
+                            className="w-full text-sm font-semibold border border-green-300 rounded-lg px-3 py-1.5 pr-7 focus:outline-none focus:border-green-500 bg-white" />
+                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
+                        </div>
                       </div>
-                    </div>
-                    {targetCap > 0 && offerPrice > 0 ? (
+                    ) : (
+                      <div className="flex items-center gap-2 mb-3">
+                        <label className="text-xs text-gray-600 whitespace-nowrap">Target price</label>
+                        <div className="relative flex-1">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
+                          <input type="text" inputMode="decimal"
+                            value={targetPrice ? targetPrice.toLocaleString('en-US') : ''} placeholder="e.g. 1,800,000"
+                            onFocus={e => { e.target.value = targetPrice ? String(targetPrice) : ''; e.target.select() }}
+                            onBlur={e => { const v = parseFloat(e.target.value.replace(/,/g, '')) || 0; setTargetPrice(v) }}
+                            onChange={e => { const v = parseFloat(e.target.value.replace(/,/g, '')) || 0; setTargetPrice(v) }}
+                            className="w-full text-sm font-semibold border border-green-300 rounded-lg pl-6 pr-3 py-1.5 focus:outline-none focus:border-green-500 bg-white" />
+                        </div>
+                      </div>
+                    )}
+                    {hasResult ? (
                       <>
                         <div className="grid grid-cols-2 gap-2 mb-2">
                           <div className="bg-white rounded-lg p-2.5 border border-green-200">
-                            <div className="text-[10px] text-gray-500 mb-0.5">Implied offer price</div>
+                            <div className="text-[10px] text-gray-500 mb-0.5">{mode === 'cap' ? 'Implied offer price' : 'Offer price'}</div>
                             <div className="text-lg font-bold text-green-800">{fmtDollar(offerPrice)}</div>
                             <div className={`text-[10px] font-semibold mt-0.5 ${delta < 0 ? 'text-green-700' : 'text-red-600'}`}>
                               {delta < 0 ? '▼' : '▲'} {fmtDollar(Math.abs(delta))} ({Math.abs(deltaPct).toFixed(1)}%) vs. asking
                             </div>
                           </div>
                           <div className="bg-white rounded-lg p-2.5 border border-green-200">
-                            <div className="text-[10px] text-gray-500 mb-0.5">Price / unit</div>
-                            <div className="text-lg font-bold text-gray-800">{inputs.tu > 0 ? fmtDollar(offerPrice / inputs.tu) : '—'}</div>
-                            <div className="text-[10px] text-gray-400 mt-0.5">asking: {inputs.tu > 0 ? fmtDollar(inputs.price / inputs.tu) : '—'}/unit</div>
+                            <div className="text-[10px] text-gray-500 mb-0.5">{mode === 'cap' ? 'Target cap rate' : 'Implied cap rate'}</div>
+                            <div className="text-lg font-bold text-gray-800">{mode === 'cap' ? `${targetCap.toFixed(2)}%` : `${impliedCap.toFixed(2)}%`}</div>
+                            <div className="text-[10px] text-gray-400 mt-0.5">asking cap: {fmtPct(d.cap)}</div>
                           </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-1.5">
+                        <div className="grid grid-cols-2 gap-2 mb-2">
+                          <div className="bg-white rounded-lg p-2.5 border border-green-200">
+                            <div className="text-[10px] text-gray-500 mb-0.5">Price / unit</div>
+                            <div className="text-base font-bold text-gray-800">{inputs.tu > 0 ? fmtDollar(offerPrice / inputs.tu) : '—'}</div>
+                            <div className="text-[10px] text-gray-400 mt-0.5">asking: {inputs.tu > 0 ? fmtDollar(inputs.price / inputs.tu) : '—'}/unit</div>
+                          </div>
+                          <div className={`bg-white rounded-lg p-2.5 border border-green-200`}>
+                            <div className="text-[9px] text-gray-500">DCR at offer</div>
+                            <div className={`text-base font-bold ${offerDCR < 1 ? 'text-red-600' : offerDCR < 1.2 ? 'text-amber-600' : 'text-green-700'}`}>{fmtX(offerDCR)}</div>
+                            <div className="text-[9px] text-gray-400">min 1.20×</div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5">
                           <div className="bg-white rounded-lg p-2 text-center border border-green-200">
                             <div className="text-[9px] text-gray-500">Down payment</div>
                             <div className="text-xs font-semibold text-gray-800">{fmtDollar(offerDown)}</div>
-                            <div className="text-[9px] text-gray-400">{inputs.lev.toFixed(0)}% LTV</div>
+                            <div className="text-[9px] text-gray-400">{(100 - inputs.lev).toFixed(0)}% equity</div>
                           </div>
                           <div className="bg-white rounded-lg p-2 text-center border border-green-200">
                             <div className="text-[9px] text-gray-500">Loan amount</div>
                             <div className="text-xs font-semibold text-gray-800">{fmtDollar(offerLoan)}</div>
                             <div className="text-[9px] text-gray-400">{inputs.ir}% / {inputs.am}yr</div>
                           </div>
-                          <div className="bg-white rounded-lg p-2 text-center border border-green-200">
-                            <div className="text-[9px] text-gray-500">DCR at offer</div>
-                            <div className={`text-xs font-semibold ${offerDCR < 1 ? 'text-red-600' : offerDCR < 1.2 ? 'text-amber-600' : 'text-green-700'}`}>{fmtX(offerDCR)}</div>
-                            <div className="text-[9px] text-gray-400">min 1.20×</div>
-                          </div>
                         </div>
                       </>
                     ) : (
-                      <p className="text-[10px] text-gray-400 text-center py-2">Enter a target cap rate above to see your implied offer price</p>
+                      <p className="text-[10px] text-gray-400 text-center py-2">
+                        {mode === 'cap' ? 'Enter a target cap rate to see implied offer price' : 'Enter a target price to see implied cap rate'}
+                      </p>
                     )}
                   </div>
                 </div>

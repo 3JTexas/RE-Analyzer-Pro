@@ -33,6 +33,8 @@ export interface ModelInputs {
   basis1031: number // carryover adjusted basis $ (used when is1031 = true)
   equity1031: number // 1031 equity rolling in $ (reduces cash to close)
   targetCapRate?: number // offer calculator target cap rate %
+  targetOfferPrice?: number // offer calculator target price $
+  offerCalcMode?: 'cap' | 'price' // which offer calculator mode is active
 }
 
 // ── Computed outputs ──────────────────────────────────────────────────────
