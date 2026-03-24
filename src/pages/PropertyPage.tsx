@@ -66,10 +66,12 @@ export function PropertyPage() {
     try {
       const ext = file.name.split('.').pop() ?? 'jpg'
       const path = `${id}.${ext}`
-      const { error } = await supabase.storage.from('property-images').upload(path, file, { upsert: true })
-      if (error) throw error
+      const { error: uploadErr } = await supabase.storage.from('property-images').upload(path, file, { upsert: true })
+      if (uploadErr) throw uploadErr
       const { data } = supabase.storage.from('property-images').getPublicUrl(path)
-      await supabase.from('properties').update({ property_image_url: data.publicUrl }).eq('id', id)
+      console.log('[Photo] Storage upload OK — public URL:', data.publicUrl)
+      const { error: dbErr } = await supabase.from('properties').update({ property_image_url: data.publicUrl }).eq('id', id)
+      console.log('[Photo] DB update result:', dbErr ? `ERROR: ${dbErr.message}` : 'OK — property_image_url saved')
       setProperty(prev => prev ? { ...prev, property_image_url: data.publicUrl } as any : prev)
     } catch (e: any) {
       console.error('Photo upload failed:', e.message)
