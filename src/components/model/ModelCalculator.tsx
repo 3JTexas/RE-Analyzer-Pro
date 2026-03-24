@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Download, Save, RotateCcw } from 'lucide-react'
 import { calculate, OM_DEFAULTS, fmtDollar, fmtNeg, fmtPct, fmtX, fmtDelta, fmtDeltaPct } from '../../lib/calc'
 import type { ModelInputs, Method, Scenario } from '../../types'
@@ -6,6 +6,7 @@ import {
   InputField, SectionHeader, MetricCard, PLRow, Alert, Toggle, DCRBar, Badge
 } from '../ui'
 import { generatePDF } from '../pdf/PdfReport'
+import { loadCompareState, saveCompareState } from '../../lib/uiState'
 
 // ── Column color palettes ────────────────────────────────────────────────
 const COL_STYLES = [
@@ -65,10 +66,13 @@ interface CompareTabProps {
   scenarioOptions: { id: string; name: string }[]
   resolveInputs: (sid: string) => { inputs: ModelInputs; method: Method; label: string }
   deltaRows: (a: any, b: any) => any[]
+  onSaveCompare?: () => Promise<void>
+  compareSaving?: boolean
 }
 
 function CompareTab({ compareA, setCompareA, compareB, setCompareB,
-  compareCols, setCompareCols, scenarioOptions, resolveInputs }: CompareTabProps) {
+  compareCols, setCompareCols, scenarioOptions, resolveInputs,
+  onSaveCompare, compareSaving }: CompareTabProps) {
 
   const allIds = [compareA, compareB, ...compareCols]
 
@@ -98,6 +102,18 @@ function CompareTab({ compareA, setCompareA, compareB, setCompareB,
 
   return (
     <div className="mt-3">
+      {onSaveCompare && (
+        <div className="flex justify-end mb-2">
+          <button
+            onClick={onSaveCompare}
+            disabled={compareSaving}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            <Save size={12} />
+            {compareSaving ? 'Saving…' : 'Save layout'}
+          </button>
+        </div>
+      )}
       <div className="rounded-lg border border-gray-100 overflow-hidden mb-3">
         <div className="overflow-x-auto">
           <table className="text-xs" style={{ minWidth: `${180 + allCols.length * 110}px`, width: '100%' }}>
@@ -395,13 +411,14 @@ interface ModelProps {
   propertyAddress?: string
   propertyUnits?: number
   propertyYearBuilt?: number | null
+  propertyId?: string
 }
 
 export function ModelCalculator({
   initialInputs, initialMethod = 'om', scenarioName = 'New Scenario',
   onSave, saving, siblings = [], currentScenarioId, omScenario,
   propertyName = 'Investment Property', propertyAddress = '',
-  propertyUnits, propertyYearBuilt,
+  propertyUnits, propertyYearBuilt, propertyId,
 }: ModelProps) {
   const [inputs, setInputs] = useState<ModelInputs>({
     ...OM_DEFAULTS,
@@ -422,7 +439,8 @@ export function ModelCalculator({
   const [activeTab, setActiveTab] = useState<'inputs'|'pl'|'tax'|'om'|'flags'|'compare'>('inputs')
   const [omLocked, setOmLocked] = useState(true)
   const [omSnapshot, setOmSnapshot] = useState<ModelInputs | null>(null)
-  const [targetCap, setTargetCap] = useState<number>(0)
+  const targetCap = inputs.targetCapRate ?? 0
+  const setTargetCap = (v: number) => setInputs(prev => ({ ...prev, targetCapRate: v }))
 
   // Compare tab: which two scenarios to diff
   const [compareA, setCompareA] = useState<string>(currentScenarioId ?? 'current')
@@ -430,6 +448,20 @@ export function ModelCalculator({
     siblings.find(s => s.id !== currentScenarioId)?.id ?? 'current'
   )
   const [compareCols, setCompareCols] = useState<string[]>([])  // extra cols C, D
+  const [compareSaving, setCompareSaving] = useState(false)
+
+  // Load compare state from DB on mount
+  useEffect(() => {
+    if (!propertyId) return
+    loadCompareState(propertyId).then(cs => {
+      if (cs.a) setCompareA(cs.a)
+      if (cs.b) setCompareB(cs.b)
+      const extra: string[] = []
+      if (cs.c) extra.push(cs.c)
+      if (cs.d) extra.push(cs.d)
+      if (extra.length) setCompareCols(extra)
+    })
+  }, [propertyId])
 
   const set = useCallback((key: keyof ModelInputs, val: number | boolean) => {
     setInputs(prev => ({ ...prev, [key]: val }))
@@ -1099,6 +1131,15 @@ export function ModelCalculator({
             scenarioOptions={scenarioOptions}
             resolveInputs={resolveInputs}
             deltaRows={deltaRows}
+            onSaveCompare={propertyId ? async () => {
+              setCompareSaving(true)
+              await saveCompareState(propertyId, {
+                a: compareA, b: compareB,
+                c: compareCols[0] ?? null, d: compareCols[1] ?? null,
+              })
+              setCompareSaving(false)
+            } : undefined}
+            compareSaving={compareSaving}
           />
         )}
 

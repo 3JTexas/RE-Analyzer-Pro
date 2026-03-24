@@ -77,6 +77,7 @@ export function ScenarioPage() {
             propertyAddress={property?.address ?? ''}
             propertyUnits={property?.units ?? 0}
             propertyYearBuilt={property?.year_built ?? 0}
+            propertyId={scenario.property_id}
           />
         </div>
       )}

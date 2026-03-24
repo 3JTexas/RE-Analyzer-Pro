@@ -32,6 +32,7 @@ export interface ModelInputs {
   is1031: boolean  // 1031 exchange — use carryover basis for depreciation
   basis1031: number // carryover adjusted basis $ (used when is1031 = true)
   equity1031: number // 1031 equity rolling in $ (reduces cash to close)
+  targetCapRate?: number // offer calculator target cap rate %
 }
 
 // ── Computed outputs ──────────────────────────────────────────────────────
