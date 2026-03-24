@@ -150,31 +150,29 @@ function CompareTab({ compareA, setCompareA, compareB, setCompareB,
               </tr>
             </thead>
             <tbody>
-              {/* Offer Price headline row */}
-              {allCols.some(c => (c.inputs.targetCapRate ?? 0) > 0 && c.data.NOI > 0) && (() => {
-                const offers = allCols.map(c => {
+              {/* Price / Offer headline row */}
+              {(() => {
+                const prices = allCols.map(c => {
                   const cap = c.inputs.targetCapRate ?? 0
-                  return cap > 0 && c.data.NOI > 0 ? { price: c.data.NOI / (cap / 100), cap } : null
+                  if (cap > 0 && c.data.NOI > 0) return { value: c.data.NOI / (cap / 100), label: 'Offer Price', sub: `at ${cap.toFixed(1)}% cap` }
+                  return { value: c.inputs.price, label: 'Ask Price', sub: 'purchase price' }
                 })
-                const baseOffer = offers[0]?.price ?? 0
+                const basePrice = prices[0].value
                 return (
                   <tr className="border-b-2 border-green-300 bg-green-50">
                     <td className="px-3 py-2 font-semibold text-gray-900">
-                      Offer Price
-                      <div className="text-[9px] font-normal text-gray-400">implied from target cap</div>
+                      Price
+                      <div className="text-[9px] font-normal text-gray-400">offer or asking</div>
                     </td>
                     {allCols.map((col, ci) => (
                       <td key={ci} className={`px-3 py-2 text-right font-bold text-sm ${col.style.val}`}>
-                        {offers[ci]
-                          ? <><div>{fmtDollar(offers[ci]!.price)}</div><div className="text-[9px] font-normal text-gray-400">at {offers[ci]!.cap.toFixed(1)}% cap</div></>
-                          : <span className="text-gray-300">—</span>}
+                        <div>{fmtDollar(prices[ci].value)}</div>
+                        <div className="text-[9px] font-normal text-gray-400">{prices[ci].label} · {prices[ci].sub}</div>
                       </td>
                     ))}
                     <td className="px-3 py-2 text-right">
                       {allCols.slice(1).map((_, ci) => {
-                        const o = offers[ci + 1]
-                        if (!o || !baseOffer) return <div key={ci} className="text-[10px] text-gray-300">—</div>
-                        const delta = o.price - baseOffer
+                        const delta = prices[ci + 1].value - basePrice
                         return (
                           <div key={ci} className={`font-medium text-[10px] ${delta > 0 ? 'text-red-600' : delta < 0 ? 'text-green-700' : 'text-gray-400'}`}>
                             {allCols.length > 2 && <span className="opacity-50 mr-0.5">{COL_LABELS[ci+1]}:</span>}
