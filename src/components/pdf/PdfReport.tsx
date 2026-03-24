@@ -468,6 +468,23 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
   )
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────
+async function fetchImageAsBase64(url: string): Promise<string | null> {
+  try {
+    const resp = await fetch(url)
+    if (!resp.ok) return null
+    const blob = await resp.blob()
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string)
+      reader.onerror = () => resolve(null)
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
+}
+
 // ── Export function ───────────────────────────────────────────────────────
 export async function generatePDF(
   inputs: ModelInputs,
@@ -480,6 +497,13 @@ export async function generatePDF(
   scenarioCols?: ScenarioCol[],
   propertyImageUrl?: string
 ): Promise<void> {
+  // Pre-fetch property image as base64 to avoid CORS issues in @react-pdf/renderer
+  let imageData: string | undefined
+  if (propertyImageUrl) {
+    const b64 = await fetchImageAsBase64(propertyImageUrl)
+    if (b64) imageData = b64
+  }
+
   const blob = await pdf(
     <ReportDocument
       inputs={inputs}
@@ -490,7 +514,7 @@ export async function generatePDF(
       yearBuilt={yearBuilt}
       scenarioName={scenarioName}
       scenarioCols={scenarioCols}
-      propertyImageUrl={propertyImageUrl}
+      propertyImageUrl={imageData}
     />
   ).toBlob()
   const url = URL.createObjectURL(blob)
