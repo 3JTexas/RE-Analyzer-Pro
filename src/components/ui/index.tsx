@@ -5,9 +5,30 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string
   badge?: string
   badgeColor?: 'blue' | 'amber'
+  tooltip?: string
+  dollar?: boolean
 }
-export function InputField({ label, badge, badgeColor = 'blue', className, onFocus, onBlur, onChange, ...props }: InputProps) {
-  const isNumber = props.type === 'number'
+
+function commaFmt(v: number | string): string {
+  const n = typeof v === 'string' ? parseFloat(v) : v
+  if (isNaN(n) || n === 0) return '0'
+  return n.toLocaleString('en-US', { maximumFractionDigits: 2 })
+}
+
+function stripCommas(s: string): string {
+  return s.replace(/,/g, '')
+}
+
+export function InputField({ label, badge, badgeColor = 'blue', tooltip, dollar, className, onFocus, onBlur, onChange, value, type, ...props }: InputProps) {
+  const isNumber = type === 'number' && !dollar
+  const [editing, setEditing] = React.useState(false)
+  const [rawText, setRawText] = React.useState('')
+
+  const inputType = dollar ? 'text' : type
+  const displayValue = dollar
+    ? (editing ? rawText : commaFmt(value as number | string))
+    : value
+
   return (
     <div className="relative bg-gray-50 rounded-lg p-2.5">
       {badge && (
@@ -16,15 +37,42 @@ export function InputField({ label, badge, badgeColor = 'blue', className, onFoc
           {badge}
         </span>
       )}
-      <label className="block text-xs text-gray-500 mb-1">{label}</label>
+      <label className="text-xs text-gray-500 mb-1 flex items-center gap-1">
+        {label}
+        {tooltip && (
+          <span className="relative group">
+            <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-200 text-[9px] text-gray-500 cursor-help font-semibold leading-none">i</span>
+            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 px-2.5 py-2 text-[10px] leading-snug text-white bg-gray-800 rounded-lg shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50">
+              {tooltip}
+            </span>
+          </span>
+        )}
+      </label>
       <input
         {...props}
+        type={inputType}
+        inputMode={dollar ? 'decimal' : props.inputMode}
+        value={displayValue}
         onFocus={e => {
-          if (isNumber) e.target.select()
+          if (dollar) {
+            const num = stripCommas(e.target.value)
+            setRawText(num === '0' ? '' : num)
+            setEditing(true)
+            setTimeout(() => e.target.select(), 0)
+          } else if (isNumber) {
+            e.target.select()
+          }
           onFocus?.(e)
         }}
         onBlur={e => {
-          if (isNumber && e.target.value === '') {
+          if (dollar) {
+            setEditing(false)
+            const num = parseFloat(stripCommas(e.target.value)) || 0
+            if (onChange) {
+              const synth = { ...e, target: { ...e.target, value: String(num) } } as React.ChangeEvent<HTMLInputElement>
+              onChange(synth)
+            }
+          } else if (isNumber && e.target.value === '') {
             const nativeSet = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
             nativeSet.call(e.target, '0')
             e.target.dispatchEvent(new Event('input', { bubbles: true }))
@@ -32,14 +80,22 @@ export function InputField({ label, badge, badgeColor = 'blue', className, onFoc
           onBlur?.(e)
         }}
         onChange={e => {
-          if (isNumber) {
-            const raw = e.target.value
-            const cleaned = raw.replace(/^0+(\d)/, '$1')
-            if (cleaned !== raw) {
-              e.target.value = cleaned
+          if (dollar) {
+            const cleaned = e.target.value.replace(/[^0-9.\-]/g, '')
+            setRawText(cleaned)
+            if (onChange) {
+              const num = parseFloat(cleaned) || 0
+              const synth = { ...e, target: { ...e.target, value: String(num) } } as React.ChangeEvent<HTMLInputElement>
+              onChange(synth)
             }
+          } else {
+            if (isNumber) {
+              const raw = e.target.value
+              const cleaned = raw.replace(/^0+(\d)/, '$1')
+              if (cleaned !== raw) e.target.value = cleaned
+            }
+            onChange?.(e)
           }
-          onChange?.(e)
         }}
         className={`w-full text-sm font-medium text-gray-900 bg-white border border-gray-200
           rounded-md px-2 py-1 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 ${className ?? ''}`}

@@ -681,7 +681,7 @@ export function ModelCalculator({
                 badge="OM" onChange={e => set('ou', +e.target.value)} />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <InputField label="Avg rent / unit / mo ($)" type="number" value={inputs.rent} min={500} step={25}
+              <InputField label="Avg rent / unit / mo ($)" type="number" dollar value={inputs.rent} min={500} step={25}
                 badge="OM" onChange={e => set('rent', +e.target.value)} />
               <InputField
                 label={method === 'om' ? 'Vacancy % (of GSR)' : 'Turnover buffer %'}
@@ -711,7 +711,7 @@ export function ModelCalculator({
               </button>
             </SectionHeader>
             <div className="grid grid-cols-2 gap-2">
-              <InputField {...omBadge('price')} label="Purchase price ($)" type="number" value={inputs.price} step={10000}
+              <InputField {...omBadge('price')} label="Purchase price ($)" type="number" dollar value={inputs.price} step={10000}
                 badge="OM" onChange={e => set('price', +e.target.value)} />
               <InputField {...omBadge('ir')} label="Interest rate (%)" type="number" value={inputs.ir} step={0.125}
                 badge="OM" onChange={e => set('ir', +e.target.value)} />
@@ -755,19 +755,19 @@ export function ModelCalculator({
                 badgeColor="amber" badge="blended" onChange={e => set('expPct', +e.target.value)} />
             ) : (
               <div className="grid grid-cols-2 gap-2">
-                <InputField {...omBadge('tax')} label="Real estate taxes ($)" type="number" value={inputs.tax} step={500}
+                <InputField {...omBadge('tax')} label="Real estate taxes ($)" type="number" dollar value={inputs.tax} step={500}
                   badge="OM" onChange={e => set('tax', +e.target.value)} />
-                <InputField {...omBadge('ins')} label="Insurance ($/door/yr)" type="number" value={inputs.ins} step={100}
+                <InputField {...omBadge('ins')} label="Insurance ($/door/yr)" type="number" dollar value={inputs.ins} step={100}
                   badge="OM" onChange={e => set('ins', +e.target.value)} />
-                <InputField {...omBadge('util')} label="Utilities ($)" type="number" value={inputs.util} step={500}
+                <InputField {...omBadge('util')} label="Utilities ($)" type="number" dollar value={inputs.util} step={500}
                   badge="OM" onChange={e => set('util', +e.target.value)} />
-                <InputField {...omBadge('rm')} label="R&M ($/unit/yr)" type="number" value={inputs.rm} step={50}
+                <InputField {...omBadge('rm')} label="R&M ($/unit/yr)" type="number" dollar value={inputs.rm} step={50}
                   badge="OM" onChange={e => set('rm', +e.target.value)} />
-                <InputField {...omBadge('cs')} label="Contract services ($)" type="number" value={inputs.cs} step={100}
+                <InputField {...omBadge('cs')} label="Contract services ($)" type="number" dollar value={inputs.cs} step={100}
                   badge="OM" onChange={e => set('cs', +e.target.value)} />
-                <InputField {...omBadge('ga')} label="G&A ($)" type="number" value={inputs.ga} step={100}
+                <InputField {...omBadge('ga')} label="G&A ($)" type="number" dollar value={inputs.ga} step={100}
                   badge="OM" onChange={e => set('ga', +e.target.value)} />
-                <InputField {...omBadge('res')} label="Reserves ($/unit/yr)" type="number" value={inputs.res} step={50}
+                <InputField {...omBadge('res')} label="Reserves ($/unit/yr)" type="number" dollar value={inputs.res} step={50}
                   badge="OM" onChange={e => set('res', +e.target.value)} />
                 <InputField {...omBadge('pm')} label="Prop. mgmt (%)" type="number" value={inputs.pm} step={0.5}
                   badge="OM" onChange={e => set('pm', +e.target.value)} />
@@ -795,8 +795,10 @@ export function ModelCalculator({
               <InputField label="Tax bracket (%)" type="number" value={inputs.brk} step={1}
                 badgeColor="amber" badge="yours" onChange={e => set('brk', +e.target.value)} />
               <InputField label="Land % (non-depreciable)" type="number" value={inputs.land} step={1}
+                tooltip="Estimated % of purchase price allocated to land. Land is not depreciable. Typically 15\u201325% in Florida."
                 badgeColor="amber" badge="estimated" onChange={e => set('land', +e.target.value)} />
               <InputField label="Cost seg % (5/7/15yr)" type="number" value={inputs.costSeg} step={1}
+                tooltip="% of depreciable building value reclassified to 5/7/15-year property via cost segregation study. Qualifies for 100% bonus depreciation. Typically 20\u201330% of building value."
                 badgeColor="amber" badge="estimated" onChange={e => set('costSeg', +e.target.value)} />
             </div>
             {omScenario?.id !== currentScenarioId && (
@@ -818,9 +820,10 @@ export function ModelCalculator({
             )}
             {omScenario?.id !== currentScenarioId && inputs.is1031 && (
               <div className="mt-2 space-y-2">
-                <InputField label="1031 equity rolling in ($)" type="number" value={inputs.equity1031} step={10000}
+                <InputField label="1031 equity rolling in ($)" type="number" dollar value={inputs.equity1031} step={10000}
                   badgeColor="amber" badge="from relinquished sale" onChange={e => set('equity1031', +e.target.value)} />
-                <InputField label="Est. carryover adjusted basis ($)" type="number" value={inputs.basis1031} step={10000} min={0}
+                <InputField label="Est. carryover adjusted basis ($)" type="number" dollar value={inputs.basis1031} step={10000} min={0}
+                  tooltip="In a 1031 exchange, your depreciation basis carries over from the relinquished property. Enter the remaining adjusted basis of the property you sold. This replaces the standard purchase-price basis for depreciation calculations."
                   badgeColor="amber" badge="verify w/ CPA" onChange={e => set('basis1031', Math.max(0, +e.target.value))} />
                 <p className="text-[10px] text-amber-700 px-1">
                   ⚠ Carryover basis determines bonus dep — NOT purchase price. Equity rolling in reduces cash to close. Verify both with CPA.
@@ -1035,25 +1038,25 @@ export function ModelCalculator({
                 <SectionHeader title="Income" />
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <InputField label="Total units" type="number" value={inputs.tu} step={1} onChange={e => set('tu', +e.target.value)} />
-                  <InputField label="Avg rent / unit / mo ($)" type="number" value={inputs.rent} step={25} onChange={e => set('rent', +e.target.value)} />
+                  <InputField label="Avg rent / unit / mo ($)" type="number" dollar value={inputs.rent} step={25} onChange={e => set('rent', +e.target.value)} />
                   <InputField label="Vacancy % (of GSR)" type="number" value={inputs.vp} step={0.5} onChange={e => set('vp', +e.target.value)} />
                 </div>
                 <SectionHeader title="Financing" />
                 <div className="grid grid-cols-2 gap-2 mb-2">
-                  <InputField label="Purchase price ($)" type="number" value={inputs.price} step={10000} onChange={e => set('price', +e.target.value)} />
+                  <InputField label="Purchase price ($)" type="number" dollar value={inputs.price} step={10000} onChange={e => set('price', +e.target.value)} />
                   <InputField label="LTV (%)" type="number" value={inputs.lev} step={1} onChange={e => set('lev', +e.target.value)} />
                   <InputField label="Interest rate (%)" type="number" value={inputs.ir} step={0.125} onChange={e => set('ir', +e.target.value)} />
                   <InputField label="Amortization (yrs)" type="number" value={inputs.am} step={5} onChange={e => set('am', +e.target.value)} />
                 </div>
                 <SectionHeader title="Expenses" />
                 <div className="grid grid-cols-2 gap-2 mb-2">
-                  <InputField label="Real estate taxes ($)" type="number" value={inputs.tax} step={500} onChange={e => set('tax', +e.target.value)} />
-                  <InputField label="Insurance ($/door/yr)" type="number" value={inputs.ins} step={100} onChange={e => set('ins', +e.target.value)} />
-                  <InputField label="Utilities ($)" type="number" value={inputs.util} step={500} onChange={e => set('util', +e.target.value)} />
-                  <InputField label="R&M ($/unit/yr)" type="number" value={inputs.rm} step={50} onChange={e => set('rm', +e.target.value)} />
-                  <InputField label="Contract services ($)" type="number" value={inputs.cs} step={100} onChange={e => set('cs', +e.target.value)} />
-                  <InputField label="G&A ($)" type="number" value={inputs.ga} step={100} onChange={e => set('ga', +e.target.value)} />
-                  <InputField label="Reserves ($/unit/yr)" type="number" value={inputs.res} step={50} onChange={e => set('res', +e.target.value)} />
+                  <InputField label="Real estate taxes ($)" type="number" dollar value={inputs.tax} step={500} onChange={e => set('tax', +e.target.value)} />
+                  <InputField label="Insurance ($/door/yr)" type="number" dollar value={inputs.ins} step={100} onChange={e => set('ins', +e.target.value)} />
+                  <InputField label="Utilities ($)" type="number" dollar value={inputs.util} step={500} onChange={e => set('util', +e.target.value)} />
+                  <InputField label="R&M ($/unit/yr)" type="number" dollar value={inputs.rm} step={50} onChange={e => set('rm', +e.target.value)} />
+                  <InputField label="Contract services ($)" type="number" dollar value={inputs.cs} step={100} onChange={e => set('cs', +e.target.value)} />
+                  <InputField label="G&A ($)" type="number" dollar value={inputs.ga} step={100} onChange={e => set('ga', +e.target.value)} />
+                  <InputField label="Reserves ($/unit/yr)" type="number" dollar value={inputs.res} step={50} onChange={e => set('res', +e.target.value)} />
                   <InputField label="Prop. mgmt (%)" type="number" value={inputs.pm} step={0.5} onChange={e => set('pm', +e.target.value)} />
                 </div>
               </div>
