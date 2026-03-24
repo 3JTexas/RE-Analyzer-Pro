@@ -367,89 +367,104 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
           </View>
         </View>
 
-        {/* ── Tax Benefit Runway ──────────────────────────────────────── */}
+        {/* ── Tax Benefit Runway — Three Scenarios ──────────────────── */}
         {d.brk > 0 && (inputs.costSeg > 0 || inputs.land < 100) && (() => {
           const monthlyCF = d.CF / 12
-          const y1MonthlyTax = d.ts / 12
-          const y2MonthlyTax = (d.sl * d.brk / 100) / 12
-          const cumulative: number[] = []
-          let bal = 0
+          const bracket = d.brk / 100
+          const fullSL = d.deprBase / 27.5
+          const y1Tax1 = d.ts / 12, y2Tax1 = (d.sl * bracket) / 12
+          const slOnlyTax = (fullSL * bracket) / 12
+          const line1: number[] = [], line2: number[] = [], line3: number[] = []
+          let b1 = 0, b2 = 0, b3 = 0
           for (let m = 1; m <= 120; m++) {
-            bal += monthlyCF + (m <= 12 ? y1MonthlyTax : y2MonthlyTax)
-            cumulative.push(Math.round(bal))
+            b1 += monthlyCF + (m <= 12 ? y1Tax1 : y2Tax1)
+            b2 += monthlyCF + slOnlyTax
+            b3 += monthlyCF
+            line1.push(Math.round(b1)); line2.push(Math.round(b2)); line3.push(Math.round(b3))
           }
-          const peak = Math.max(...cumulative)
-          const peakIdx = cumulative.indexOf(peak)
-          const trough = Math.min(...cumulative)
-          const extIdx = cumulative.findIndex((v, i) => i > peakIdx && v <= 0)
-          const extMonth = extIdx >= 0 ? extIdx + 1 : null
+          const peak1 = Math.max(...line1), peakIdx1 = line1.indexOf(peak1)
+          const ext1 = line1.findIndex((v, i) => i > peakIdx1 && v <= 0)
+          const ext2 = line2.findIndex((v, i) => i > 0 && v <= 0)
+          const allVals = [...line1, ...line2, ...line3]
+          const yMax = Math.max(...allVals, 1000)
+          const yMin = Math.min(...allVals, 0) - 500
+          const ext1Mo = ext1 >= 0 ? ext1 + 1 : null
+          const ext2Mo = ext2 >= 0 ? ext2 + 1 : null
 
-          // SVG chart dimensions
-          const W = 480, H = 100, PX = 30, PY = 8
+          const W = 480, H = 110, PX = 30, PY = 8
           const cW = W - PX * 2, cH = H - PY * 2
-          const yMax = Math.max(peak, 1000)
-          const yMin = Math.min(trough, 0) - 500
           const yRange = yMax - yMin
           const toX = (i: number) => PX + (i / 119) * cW
           const toY = (v: number) => PY + (1 - (v - yMin) / yRange) * cH
           const zeroY = toY(0)
+          const toPath = (vals: number[]) => vals.map((v, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')
 
-          const pathD = cumulative.map((v, i) =>
-            `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`
-          ).join(' ')
-
-          const y1Monthly = monthlyCF + y1MonthlyTax
-          const y2Monthly = monthlyCF + y2MonthlyTax
+          const PC = { bonus: '#0072B2', sl: '#E69F00', none: '#CC79A7' }
 
           return (
             <>
-              <SectionHdr title="Tax benefit runway — 10yr cumulative after-tax" />
+              <SectionHdr title="Cumulative after-tax cash — three depreciation scenarios" />
               <Svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+                {/* Monthly gridlines */}
+                {Array.from({ length: 120 }, (_, i) => (
+                  <SvgLine key={i} x1={toX(i)} y1={PY} x2={toX(i)} y2={H - PY}
+                    strokeWidth={(i + 1) % 12 === 0 ? 0.8 : 0.2} stroke={(i + 1) % 12 === 0 ? '#bbb' : '#eee'} />
+                ))}
                 {/* Zero axis */}
-                <SvgLine x1={PX} y1={zeroY} x2={W - PX} y2={zeroY} strokeWidth={0.5} stroke="#888" />
-                {/* Year 1 separator */}
-                <SvgLine x1={toX(11)} y1={PY} x2={toX(11)} y2={H - PY} strokeWidth={0.5} stroke="#aaa" strokeDasharray="2,2" />
-                {/* Data line */}
-                <Path d={pathD} fill="none" stroke={C.green} strokeWidth={1.2} />
-                {/* Red portion after extinguish */}
-                {extIdx >= 0 && (
-                  <Path d={cumulative.slice(extIdx).map((v, i) =>
-                    `${i === 0 ? 'M' : 'L'}${toX(extIdx + i).toFixed(1)},${toY(v).toFixed(1)}`
-                  ).join(' ')} fill="none" stroke={C.red} strokeWidth={1.2} />
-                )}
+                <SvgLine x1={PX} y1={zeroY} x2={W - PX} y2={zeroY} strokeWidth={1} stroke="#333" />
+                {/* Year 1 dashed separator */}
+                <SvgLine x1={toX(11)} y1={PY} x2={toX(11)} y2={H - PY} strokeWidth={0.7} stroke="#888" strokeDasharray="3,2" />
+                {/* Three lines */}
+                <Path d={toPath(line3)} fill="none" stroke={PC.none} strokeWidth={0.8} strokeDasharray="3,2" />
+                <Path d={toPath(line2)} fill="none" stroke={PC.sl} strokeWidth={1} />
+                <Path d={toPath(line1)} fill="none" stroke={PC.bonus} strokeWidth={1.4} />
                 {/* Peak dot */}
-                <Circle cx={toX(peakIdx)} cy={toY(peak)} r={3} fill={C.green} />
-                {/* Extinguish dot */}
-                {extIdx >= 0 && <Circle cx={toX(extIdx)} cy={toY(0)} r={3} fill={C.red} />}
+                <Circle cx={toX(peakIdx1)} cy={toY(peak1)} r={2.5} fill={PC.bonus} />
+                {/* Extinguish dots */}
+                {ext1 >= 0 && <Circle cx={toX(ext1)} cy={toY(0)} r={2.5} fill={PC.bonus} />}
+                {ext2 >= 0 && <Circle cx={toX(ext2)} cy={toY(0)} r={2} fill={PC.sl} />}
               </Svg>
-              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 4, marginTop: 2 }}>
-                <Text style={{ fontSize: 7.5, color: C.green }}>Peak: {fmtDollar(peak)} at Mo {peakIdx + 1}</Text>
-                <Text style={{ fontSize: 7.5, color: C.textMuted }}>|  Dashed line = bonus dep ends (Mo 12)</Text>
-                {extMonth && <Text style={{ fontSize: 7.5, color: C.red }}>Exhausted: Mo {extMonth} (Yr {Math.ceil(extMonth / 12)})</Text>}
-                {!extMonth && <Text style={{ fontSize: 7.5, color: C.green }}>Never exhausted within 10 years</Text>}
+              {/* Legend */}
+              <View style={{ flexDirection: 'row', gap: 14, marginTop: 2, marginBottom: 3 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <View style={{ width: 10, height: 2, backgroundColor: PC.bonus, borderRadius: 1 }} />
+                  <Text style={{ fontSize: 7, color: C.text }}>Bonus + Cost Seg</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <View style={{ width: 10, height: 2, backgroundColor: PC.sl, borderRadius: 1 }} />
+                  <Text style={{ fontSize: 7, color: C.text }}>SL only (no cost seg)</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <View style={{ width: 10, height: 1, backgroundColor: PC.none, borderRadius: 1 }} />
+                  <Text style={{ fontSize: 7, color: C.text }}>No depreciation</Text>
+                </View>
+                <Text style={{ fontSize: 7, color: C.textMuted }}>Peak: {fmtDollar(peak1)} Mo {peakIdx1 + 1}</Text>
+                {ext1Mo && <Text style={{ fontSize: 7, color: PC.bonus }}>Exhausted: Mo {ext1Mo}</Text>}
+                {ext2Mo && <Text style={{ fontSize: 7, color: PC.sl }}>SL crosses zero: Mo {ext2Mo}</Text>}
               </View>
 
-              {/* How this chart works — explanation grid */}
-              <View style={[s.table, { marginTop: 4 }]}>
+              {/* Explanation grid — three scenarios */}
+              <View style={[s.table, { marginTop: 2 }]}>
                 <View style={s.tableHdrRow}>
-                  <Text style={[s.tableHdrCell, { flex: 2 }]}>Component</Text>
-                  <Text style={[s.tableHdrCell, { flex: 1.5, textAlign: 'right' }]}>Year 1 (monthly)</Text>
-                  <Text style={[s.tableHdrCell, { flex: 1.5, textAlign: 'right' }]}>Year 2+ (monthly)</Text>
-                  <Text style={[s.tableHdrCell, { flex: 2, textAlign: 'right' }]}>Note</Text>
+                  <Text style={[s.tableHdrCell, { flex: 2.5 }]}>Component</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1.2, textAlign: 'right', color: PC.bonus }]}>Bonus+CS (Y1)</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1.2, textAlign: 'right', color: PC.bonus }]}>Bonus+CS (Y2+)</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1.2, textAlign: 'right', color: PC.sl }]}>SL only</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1.2, textAlign: 'right', color: PC.none }]}>No dep</Text>
                 </View>
                 {[
-                  { label: 'Pre-tax cash flow', y1: fmtDollar(monthlyCF), y2: fmtDollar(monthlyCF), note: monthlyCF < 0 ? 'Negative - NOI < debt service' : 'NOI less debt service' },
-                  { label: '+ Bonus dep tax savings', y1: fmtDollar(d.ts / 12), y2: '-', note: 'One-time Year 1 benefit only' },
-                  { label: '+ SL dep tax savings', y1: 'incl. above', y2: fmtDollar(d.sl * d.brk / 100 / 12), note: 'Ongoing annual benefit' },
-                  { label: 'Monthly net after-tax', y1: fmtDollar(y1Monthly), y2: fmtDollar(y2Monthly), note: 'Cliff when bonus dep exhausts', bold: true },
-                  { label: 'Peak cumulative balance', y1: fmtDollar(peak), y2: '-', note: 'Maximum benefit position', bold: true },
-                  { label: 'Months until exhausted', y1: '-', y2: extMonth ? `Month ${extMonth}` : 'Never', note: extMonth ? `Year ${Math.ceil(extMonth / 12)}` : 'Stays positive 10yr', bold: true },
+                  { label: 'Pre-tax CF/mo', v1: fmtDollar(monthlyCF), v2: fmtDollar(monthlyCF), v3: fmtDollar(monthlyCF), v4: fmtDollar(monthlyCF) },
+                  { label: '+ Tax savings/mo', v1: fmtDollar(y1Tax1), v2: fmtDollar(y2Tax1), v3: fmtDollar(slOnlyTax), v4: '$0' },
+                  { label: 'Net monthly', v1: fmtDollar(monthlyCF + y1Tax1), v2: fmtDollar(monthlyCF + y2Tax1), v3: fmtDollar(monthlyCF + slOnlyTax), v4: fmtDollar(monthlyCF), bold: true },
+                  { label: 'Peak cumulative', v1: fmtDollar(peak1), v2: '-', v3: line2[11] > 0 ? fmtDollar(Math.max(...line2)) : 'n/a', v4: '-', bold: true },
+                  { label: 'Months to zero', v1: ext1Mo ? `Mo ${ext1Mo}` : 'Never', v2: '-', v3: ext2Mo ? `Mo ${ext2Mo}` : 'Never', v4: line3[0] <= 0 ? 'Mo 1' : 'Never', bold: true },
                 ].map((row, i) => (
                   <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
-                    <Text style={[s.tableCell, { flex: 2, fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica' }]}>{row.label}</Text>
-                    <Text style={[s.tableCellR, { flex: 1.5, fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica' }]}>{row.y1}</Text>
-                    <Text style={[s.tableCellR, { flex: 1.5, fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica' }]}>{row.y2}</Text>
-                    <Text style={[s.tableCellR, { flex: 2, color: C.textLight, fontSize: 7.5 }]}>{row.note}</Text>
+                    <Text style={[s.tableCell, { flex: 2.5, fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica' }]}>{row.label}</Text>
+                    <Text style={[s.tableCellR, { flex: 1.2, fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica' }]}>{row.v1}</Text>
+                    <Text style={[s.tableCellR, { flex: 1.2, fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica' }]}>{row.v2}</Text>
+                    <Text style={[s.tableCellR, { flex: 1.2, fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica' }]}>{row.v3}</Text>
+                    <Text style={[s.tableCellR, { flex: 1.2, fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica' }]}>{row.v4}</Text>
                   </View>
                 ))}
               </View>

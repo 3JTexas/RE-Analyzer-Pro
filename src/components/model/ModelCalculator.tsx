@@ -12,73 +12,90 @@ import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
 
-// ── Tax Benefit Runway chart ──────────────────────────────────────────────
+// ── Tax Benefit Runway — three-scenario chart ────────────────────────────
+const RUNWAY_COLORS = { bonus: '#0072B2', sl: '#E69F00', none: '#CC79A7' }
+
+function computeRunway(d: ReturnType<typeof calculate>) {
+  const monthlyCF = d.CF / 12
+  const bracket = d.brk / 100
+  const fullSL = d.deprBase / 27.5
+
+  // Line 1: Bonus + Cost Seg (current scenario)
+  const y1Tax1 = d.ts / 12
+  const y2Tax1 = (d.sl * bracket) / 12
+  // Line 2: SL only (no cost seg, full basis on 27.5yr)
+  const slOnlyTax = (fullSL * bracket) / 12
+  // Line 3: No depreciation
+  const line1: number[] = [], line2: number[] = [], line3: number[] = []
+  let b1 = 0, b2 = 0, b3 = 0
+  for (let m = 1; m <= 120; m++) {
+    b1 += monthlyCF + (m <= 12 ? y1Tax1 : y2Tax1)
+    b2 += monthlyCF + slOnlyTax
+    b3 += monthlyCF
+    line1.push(Math.round(b1)); line2.push(Math.round(b2)); line3.push(Math.round(b3))
+  }
+  const peak1 = Math.max(...line1), peakIdx1 = line1.indexOf(peak1)
+  const ext1 = line1.findIndex((v, i) => i > peakIdx1 && v <= 0)
+  const ext2 = line2.findIndex((v, i) => i > 0 && v <= 0)
+  return {
+    line1, line2, line3, peak1, peakIdx1, ext1, ext2, monthlyCF,
+    y1Net1: monthlyCF + y1Tax1, y2Net1: monthlyCF + y2Tax1,
+    slNet: monthlyCF + slOnlyTax, noneNet: monthlyCF,
+  }
+}
+
 function TaxRunwayChart({ d }: { d: ReturnType<typeof calculate> }) {
-  const data = useMemo(() => {
-    const months = 120
-    const monthlyCF = d.CF / 12
-    const y1MonthlyTax = d.ts / 12
-    const y2MonthlyTax = (d.sl * d.brk / 100) / 12
-    const cumulative: number[] = []
-    let bal = 0
-    for (let m = 1; m <= months; m++) {
-      const taxSav = m <= 12 ? y1MonthlyTax : y2MonthlyTax
-      bal += monthlyCF + taxSav
-      cumulative.push(Math.round(bal))
-    }
-    const peak = Math.max(...cumulative)
-    const peakIdx = cumulative.indexOf(peak)
-    const extinguishIdx = cumulative.findIndex((v, i) => i > peakIdx && v <= 0)
-    return { cumulative, peak, peakIdx, extinguishIdx }
-  }, [d.CF, d.ts, d.sl, d.brk])
+  const data = useMemo(() => computeRunway(d), [d.CF, d.ts, d.sl, d.brk, d.deprBase])
 
   const labels = Array.from({ length: 120 }, (_, i) => {
     const m = i + 1
-    if (m % 12 === 0) return `Year ${m / 12}`
-    if (m % 3 === 0 && m < 24) return `Mo ${m}`
+    if (m % 12 === 0) return `Yr ${m / 12}`
+    if (m % 12 === 6) return `${m}`
     return ''
   })
 
-  const extMonth = data.extinguishIdx >= 0 ? data.extinguishIdx + 1 : null
-  const extYear = extMonth ? Math.ceil(extMonth / 12) : null
+  const ext1Month = data.ext1 >= 0 ? data.ext1 + 1 : null
+  const ext2Month = data.ext2 >= 0 ? data.ext2 + 1 : null
+
+  const makeLine = (vals: number[], color: string, label: string, showPeak?: number) => ({
+    label,
+    data: vals,
+    borderColor: color,
+    backgroundColor: 'transparent',
+    fill: false,
+    tension: 0.3,
+    pointRadius: vals.map((_, i) =>
+      (showPeak !== undefined && i === showPeak) ? 5 :
+      (data.ext1 >= 0 && i === data.ext1 && color === RUNWAY_COLORS.bonus) ? 5 : 0
+    ),
+    pointBackgroundColor: color,
+    borderWidth: color === RUNWAY_COLORS.bonus ? 2 : 1.5,
+    borderDash: color === RUNWAY_COLORS.none ? [4, 3] : undefined,
+  })
 
   const chartData = {
     labels,
-    datasets: [{
-      data: data.cumulative,
-      borderColor: data.cumulative.map(v => v >= 0 ? '#16a34a' : '#dc2626'),
-      segment: {
-        borderColor: (ctx: any) => {
-          const v = data.cumulative[ctx.p0DataIndex]
-          return v >= 0 ? '#16a34a' : '#dc2626'
-        },
-      },
-      backgroundColor: data.cumulative.map(v => v >= 0 ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.08)'),
-      fill: true,
-      tension: 0.3,
-      pointRadius: data.cumulative.map((_, i) =>
-        i === data.peakIdx ? 6 : (data.extinguishIdx >= 0 && i === data.extinguishIdx) ? 6 : 0
-      ),
-      pointBackgroundColor: data.cumulative.map((_, i) =>
-        i === data.peakIdx ? '#16a34a' : (data.extinguishIdx >= 0 && i === data.extinguishIdx) ? '#dc2626' : '#16a34a'
-      ),
-      borderWidth: 1.5,
-    }],
+    datasets: [
+      makeLine(data.line1, RUNWAY_COLORS.bonus, 'Bonus + Cost Seg', data.peakIdx1),
+      makeLine(data.line2, RUNWAY_COLORS.sl, 'Straight-line only'),
+      makeLine(data.line3, RUNWAY_COLORS.none, 'No depreciation'),
+    ],
   }
 
   return (
     <div className="mt-3">
-      <SectionHeader title="Tax benefit runway — 10yr cumulative after-tax" tooltip="Shows how long the Y1 bonus depreciation tax benefit lasts when offset against ongoing cash flow and SL depreciation savings." />
+      <SectionHeader title="Cumulative after-tax cash position — three depreciation scenarios" tooltip="Compares cumulative after-tax cash position under three depreciation strategies over 10 years." />
       <div className="border border-gray-100 rounded-lg p-3 bg-white">
-        <div style={{ height: 200 }}>
+        <div style={{ height: 220 }}>
           <Line data={chartData} options={{
             responsive: true,
             maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             plugins: {
               tooltip: {
                 callbacks: {
                   title: (items) => `Month ${items[0].dataIndex + 1}`,
-                  label: (item) => fmtDollar(item.raw as number),
+                  label: (item) => `${item.dataset.label}: ${fmtDollar(item.raw as number)}`,
                 },
               },
               legend: { display: false },
@@ -86,49 +103,54 @@ function TaxRunwayChart({ d }: { d: ReturnType<typeof calculate> }) {
             scales: {
               x: {
                 ticks: {
-                  font: (ctx) => ({ size: ctx.tick?.label?.toString().startsWith('Year') ? 10 : 8, weight: ctx.tick?.label?.toString().startsWith('Year') ? 'bold' as const : 'normal' as const }),
-                  color: (ctx) => ctx.tick?.label?.toString().startsWith('Year') ? '#333' : '#aaa',
+                  font: (ctx) => ({ size: ctx.tick?.label?.toString().startsWith('Yr') ? 10 : 8, weight: ctx.tick?.label?.toString().startsWith('Yr') ? 'bold' as const : 'normal' as const }),
+                  color: (ctx) => ctx.tick?.label?.toString().startsWith('Yr') ? '#333' : '#bbb',
                   maxRotation: 0,
                 },
                 grid: {
-                  color: (ctx) => ctx.tick?.label?.toString().startsWith('Year') ? '#e0e0e0' : 'transparent',
-                  lineWidth: (ctx) => ctx.tick?.label === 'Year 1' ? 2 : 1,
+                  color: (ctx) => {
+                    const lbl = ctx.tick?.label?.toString() ?? ''
+                    if (lbl.startsWith('Yr')) return '#d0d0d0'
+                    if (lbl) return '#f0f0f0'
+                    return '#f8f8f8'
+                  },
+                  lineWidth: (ctx) => ctx.tick?.label?.toString().startsWith('Yr') ? 1.5 : 0.5,
                 },
               },
               y: {
                 ticks: {
-                  font: { size: 9 },
-                  color: '#888',
-                  callback: (v) => {
-                    const n = v as number
-                    if (n === 0) return '$0'
-                    return n >= 1000 || n <= -1000 ? `$${(n / 1000).toFixed(0)}k` : `$${n}`
-                  },
+                  font: { size: 9 }, color: '#888',
+                  callback: (v) => { const n = v as number; return n === 0 ? '$0' : `$${(n / 1000).toFixed(0)}k` },
                 },
                 grid: {
-                  color: (ctx) => ctx.tick.value === 0 ? '#666' : '#f0f0f0',
-                  lineWidth: (ctx) => ctx.tick.value === 0 ? 1.5 : 0.5,
+                  color: (ctx) => ctx.tick.value === 0 ? '#111' : ctx.tick.value > 0 ? 'rgba(22,163,74,0.06)' : 'rgba(220,38,38,0.06)',
+                  lineWidth: (ctx) => ctx.tick.value === 0 ? 2 : 0.5,
                 },
               },
             },
           }} />
         </div>
+        {/* Legend */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[10px]">
           <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-green-600" />
-            <span className="text-gray-500">Peak: <strong className="text-gray-700">{fmtDollar(data.peak)}</strong> at Month {data.peakIdx + 1}</span>
+            <div className="w-3 h-0.5 rounded" style={{ backgroundColor: RUNWAY_COLORS.bonus }} />
+            <span className="text-gray-600"><strong>Bonus + Cost Seg</strong> — current scenario</span>
           </div>
-          {extMonth && (
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-red-600" />
-              <span className="text-gray-500">Exhausted: <strong className="text-red-600">Month {extMonth} (Year {extYear})</strong></span>
-            </div>
-          )}
-          {!extMonth && (
-            <span className="text-green-600 font-medium">Benefit never exhausted within 10 years</span>
-          )}
-          <span className="text-gray-400">|</span>
-          <span className="text-gray-400">Dashed grid at Year 1 = bonus dep ends</span>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-0.5 rounded" style={{ backgroundColor: RUNWAY_COLORS.sl }} />
+            <span className="text-gray-600"><strong>SL only</strong> — no cost seg study</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-0.5 rounded border-t border-dashed" style={{ borderColor: RUNWAY_COLORS.none }} />
+            <span className="text-gray-600"><strong>No depreciation</strong> — pre-tax only</span>
+          </div>
+        </div>
+        {/* Key data points */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-[10px]">
+          <span className="text-gray-500">Peak (bonus): <strong className="text-gray-700">{fmtDollar(data.peak1)}</strong> at Mo {data.peakIdx1 + 1}</span>
+          {ext1Month && <span className="text-gray-500">Exhausted (bonus): <strong style={{ color: RUNWAY_COLORS.bonus }}>Mo {ext1Month} (Yr {Math.ceil(ext1Month / 12)})</strong></span>}
+          {!ext1Month && <span style={{ color: RUNWAY_COLORS.bonus }} className="font-medium">Bonus never exhausted in 10yr</span>}
+          {ext2Month && <span className="text-gray-500">SL-only crosses zero: <strong style={{ color: RUNWAY_COLORS.sl }}>Mo {ext2Month}</strong></span>}
         </div>
       </div>
     </div>
