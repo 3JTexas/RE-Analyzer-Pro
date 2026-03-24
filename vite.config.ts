@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: process.env.VITE_BASE_URL || '/RE-Analyzer-Pro/',
+  base: process.env.NODE_ENV === 'production' ? '/RE-Analyzer-Pro/' : '/',
   build: {
     outDir: 'dist',
     sourcemap: false,
