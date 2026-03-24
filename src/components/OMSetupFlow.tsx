@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
-import { Upload, FileText, X, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
+import { Upload, FileText, X, Loader2, CheckCircle, AlertCircle, Camera } from 'lucide-react'
 import { OM_DEFAULTS } from '../lib/calc'
+import { supabase } from '../lib/supabase'
 import type { ModelInputs } from '../types'
 
 const FIELDS: { key: keyof ModelInputs; label: string; step: number; prefix?: string; suffix?: string }[] = [
@@ -26,6 +27,7 @@ export interface OmConfirmMeta {
   propertyName?: string
   propertyAddress?: string
   propertyYearBuilt?: number
+  propertyImageUrl?: string
 }
 
 type Mode = 'choose' | 'manual' | 'pdf'
@@ -48,7 +50,10 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
   const [propertyName, setPropertyName] = useState('')
   const [propertyAddress, setPropertyAddress] = useState('')
   const [propertyYearBuilt, setPropertyYearBuilt] = useState<number | undefined>(undefined)
+  const [propertyImageUrl, setPropertyImageUrl] = useState<string | undefined>(undefined)
+  const [photoUploading, setPhotoUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const photoRef = useRef<HTMLInputElement>(null)
 
   const set = (key: keyof ModelInputs, val: number) =>
     setInputs(prev => ({ ...prev, [key]: val }))
@@ -68,11 +73,27 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
       r.readAsDataURL(file)
     })
 
+  const uploadPhoto = async (file: File) => {
+    setPhotoUploading(true)
+    try {
+      const ext = file.name.split('.').pop() ?? 'jpg'
+      const path = `${crypto.randomUUID()}.${ext}`
+      const { error } = await supabase.storage.from('property-images').upload(path, file, { upsert: true })
+      if (error) throw error
+      const { data } = supabase.storage.from('property-images').getPublicUrl(path)
+      setPropertyImageUrl(data.publicUrl)
+    } catch (e: any) {
+      console.error('Photo upload failed:', e.message)
+    }
+    setPhotoUploading(false)
+  }
+
   const confirm = () => onConfirm(inputs, {
     scenarioName: scenarioName.trim() || defaultScenarioName,
     propertyName: showPropertyFields ? propertyName.trim() : undefined,
     propertyAddress: showPropertyFields ? propertyAddress.trim() : undefined,
     propertyYearBuilt: showPropertyFields ? propertyYearBuilt : undefined,
+    propertyImageUrl: showPropertyFields ? propertyImageUrl : undefined,
   })
 
   const extractFromPdfs = async () => {
@@ -176,6 +197,25 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
             <input value={propertyAddress} onChange={e => setPropertyAddress(e.target.value)}
               placeholder="e.g. 215 S Seacrest Blvd, Boynton Beach FL"
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-navy" />
+          </div>
+          <div>
+            <label className="block text-[9px] text-gray-500 mb-0.5 font-medium uppercase tracking-wide">Property photo (optional)</label>
+            <input ref={photoRef} type="file" accept="image/*" className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) uploadPhoto(f) }} />
+            {propertyImageUrl ? (
+              <div className="flex items-center gap-2">
+                <img src={propertyImageUrl} alt="Property" className="w-16 h-12 object-cover rounded border border-gray-200" />
+                <button onClick={() => photoRef.current?.click()}
+                  className="text-[10px] text-blue-500 hover:text-blue-700 font-medium">Change</button>
+              </div>
+            ) : (
+              <button onClick={() => photoRef.current?.click()}
+                disabled={photoUploading}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 border border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:text-blue-500">
+                {photoUploading ? <Loader2 size={12} className="animate-spin" /> : <Camera size={12} />}
+                {photoUploading ? 'Uploading…' : 'Add photo'}
+              </button>
+            )}
           </div>
         </>
       )}

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ChevronLeft, Plus, BarChart3, Trash2, Copy } from 'lucide-react'
+import { ChevronLeft, Plus, BarChart3, Trash2, Copy, Camera, Loader2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getScenariosForProperty, useScenario } from '../hooks/useScenario'
 import type { Property, Scenario, ModelInputs } from '../types'
@@ -18,6 +18,8 @@ export function PropertyPage() {
   const [showSetup, setShowSetup] = useState(false)
   const [duplicating, setDuplicating] = useState<Scenario | null>(null)
   const [dupName, setDupName] = useState('')
+  const [photoUploading, setPhotoUploading] = useState(false)
+  const photoRef = useRef<HTMLInputElement>(null)
 
   const loadData = async () => {
     if (!id) return
@@ -58,6 +60,23 @@ export function PropertyPage() {
     if (s) { await loadData(); navigate(`/scenario/${s.id}`) }
   }
 
+  const handlePhotoUpload = async (file: File) => {
+    if (!id) return
+    setPhotoUploading(true)
+    try {
+      const ext = file.name.split('.').pop() ?? 'jpg'
+      const path = `${id}.${ext}`
+      const { error } = await supabase.storage.from('property-images').upload(path, file, { upsert: true })
+      if (error) throw error
+      const { data } = supabase.storage.from('property-images').getPublicUrl(path)
+      await supabase.from('properties').update({ property_image_url: data.publicUrl }).eq('id', id)
+      setProperty(prev => prev ? { ...prev, property_image_url: data.publicUrl } as any : prev)
+    } catch (e: any) {
+      console.error('Photo upload failed:', e.message)
+    }
+    setPhotoUploading(false)
+  }
+
   if (loading) return <Spinner />
 
   return (
@@ -70,6 +89,14 @@ export function PropertyPage() {
           <h1 className="text-sm font-semibold text-gray-900 truncate">{property?.name}</h1>
           {property?.address && <p className="text-xs text-gray-400 truncate">{property.address}</p>}
         </div>
+        <input ref={photoRef} type="file" accept="image/*" className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f) }} />
+        <button onClick={() => photoRef.current?.click()}
+          disabled={photoUploading}
+          className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-medium text-gray-500 border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-500">
+          {photoUploading ? <Loader2 size={11} className="animate-spin" /> : <Camera size={11} />}
+          {photoUploading ? 'Uploading…' : 'Photo'}
+        </button>
         <button onClick={() => setShowSetup(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-navy text-white rounded-lg">
           <Plus size={13} /> Scenario

@@ -13,6 +13,7 @@ interface PropertyMeta {
   address: string
   units: number
   year_built: number
+  property_image_url: string | null
 }
 
 export function ScenarioPage() {
@@ -34,7 +35,7 @@ export function ScenarioPage() {
       // Load property metadata for PDF export
       supabase
         .from('properties')
-        .select('name, address, units, year_built')
+        .select('name, address, units, year_built, property_image_url')
         .eq('id', scenario.property_id)
         .single()
         .then(({ data }) => {
@@ -78,6 +79,7 @@ export function ScenarioPage() {
             propertyUnits={property?.units ?? 0}
             propertyYearBuilt={property?.year_built ?? 0}
             propertyId={scenario.property_id}
+            propertyImageUrl={property?.property_image_url ?? undefined}
           />
         </div>
       )}

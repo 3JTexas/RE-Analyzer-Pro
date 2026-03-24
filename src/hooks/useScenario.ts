@@ -18,12 +18,16 @@ export function useProperties() {
 
   useEffect(() => { fetch() }, [fetch])
 
-  const createProperty = async (name: string, address?: string, yearBuilt?: number) => {
+  const createProperty = async (name: string, address?: string, yearBuilt?: number, propertyImageUrl?: string) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
     const { data, error } = await supabase
       .from('properties')
-      .insert({ name, address, user_id: user.id, ...(yearBuilt ? { year_built: yearBuilt } : {}) })
+      .insert({
+        name, address, user_id: user.id,
+        ...(yearBuilt ? { year_built: yearBuilt } : {}),
+        ...(propertyImageUrl ? { property_image_url: propertyImageUrl } : {}),
+      })
       .select()
       .single()
     if (!error) await fetch()

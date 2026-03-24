@@ -446,13 +446,14 @@ interface ModelProps {
   propertyUnits?: number
   propertyYearBuilt?: number | null
   propertyId?: string
+  propertyImageUrl?: string
 }
 
 export function ModelCalculator({
   initialInputs, initialMethod = 'om', scenarioName = 'New Scenario',
   onSave, saving, siblings = [], currentScenarioId, omScenario,
   propertyName = 'Investment Property', propertyAddress = '',
-  propertyUnits, propertyYearBuilt, propertyId,
+  propertyUnits, propertyYearBuilt, propertyId, propertyImageUrl,
 }: ModelProps) {
   const [inputs, setInputs] = useState<ModelInputs>({
     ...OM_DEFAULTS,
@@ -589,6 +590,7 @@ export function ModelCalculator({
       propertyYearBuilt ?? 0,
       name,
       cols,
+      propertyImageUrl,
     )
   }
   const handleScenarioSwitch = (sid: string) => {

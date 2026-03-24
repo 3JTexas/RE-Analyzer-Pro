@@ -81,6 +81,9 @@ Be precise with all other figures. Convert monthly figures to annual where neede
     const clean = text.replace(/```json|```/g, '').trim()
     const parsed = JSON.parse(clean)
 
+    // Image extraction from PDF is not supported via vision API — manual upload only
+    parsed.propertyImageUrl = null
+
     return new Response(JSON.stringify(parsed), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })

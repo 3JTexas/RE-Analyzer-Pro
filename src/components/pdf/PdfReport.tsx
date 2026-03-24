@@ -1,48 +1,75 @@
-import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer'
+import { Document, Page, Text, View, Image, StyleSheet, pdf } from '@react-pdf/renderer'
 import type { ModelInputs, Method } from '../../types'
 import { calculate, fmtDollar, fmtNeg, fmtPct, fmtX, fmtDelta, fmtDeltaPct } from '../../lib/calc'
 
+// ── Colors ───────────────────────────────────────────────────────────────
+const C = {
+  text: '#1a1a2e',
+  textLight: '#5F5E5A',
+  textMuted: '#888',
+  accent: '#E07820',
+  navy: '#0D2340',
+  blue: '#185FA5',
+  green: '#1D6B3E',
+  red: '#A32D2D',
+  amber: '#854F0B',
+  bgLight: '#F8F8F8',
+  bgCard: '#F5F4F0',
+  border: '#E5E3DC',
+  borderLight: '#EDEDEB',
+}
+
 // ── Styles ────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  page: { fontFamily: 'Helvetica', fontSize: 9, color: '#111', padding: '0.5in' },
-  coverPage: { fontFamily: 'Helvetica', fontSize: 9, backgroundColor: '#0D2340', padding: '0.75in' },
+  page: { fontFamily: 'Helvetica', fontSize: 9, color: C.text, padding: '0.5in' },
+  coverPage: { fontFamily: 'Helvetica', fontSize: 9, backgroundColor: '#FFFFFF', padding: '0.6in' },
 
-  coverTitle: { fontSize: 28, fontFamily: 'Helvetica-Bold', color: 'white', marginBottom: 6 },
-  coverSub:   { fontSize: 13, color: '#A8C4E0', marginBottom: 4 },
-  coverMeta:  { fontSize: 10, color: '#C8D8E8', marginBottom: 3 },
-  orangeLine: { height: 3, backgroundColor: '#E07820', marginBottom: 20, marginTop: 8 },
+  coverLogo: { width: 180, marginBottom: 16 },
+  coverPhoto: { width: '100%', height: 220, objectFit: 'cover', borderRadius: 6, marginBottom: 16 },
+  coverPhotoPlaceholder: { width: '100%', height: 120, backgroundColor: C.bgLight, borderRadius: 6,
+    marginBottom: 16, borderWidth: 0.5, borderColor: C.borderLight, justifyContent: 'center', alignItems: 'center' },
+  coverTitle: { fontSize: 26, fontFamily: 'Helvetica-Bold', color: C.navy, marginBottom: 4 },
+  coverAddress: { fontSize: 11, color: C.textLight, marginBottom: 12 },
+  orangeLine: { height: 3, backgroundColor: C.accent, marginBottom: 16, marginTop: 4 },
+  coverMetricsRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  coverMetricBox: { flex: 1, backgroundColor: C.bgCard, borderRadius: 4, padding: '8 10', borderWidth: 0.5, borderColor: C.borderLight },
+  coverMetricLabel: { fontSize: 7.5, color: C.textMuted, marginBottom: 2 },
+  coverMetricValue: { fontSize: 16, fontFamily: 'Helvetica-Bold', color: C.navy },
+  coverMetricSub: { fontSize: 7, color: C.textMuted, marginTop: 1 },
+  coverFooter: { fontSize: 8.5, color: C.textLight, marginTop: 12 },
+  coverConfidential: { fontSize: 7.5, color: C.textMuted, marginTop: 6 },
 
-  pageHeader: { borderBottomWidth: 1.5, borderBottomColor: '#E07820', marginBottom: 14, paddingBottom: 6,
+  pageHeader: { borderBottomWidth: 1.5, borderBottomColor: C.accent, marginBottom: 14, paddingBottom: 6,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  pageHeaderLeft:  { fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: '#0D2340' },
-  pageHeaderRight: { fontSize: 7.5, color: '#5F5E5A' },
+  pageHeaderLeft:  { fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: C.navy },
+  pageHeaderRight: { fontSize: 7.5, color: C.textLight },
 
-  sectionHdr: { backgroundColor: '#0D2340', color: 'white', fontFamily: 'Helvetica-Bold',
-    fontSize: 8, padding: '5 8', marginTop: 12, marginBottom: 6 },
+  sectionHdr: { backgroundColor: C.bgLight, color: C.navy, fontFamily: 'Helvetica-Bold',
+    fontSize: 8, padding: '5 8', marginTop: 12, marginBottom: 6, borderBottomWidth: 0.5, borderBottomColor: C.border },
 
   metricsRow: { flexDirection: 'row', gap: 6, marginBottom: 8 },
-  metricCard: { flex: 1, backgroundColor: '#F1EFE8', borderRadius: 4, padding: '6 8' },
-  metricLabel: { fontSize: 7.5, color: '#5F5E5A', marginBottom: 2 },
+  metricCard: { flex: 1, backgroundColor: C.bgCard, borderRadius: 4, padding: '6 8' },
+  metricLabel: { fontSize: 7.5, color: C.textLight, marginBottom: 2 },
   metricValue: { fontSize: 14, fontFamily: 'Helvetica-Bold', marginBottom: 1 },
-  metricSub:   { fontSize: 7, color: '#888' },
+  metricSub:   { fontSize: 7, color: C.textMuted },
 
   plRow:     { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 0.3,
-    borderBottomColor: '#E5E3DC', paddingVertical: 2.5 },
-  plTotal:   { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#D6E4F4',
-    borderTopWidth: 0.6, borderBottomWidth: 0.6, borderColor: '#185FA5', paddingVertical: 3.5, marginTop: 2 },
+    borderBottomColor: C.border, paddingVertical: 2.5 },
+  plTotal:   { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#E8EFF8',
+    borderTopWidth: 0.6, borderBottomWidth: 0.6, borderColor: C.blue, paddingVertical: 3.5, marginTop: 2 },
   plNOI:     { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#EAF3DE',
-    borderTopWidth: 0.6, borderBottomWidth: 0.6, borderColor: '#185FA5', paddingVertical: 3.5, marginTop: 2 },
+    borderTopWidth: 0.6, borderBottomWidth: 0.6, borderColor: C.blue, paddingVertical: 3.5, marginTop: 2 },
   plLabel:   { flex: 1, fontSize: 8.5 },
-  plIndent:  { flex: 1, fontSize: 8.5, paddingLeft: 10, color: '#5F5E5A' },
+  plIndent:  { flex: 1, fontSize: 8.5, paddingLeft: 10, color: C.textLight },
   plVal:     { fontSize: 8.5, fontFamily: 'Helvetica-Bold' },
   plTotLabel:{ flex: 1, fontSize: 9, fontFamily: 'Helvetica-Bold' },
   plTotVal:  { fontSize: 9, fontFamily: 'Helvetica-Bold' },
 
-  table:       { borderWidth: 0.5, borderColor: '#D3D1C7', borderRadius: 3, overflow: 'hidden', marginBottom: 8 },
-  tableHdrRow: { flexDirection: 'row', backgroundColor: '#0D2340' },
-  tableHdrCell:{ flex: 1, padding: '4 6', fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: 'white' },
-  tableRow:    { flexDirection: 'row', borderBottomWidth: 0.3, borderBottomColor: '#E5E3DC' },
-  tableRowAlt: { flexDirection: 'row', borderBottomWidth: 0.3, borderBottomColor: '#E5E3DC', backgroundColor: '#F1EFE8' },
+  table:       { borderWidth: 0.5, borderColor: C.border, borderRadius: 3, overflow: 'hidden', marginBottom: 8 },
+  tableHdrRow: { flexDirection: 'row', backgroundColor: C.bgLight, borderBottomWidth: 0.5, borderBottomColor: C.border },
+  tableHdrCell:{ flex: 1, padding: '4 6', fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: C.navy },
+  tableRow:    { flexDirection: 'row', borderBottomWidth: 0.3, borderBottomColor: C.border },
+  tableRowAlt: { flexDirection: 'row', borderBottomWidth: 0.3, borderBottomColor: C.border, backgroundColor: C.bgCard },
   tableCell:   { flex: 1, padding: '3 6', fontSize: 8.5 },
   tableCellR:  { flex: 1, padding: '3 6', fontSize: 8.5, textAlign: 'right' },
 
@@ -54,7 +81,7 @@ const s = StyleSheet.create({
     padding: '5 8', marginBottom: 6 },
   alertText:  { fontSize: 8.5, fontFamily: 'Helvetica-Bold' },
 
-  disclaimer: { marginTop: 14, fontSize: 7.5, color: '#888', borderTopWidth: 0.5, borderTopColor: '#D3D1C7',
+  disclaimer: { marginTop: 14, fontSize: 7.5, color: C.textMuted, borderTopWidth: 0.5, borderTopColor: C.border,
     paddingTop: 6, lineHeight: 1.5 },
   twoCol: { flexDirection: 'row', gap: 12 },
   col:    { flex: 1 },
@@ -89,7 +116,7 @@ function PLRowComp({ label, value, variant = 'normal', indent = false }:
   const rowStyle = isTotal ? s.plTotal : isNOI ? s.plNOI : s.plRow
   const lblStyle = (isTotal || isNOI) ? s.plTotLabel : indent ? s.plIndent : s.plLabel
   const valStyle = (isTotal || isNOI) ? s.plTotVal : s.plVal
-  const valColor = variant === 'neg' ? '#A32D2D' : variant === 'pos' ? '#1D6B3E' : isNOI ? '#185FA5' : '#111'
+  const valColor = variant === 'neg' ? C.red : variant === 'pos' ? C.green : isNOI ? C.blue : C.text
   return (
     <View style={rowStyle}>
       <Text style={lblStyle}>{label}</Text>
@@ -114,42 +141,101 @@ interface ReportProps {
   yearBuilt: number
   scenarioName: string
   scenarioCols?: ScenarioCol[]
+  propertyImageUrl?: string
 }
 
-function ReportDocument({ inputs, method, propertyName, address, units, yearBuilt, scenarioName, scenarioCols = [] }: ReportProps) {
+function ReportDocument({ inputs, method, propertyName, address, units, yearBuilt, scenarioName, scenarioCols = [], propertyImageUrl }: ReportProps) {
   const isOM = method === 'om'
   const d    = calculate(inputs, isOM)
   const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
   const methodLabel = isOM ? 'OM Method' : 'Physical Occupancy'
-  const dcrColor = d.dcr < 1 ? '#A32D2D' : d.dcr < 1.2 ? '#854F0B' : '#1D6B3E'
+  const dcrColor = d.dcr < 1 ? C.red : d.dcr < 1.2 ? C.amber : C.green
   const targetCap = inputs.targetCapRate ?? 0
   const offerPrice = targetCap > 0 && d.NOI > 0 ? d.NOI / (targetCap / 100) : 0
 
   const safeName = (propertyName || 'Investment Property').trim()
-  
+
   // Build scenario columns for side-by-side — current scenario + siblings
   const allCols: ScenarioCol[] = scenarioCols.length > 0 ? scenarioCols : [{ label: scenarioName, inputs, method }]
+
+  // Resolve logo path — works for both dev and production builds
+  const logoSrc = `${import.meta.env.BASE_URL}Chai_Logo.jpeg`
 
   return (
     <Document title={`${propertyName} — ${scenarioName} — Investment Analysis`}>
 
       {/* ── Cover ──────────────────────────────────────────────────────── */}
       <Page size="LETTER" style={s.coverPage}>
-        <Text style={s.coverSub}>Investment Analysis</Text>
-        <Text style={s.coverTitle}>{safeName}</Text>
-        <View style={s.orangeLine} />
-        {!!address && <Text style={s.coverMeta}>{address}</Text>}
-        <Text style={s.coverMeta}>
-          {units} Units{yearBuilt ? `  ·  Year Built ${yearBuilt}` : ''}{inputs.price > 0 ? `  ·  Listed ${fmtDollar(inputs.price)}` : ''}
-        </Text>
-        {offerPrice > 0 && (
-          <Text style={[s.coverMeta, { fontSize: 14, fontFamily: 'Helvetica-Bold', color: '#E07820', marginTop: 8 }]}>
-            Offer Price: {fmtDollar(offerPrice)}  ·  at {targetCap.toFixed(1)}% cap
-          </Text>
+        {/* Logo */}
+        <Image src={logoSrc} style={s.coverLogo} />
+
+        {/* Property photo or placeholder */}
+        {propertyImageUrl ? (
+          <Image src={propertyImageUrl} style={s.coverPhoto} />
+        ) : (
+          <View style={s.coverPhotoPlaceholder}>
+            <Text style={{ fontSize: 10, color: C.textMuted }}>No property photo</Text>
+          </View>
         )}
-        <Text style={s.coverMeta}>Scenario: {scenarioName}  ·  Method: {methodLabel}</Text>
-        <Text style={[s.coverMeta, { marginTop: 12 }]}>Prepared: {date}</Text>
-        <Text style={[s.coverMeta, { marginTop: 4 }]}>CONFIDENTIAL — For Discussion Purposes Only</Text>
+
+        {/* Property name + address */}
+        <Text style={s.coverTitle}>{safeName}</Text>
+        {!!address && <Text style={s.coverAddress}>{address}</Text>}
+        <View style={s.orangeLine} />
+
+        {/* Key metrics grid */}
+        <View style={s.coverMetricsRow}>
+          <View style={s.coverMetricBox}>
+            <Text style={s.coverMetricLabel}>{offerPrice > 0 ? 'Offer Price' : 'List Price'}</Text>
+            <Text style={s.coverMetricValue}>{fmtDollar(offerPrice > 0 ? offerPrice : inputs.price)}</Text>
+            {offerPrice > 0 && <Text style={s.coverMetricSub}>at {targetCap.toFixed(1)}% cap</Text>}
+          </View>
+          <View style={s.coverMetricBox}>
+            <Text style={s.coverMetricLabel}>Units</Text>
+            <Text style={s.coverMetricValue}>{units}</Text>
+            {yearBuilt ? <Text style={s.coverMetricSub}>Built {yearBuilt}</Text> : null}
+          </View>
+          <View style={s.coverMetricBox}>
+            <Text style={s.coverMetricLabel}>Cap Rate</Text>
+            <Text style={s.coverMetricValue}>{fmtPct(d.cap)}</Text>
+            <Text style={s.coverMetricSub}>on purchase price</Text>
+          </View>
+          <View style={s.coverMetricBox}>
+            <Text style={s.coverMetricLabel}>NOI</Text>
+            <Text style={[s.coverMetricValue, { color: C.blue }]}>{fmtDollar(d.NOI)}</Text>
+            <Text style={s.coverMetricSub}>{methodLabel.toLowerCase()}</Text>
+          </View>
+        </View>
+
+        {offerPrice > 0 && inputs.price > 0 && (
+          <View style={s.coverMetricsRow}>
+            <View style={s.coverMetricBox}>
+              <Text style={s.coverMetricLabel}>vs. Asking</Text>
+              <Text style={[s.coverMetricValue, { fontSize: 13, color: offerPrice < inputs.price ? C.green : C.red }]}>
+                {fmtDelta(offerPrice - inputs.price)} ({((offerPrice - inputs.price) / inputs.price * 100).toFixed(1)}%)
+              </Text>
+              <Text style={s.coverMetricSub}>asking {fmtDollar(inputs.price)}</Text>
+            </View>
+            <View style={s.coverMetricBox}>
+              <Text style={s.coverMetricLabel}>Price / Unit (offer)</Text>
+              <Text style={[s.coverMetricValue, { fontSize: 13 }]}>{units > 0 ? fmtDollar(offerPrice / units) : '—'}</Text>
+              <Text style={s.coverMetricSub}>{units > 0 ? `asking ${fmtDollar(inputs.price / units)}` : ''}</Text>
+            </View>
+            <View style={s.coverMetricBox}>
+              <Text style={s.coverMetricLabel}>DCR</Text>
+              <Text style={[s.coverMetricValue, { fontSize: 13, color: dcrColor }]}>{fmtX(d.dcr)}</Text>
+              <Text style={s.coverMetricSub}>lender min 1.20×</Text>
+            </View>
+            <View style={s.coverMetricBox}>
+              <Text style={s.coverMetricLabel}>Y1 Total ROE</Text>
+              <Text style={[s.coverMetricValue, { fontSize: 13, color: C.green }]}>{fmtPct(d.r1)}</Text>
+              <Text style={s.coverMetricSub}>REP + bonus dep</Text>
+            </View>
+          </View>
+        )}
+
+        <Text style={s.coverFooter}>Scenario: {scenarioName}  ·  {methodLabel}  ·  Prepared {date}</Text>
+        <Text style={s.coverConfidential}>CONFIDENTIAL — For Discussion Purposes Only</Text>
       </Page>
 
       {/* ── P&L + Tax ──────────────────────────────────────────────────── */}
@@ -160,7 +246,7 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
         <View style={s.metricsRow}>
           <View style={s.metricCard}>
             <Text style={s.metricLabel}>NOI</Text>
-            <Text style={[s.metricValue, { color: '#185FA5' }]}>{fmtDollar(d.NOI)}</Text>
+            <Text style={[s.metricValue, { color: C.blue }]}>{fmtDollar(d.NOI)}</Text>
             <Text style={s.metricSub}>{methodLabel}</Text>
           </View>
           <View style={s.metricCard}>
@@ -175,7 +261,7 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
           </View>
           <View style={s.metricCard}>
             <Text style={s.metricLabel}>Pre-tax cash flow</Text>
-            <Text style={[s.metricValue, { color: d.CF < 0 ? '#A32D2D' : '#1D6B3E' }]}>{fmtNeg(d.CF)}</Text>
+            <Text style={[s.metricValue, { color: d.CF < 0 ? C.red : C.green }]}>{fmtNeg(d.CF)}</Text>
             <Text style={s.metricSub}>after debt service</Text>
           </View>
         </View>
@@ -197,7 +283,7 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
           </View>
           <View style={s.metricCard}>
             <Text style={s.metricLabel}>Y1 total ROE</Text>
-            <Text style={[s.metricValue, { color: '#1D6B3E' }]}>{fmtPct(d.r1)}</Text>
+            <Text style={[s.metricValue, { color: C.green }]}>{fmtPct(d.r1)}</Text>
             <Text style={s.metricSub}>REP + bonus dep</Text>
           </View>
         </View>
@@ -206,12 +292,12 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
           <View style={s.metricsRow}>
             <View style={[s.metricCard, { backgroundColor: '#EAF3DE', borderWidth: 0.5, borderColor: '#97c459' }]}>
               <Text style={s.metricLabel}>Offer Price</Text>
-              <Text style={[s.metricValue, { color: '#1D6B3E' }]}>{fmtDollar(offerPrice)}</Text>
+              <Text style={[s.metricValue, { color: C.green }]}>{fmtDollar(offerPrice)}</Text>
               <Text style={s.metricSub}>at {targetCap.toFixed(1)}% cap</Text>
             </View>
             <View style={s.metricCard}>
               <Text style={s.metricLabel}>vs. Asking</Text>
-              <Text style={[s.metricValue, { color: offerPrice < inputs.price ? '#1D6B3E' : '#A32D2D' }]}>
+              <Text style={[s.metricValue, { color: offerPrice < inputs.price ? C.green : C.red }]}>
                 {fmtDelta(offerPrice - inputs.price)}
               </Text>
               <Text style={s.metricSub}>{inputs.price > 0 ? `${((offerPrice - inputs.price) / inputs.price * 100).toFixed(1)}%` : ''}</Text>
@@ -282,17 +368,17 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
             <View style={s.metricsRow}>
               <View style={s.metricCard}>
                 <Text style={s.metricLabel}>Pre-tax CoC</Text>
-                <Text style={[s.metricValue, { fontSize: 12, color: d.coc < 0 ? '#A32D2D' : '#1D6B3E' }]}>{fmtPct(d.coc)}</Text>
+                <Text style={[s.metricValue, { fontSize: 12, color: d.coc < 0 ? C.red : C.green }]}>{fmtPct(d.coc)}</Text>
               </View>
               <View style={s.metricCard}>
                 <Text style={s.metricLabel}>After-tax CoC</Text>
-                <Text style={[s.metricValue, { fontSize: 12, color: '#1D6B3E' }]}>{fmtPct(d.atc)}</Text>
+                <Text style={[s.metricValue, { fontSize: 12, color: C.green }]}>{fmtPct(d.atc)}</Text>
               </View>
             </View>
             <View style={s.metricsRow}>
               <View style={s.metricCard}>
                 <Text style={s.metricLabel}>Y1 total ROE</Text>
-                <Text style={[s.metricValue, { fontSize: 12, color: '#1D6B3E' }]}>{fmtPct(d.r1)}</Text>
+                <Text style={[s.metricValue, { fontSize: 12, color: C.green }]}>{fmtPct(d.r1)}</Text>
               </View>
               <View style={s.metricCard}>
                 <Text style={s.metricLabel}>Yr 2+ ROE</Text>
@@ -318,8 +404,8 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
           <View style={s.tableHdrRow}>
             <Text style={[s.tableHdrCell, { flex: 2.5 }]}>Line item</Text>
             {allCols.map((col, i) => (
-              <Text key={i} style={[s.tableHdrCell, { 
-                color: i === 0 ? '#A8C4E0' : i === 1 ? '#F4C87A' : i === 2 ? '#90EE90' : '#DDA0DD',
+              <Text key={i} style={[s.tableHdrCell, {
+                color: i === 0 ? C.blue : i === 1 ? C.amber : i === 2 ? C.green : '#6B21A8',
                 textAlign: 'right', flex: 1 }]}>
                 {col.label}
               </Text>
@@ -348,18 +434,18 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
                 <Text style={[s.tableCell, { flex: 2.5,
                   fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica',
                   paddingLeft: row.label.startsWith('  ') ? 16 : 6,
-                  color: row.label.startsWith('  ') ? '#5F5E5A' : '#111' }]}>
+                  color: row.label.startsWith('  ') ? C.textLight : C.text }]}>
                   {row.label.trim()}
                 </Text>
                 {calcs.map((calc, ci) => (
                   <Text key={ci} style={[s.tableCellR, { flex: 1,
-                    color: ci === 0 ? '#185FA5' : ci === 1 ? '#854F0B' : ci === 2 ? '#1D6B3E' : '#6B21A8' }]}>
+                    color: ci === 0 ? C.blue : ci === 1 ? C.amber : ci === 2 ? C.green : '#6B21A8' }]}>
                     {row.get(calc)}
                   </Text>
                 ))}
                 {allCols.length > 1 && (
                   <Text style={[s.tableCellR, { flex: 0.8,
-                    color: row.noD ? '#888' : row.delta(calcs[calcs.length-1]) > 50 ? '#1D6B3E' : row.delta(calcs[calcs.length-1]) < -50 ? '#A32D2D' : '#888',
+                    color: row.noD ? C.textMuted : row.delta(calcs[calcs.length-1]) > 50 ? C.green : row.delta(calcs[calcs.length-1]) < -50 ? C.red : C.textMuted,
                     fontFamily: 'Helvetica-Bold' }]}>
                     {row.noD ? '—' : row.pct ? fmtDeltaPct(row.delta(calcs[calcs.length-1])) : row.x ? ((row.delta(calcs[calcs.length-1]) >= 0 ? '+' : '') + row.delta(calcs[calcs.length-1]).toFixed(2) + '×') : fmtDelta(row.delta(calcs[calcs.length-1]))}
                   </Text>
@@ -391,7 +477,8 @@ export async function generatePDF(
   units: number,
   yearBuilt: number,
   scenarioName: string,
-  scenarioCols?: ScenarioCol[]
+  scenarioCols?: ScenarioCol[],
+  propertyImageUrl?: string
 ): Promise<void> {
   const blob = await pdf(
     <ReportDocument
@@ -403,6 +490,7 @@ export async function generatePDF(
       yearBuilt={yearBuilt}
       scenarioName={scenarioName}
       scenarioCols={scenarioCols}
+      propertyImageUrl={propertyImageUrl}
     />
   ).toBlob()
   const url = URL.createObjectURL(blob)
