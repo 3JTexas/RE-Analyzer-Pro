@@ -122,6 +122,8 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
   const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
   const methodLabel = isOM ? 'OM Method' : 'Physical Occupancy'
   const dcrColor = d.dcr < 1 ? '#A32D2D' : d.dcr < 1.2 ? '#854F0B' : '#1D6B3E'
+  const targetCap = inputs.targetCapRate ?? 0
+  const offerPrice = targetCap > 0 && d.NOI > 0 ? d.NOI / (targetCap / 100) : 0
 
   const safeName = (propertyName || 'Investment Property').trim()
   
@@ -140,6 +142,11 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
         <Text style={s.coverMeta}>
           {units} Units{yearBuilt ? `  ·  Year Built ${yearBuilt}` : ''}{inputs.price > 0 ? `  ·  Listed ${fmtDollar(inputs.price)}` : ''}
         </Text>
+        {offerPrice > 0 && (
+          <Text style={[s.coverMeta, { fontSize: 14, fontFamily: 'Helvetica-Bold', color: '#E07820', marginTop: 8 }]}>
+            Offer Price: {fmtDollar(offerPrice)}  ·  at {targetCap.toFixed(1)}% cap
+          </Text>
+        )}
         <Text style={s.coverMeta}>Scenario: {scenarioName}  ·  Method: {methodLabel}</Text>
         <Text style={[s.coverMeta, { marginTop: 12 }]}>Prepared: {date}</Text>
         <Text style={[s.coverMeta, { marginTop: 4 }]}>CONFIDENTIAL — For Discussion Purposes Only</Text>
@@ -194,6 +201,33 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
             <Text style={s.metricSub}>REP + bonus dep</Text>
           </View>
         </View>
+
+        {offerPrice > 0 && (
+          <View style={s.metricsRow}>
+            <View style={[s.metricCard, { backgroundColor: '#EAF3DE', borderWidth: 0.5, borderColor: '#97c459' }]}>
+              <Text style={s.metricLabel}>Offer Price</Text>
+              <Text style={[s.metricValue, { color: '#1D6B3E' }]}>{fmtDollar(offerPrice)}</Text>
+              <Text style={s.metricSub}>at {targetCap.toFixed(1)}% cap</Text>
+            </View>
+            <View style={s.metricCard}>
+              <Text style={s.metricLabel}>vs. Asking</Text>
+              <Text style={[s.metricValue, { color: offerPrice < inputs.price ? '#1D6B3E' : '#A32D2D' }]}>
+                {fmtDelta(offerPrice - inputs.price)}
+              </Text>
+              <Text style={s.metricSub}>{inputs.price > 0 ? `${((offerPrice - inputs.price) / inputs.price * 100).toFixed(1)}%` : ''}</Text>
+            </View>
+            <View style={s.metricCard}>
+              <Text style={s.metricLabel}>Price / unit (offer)</Text>
+              <Text style={s.metricValue}>{units > 0 ? fmtDollar(offerPrice / units) : '—'}</Text>
+              <Text style={s.metricSub}>{units > 0 && inputs.price > 0 ? `asking ${fmtDollar(inputs.price / units)}` : ''}</Text>
+            </View>
+            <View style={s.metricCard}>
+              <Text style={s.metricLabel}>Down payment (offer)</Text>
+              <Text style={s.metricValue}>{fmtDollar(offerPrice * (1 - inputs.lev / 100))}</Text>
+              <Text style={s.metricSub}>{(100 - inputs.lev).toFixed(0)}% equity</Text>
+            </View>
+          </View>
+        )}
 
         <View style={d.dcr < 1 ? s.alertRed : d.dcr < 1.2 ? s.alertAmber : s.alertGreen}>
           <Text style={s.alertText}>
