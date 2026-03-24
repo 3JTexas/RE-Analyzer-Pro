@@ -6,7 +6,8 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   badge?: string
   badgeColor?: 'blue' | 'amber'
 }
-export function InputField({ label, badge, badgeColor = 'blue', className, ...props }: InputProps) {
+export function InputField({ label, badge, badgeColor = 'blue', className, onFocus, onBlur, onChange, ...props }: InputProps) {
+  const isNumber = props.type === 'number'
   return (
     <div className="relative bg-gray-50 rounded-lg p-2.5">
       {badge && (
@@ -18,6 +19,28 @@ export function InputField({ label, badge, badgeColor = 'blue', className, ...pr
       <label className="block text-xs text-gray-500 mb-1">{label}</label>
       <input
         {...props}
+        onFocus={e => {
+          if (isNumber) e.target.select()
+          onFocus?.(e)
+        }}
+        onBlur={e => {
+          if (isNumber && e.target.value === '') {
+            const nativeSet = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+            nativeSet.call(e.target, '0')
+            e.target.dispatchEvent(new Event('input', { bubbles: true }))
+          }
+          onBlur?.(e)
+        }}
+        onChange={e => {
+          if (isNumber) {
+            const raw = e.target.value
+            const cleaned = raw.replace(/^0+(\d)/, '$1')
+            if (cleaned !== raw) {
+              e.target.value = cleaned
+            }
+          }
+          onChange?.(e)
+        }}
         className={`w-full text-sm font-medium text-gray-900 bg-white border border-gray-200
           rounded-md px-2 py-1 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 ${className ?? ''}`}
       />
