@@ -498,14 +498,10 @@ export async function generatePDF(
   propertyImageUrl?: string
 ): Promise<void> {
   // Pre-fetch property image as base64 to avoid CORS issues in @react-pdf/renderer
-  console.log('[PDF] generatePDF called — propertyImageUrl:', propertyImageUrl ?? '(undefined)')
   let imageData: string | undefined
   if (propertyImageUrl) {
     const b64 = await fetchImageAsBase64(propertyImageUrl)
-    console.log('[PDF] fetchImageAsBase64 result:', b64 ? `OK (${b64.slice(0, 50)}...)` : 'NULL — fetch failed')
     if (b64) imageData = b64
-  } else {
-    console.log('[PDF] No propertyImageUrl passed — skipping image fetch')
   }
 
   const blob = await pdf(

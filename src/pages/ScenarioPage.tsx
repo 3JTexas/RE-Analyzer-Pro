@@ -39,10 +39,7 @@ export function ScenarioPage() {
         .eq('id', scenario.property_id)
         .single()
         .then(({ data }) => {
-          if (data) {
-            console.log('[ScenarioPage] property_image_url from DB:', (data as any).property_image_url ?? '(null)')
-            setProperty(data as PropertyMeta)
-          }
+          if (data) setProperty(data as PropertyMeta)
         })
     }
   }, [scenario?.property_id])
