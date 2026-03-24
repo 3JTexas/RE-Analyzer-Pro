@@ -144,11 +144,19 @@ interface ReportProps {
   propertyImageUrl?: string
 }
 
+function deriveMethodLabel(inputs: ModelInputs, method: Method, label?: string): string {
+  // If scenario name indicates OM As-Presented, use that
+  if (label && /om\s*as[- ]?presented/i.test(label)) return 'OM As-Presented'
+  // Auto-derive from occupancy
+  if (inputs.ou > 0 && inputs.ou < inputs.tu) return 'Physical Occupancy'
+  return method === 'om' ? 'OM Method' : 'Physical Occupancy'
+}
+
 function ReportDocument({ inputs, method, propertyName, address, units, yearBuilt, scenarioName, scenarioCols = [], propertyImageUrl }: ReportProps) {
   const isOM = method === 'om'
   const d    = calculate(inputs, isOM)
   const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-  const methodLabel = isOM ? 'OM Method' : 'Physical Occupancy'
+  const methodLabel = deriveMethodLabel(inputs, method, scenarioName)
   const dcrColor = d.dcr < 1 ? C.red : d.dcr < 1.2 ? C.amber : C.green
   const safeName = (propertyName || 'Investment Property').trim()
 
@@ -380,6 +388,27 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
           {(() => {
             const calcs = allCols.map(col => calculate(col.inputs, col.method === 'om'))
             const base = calcs[0]
+            // Purchase Price row (uses inputs, not calcs)
+            const priceRow = (
+              <View style={[s.tableRow, { backgroundColor: '#EDF2F7' }]}>
+                <Text style={[s.tableCell, { flex: 2.5, fontFamily: 'Helvetica-Bold', paddingLeft: 6, color: C.text }]}>
+                  Purchase Price
+                </Text>
+                {allCols.map((col, ci) => (
+                  <Text key={ci} style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold',
+                    color: ci === 0 ? C.blue : ci === 1 ? C.amber : ci === 2 ? C.green : '#6B21A8' }]}>
+                    {fmtDollar(col.inputs.price)}
+                  </Text>
+                ))}
+                {allCols.length > 1 && (
+                  <Text style={[s.tableCellR, { flex: 0.8, fontFamily: 'Helvetica-Bold',
+                    color: allCols[allCols.length-1].inputs.price - allCols[0].inputs.price > 0 ? C.red
+                      : allCols[allCols.length-1].inputs.price - allCols[0].inputs.price < 0 ? C.green : C.textMuted }]}>
+                    {fmtDelta(allCols[allCols.length-1].inputs.price - allCols[0].inputs.price)}
+                  </Text>
+                )}
+              </View>
+            )
             const rows = [
               { label: 'Gross potential rent', get: (d: typeof base) => fmtDollar(d.GSR), delta: (d: typeof base) => d.GSR - base.GSR },
               { label: '  Less: vacancy', get: (d: typeof base) => `(${fmtDollar(d.vac)})`, delta: (d: typeof base) => base.vac - d.vac },
@@ -394,7 +423,7 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
               { label: 'DCR', get: (d: typeof base) => fmtX(d.dcr), delta: (d: typeof base) => d.dcr - base.dcr, x: true },
               { label: 'Y1 total ROE', get: (d: typeof base) => fmtPct(d.r1), delta: (d: typeof base) => d.r1 - base.r1, pct: true, bold: true },
             ]
-            return rows.map((row, i) => (
+            return <>{priceRow}{rows.map((row, i) => (
               <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
                 <Text style={[s.tableCell, { flex: 2.5,
                   fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica',
@@ -416,7 +445,7 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
                   </Text>
                 )}
               </View>
-            ))
+            ))}</>
           })()}
         </View>
 
