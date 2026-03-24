@@ -1,4 +1,4 @@
-import { Document, Page, Text, View, Image, StyleSheet, pdf } from '@react-pdf/renderer'
+import { Document, Page, Text, View, Image, StyleSheet, pdf, Svg, Path, Line as SvgLine, Circle } from '@react-pdf/renderer'
 import type { ModelInputs, Method } from '../../types'
 import { calculate, fmtDollar, fmtNeg, fmtPct, fmtX, fmtDelta, fmtDeltaPct } from '../../lib/calc'
 
@@ -366,6 +366,96 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
             <PLRowComp label="Est. total cash to close" value={fmtDollar(d.eq + d.ccAmt)} variant="total" />
           </View>
         </View>
+
+        {/* ── Tax Benefit Runway ──────────────────────────────────────── */}
+        {d.brk > 0 && (inputs.costSeg > 0 || inputs.land < 100) && (() => {
+          const monthlyCF = d.CF / 12
+          const y1MonthlyTax = d.ts / 12
+          const y2MonthlyTax = (d.sl * d.brk / 100) / 12
+          const cumulative: number[] = []
+          let bal = 0
+          for (let m = 1; m <= 120; m++) {
+            bal += monthlyCF + (m <= 12 ? y1MonthlyTax : y2MonthlyTax)
+            cumulative.push(Math.round(bal))
+          }
+          const peak = Math.max(...cumulative)
+          const peakIdx = cumulative.indexOf(peak)
+          const trough = Math.min(...cumulative)
+          const extIdx = cumulative.findIndex((v, i) => i > peakIdx && v <= 0)
+          const extMonth = extIdx >= 0 ? extIdx + 1 : null
+
+          // SVG chart dimensions
+          const W = 480, H = 100, PX = 30, PY = 8
+          const cW = W - PX * 2, cH = H - PY * 2
+          const yMax = Math.max(peak, 1000)
+          const yMin = Math.min(trough, 0) - 500
+          const yRange = yMax - yMin
+          const toX = (i: number) => PX + (i / 119) * cW
+          const toY = (v: number) => PY + (1 - (v - yMin) / yRange) * cH
+          const zeroY = toY(0)
+
+          const pathD = cumulative.map((v, i) =>
+            `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`
+          ).join(' ')
+
+          const y1Monthly = monthlyCF + y1MonthlyTax
+          const y2Monthly = monthlyCF + y2MonthlyTax
+
+          return (
+            <>
+              <SectionHdr title="Tax benefit runway — 10yr cumulative after-tax" />
+              <Svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+                {/* Zero axis */}
+                <SvgLine x1={PX} y1={zeroY} x2={W - PX} y2={zeroY} strokeWidth={0.5} stroke="#888" />
+                {/* Year 1 separator */}
+                <SvgLine x1={toX(11)} y1={PY} x2={toX(11)} y2={H - PY} strokeWidth={0.5} stroke="#aaa" strokeDasharray="2,2" />
+                {/* Data line */}
+                <Path d={pathD} fill="none" stroke={C.green} strokeWidth={1.2} />
+                {/* Red portion after extinguish */}
+                {extIdx >= 0 && (
+                  <Path d={cumulative.slice(extIdx).map((v, i) =>
+                    `${i === 0 ? 'M' : 'L'}${toX(extIdx + i).toFixed(1)},${toY(v).toFixed(1)}`
+                  ).join(' ')} fill="none" stroke={C.red} strokeWidth={1.2} />
+                )}
+                {/* Peak dot */}
+                <Circle cx={toX(peakIdx)} cy={toY(peak)} r={3} fill={C.green} />
+                {/* Extinguish dot */}
+                {extIdx >= 0 && <Circle cx={toX(extIdx)} cy={toY(0)} r={3} fill={C.red} />}
+              </Svg>
+              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 4, marginTop: 2 }}>
+                <Text style={{ fontSize: 7.5, color: C.green }}>Peak: {fmtDollar(peak)} at Mo {peakIdx + 1}</Text>
+                <Text style={{ fontSize: 7.5, color: C.textMuted }}>|  Dashed line = bonus dep ends (Mo 12)</Text>
+                {extMonth && <Text style={{ fontSize: 7.5, color: C.red }}>Exhausted: Mo {extMonth} (Yr {Math.ceil(extMonth / 12)})</Text>}
+                {!extMonth && <Text style={{ fontSize: 7.5, color: C.green }}>Never exhausted within 10 years</Text>}
+              </View>
+
+              {/* How this chart works — explanation grid */}
+              <View style={[s.table, { marginTop: 4 }]}>
+                <View style={s.tableHdrRow}>
+                  <Text style={[s.tableHdrCell, { flex: 2 }]}>Component</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1.5, textAlign: 'right' }]}>Year 1 (monthly)</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1.5, textAlign: 'right' }]}>Year 2+ (monthly)</Text>
+                  <Text style={[s.tableHdrCell, { flex: 2, textAlign: 'right' }]}>Note</Text>
+                </View>
+                {[
+                  { label: 'Pre-tax cash flow', y1: fmtDollar(monthlyCF), y2: fmtDollar(monthlyCF), note: monthlyCF < 0 ? 'Negative - NOI < debt service' : 'NOI less debt service' },
+                  { label: '+ Bonus dep tax savings', y1: fmtDollar(d.ts / 12), y2: '-', note: 'One-time Year 1 benefit only' },
+                  { label: '+ SL dep tax savings', y1: 'incl. above', y2: fmtDollar(d.sl * d.brk / 100 / 12), note: 'Ongoing annual benefit' },
+                  { label: 'Monthly net after-tax', y1: fmtDollar(y1Monthly), y2: fmtDollar(y2Monthly), note: 'Cliff when bonus dep exhausts', bold: true },
+                  { label: 'Peak cumulative balance', y1: fmtDollar(peak), y2: '-', note: 'Maximum benefit position', bold: true },
+                  { label: 'Months until exhausted', y1: '-', y2: extMonth ? `Month ${extMonth}` : 'Never', note: extMonth ? `Year ${Math.ceil(extMonth / 12)}` : 'Stays positive 10yr', bold: true },
+                ].map((row, i) => (
+                  <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
+                    <Text style={[s.tableCell, { flex: 2, fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica' }]}>{row.label}</Text>
+                    <Text style={[s.tableCellR, { flex: 1.5, fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica' }]}>{row.y1}</Text>
+                    <Text style={[s.tableCellR, { flex: 1.5, fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica' }]}>{row.y2}</Text>
+                    <Text style={[s.tableCellR, { flex: 2, color: C.textLight, fontSize: 7.5 }]}>{row.note}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )
+        })()}
       </Page>
 
       {/* ── Side by side: actual scenarios ──────────────────────────────── */}

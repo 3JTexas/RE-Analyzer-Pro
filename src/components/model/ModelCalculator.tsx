@@ -34,8 +34,13 @@ function TaxRunwayChart({ d }: { d: ReturnType<typeof calculate> }) {
 
   const labels = Array.from({ length: 120 }, (_, i) => {
     const m = i + 1
-    return m % 12 === 0 ? `Y${m / 12}` : ''
+    if (m % 12 === 0) return `Year ${m / 12}`
+    if (m % 3 === 0 && m < 24) return `Mo ${m}`
+    return ''
   })
+
+  const extMonth = data.extinguishIdx >= 0 ? data.extinguishIdx + 1 : null
+  const extYear = extMonth ? Math.ceil(extMonth / 12) : null
 
   const chartData = {
     labels,
@@ -51,20 +56,21 @@ function TaxRunwayChart({ d }: { d: ReturnType<typeof calculate> }) {
       backgroundColor: data.cumulative.map(v => v >= 0 ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.08)'),
       fill: true,
       tension: 0.3,
-      pointRadius: data.cumulative.map((_, i) => i === data.peakIdx ? 5 : 0),
-      pointBackgroundColor: '#16a34a',
+      pointRadius: data.cumulative.map((_, i) =>
+        i === data.peakIdx ? 6 : (data.extinguishIdx >= 0 && i === data.extinguishIdx) ? 6 : 0
+      ),
+      pointBackgroundColor: data.cumulative.map((_, i) =>
+        i === data.peakIdx ? '#16a34a' : (data.extinguishIdx >= 0 && i === data.extinguishIdx) ? '#dc2626' : '#16a34a'
+      ),
       borderWidth: 1.5,
     }],
   }
-
-  const extMonth = data.extinguishIdx >= 0 ? data.extinguishIdx + 1 : null
-  const extYear = extMonth ? Math.ceil(extMonth / 12) : null
 
   return (
     <div className="mt-3">
       <SectionHeader title="Tax benefit runway — 10yr cumulative after-tax" tooltip="Shows how long the Y1 bonus depreciation tax benefit lasts when offset against ongoing cash flow and SL depreciation savings." />
       <div className="border border-gray-100 rounded-lg p-3 bg-white">
-        <div style={{ height: 180 }}>
+        <div style={{ height: 200 }}>
           <Line data={chartData} options={{
             responsive: true,
             maintainAspectRatio: false,
@@ -79,8 +85,15 @@ function TaxRunwayChart({ d }: { d: ReturnType<typeof calculate> }) {
             },
             scales: {
               x: {
-                ticks: { font: { size: 9 }, color: '#888', maxRotation: 0 },
-                grid: { display: false },
+                ticks: {
+                  font: (ctx) => ({ size: ctx.tick?.label?.toString().startsWith('Year') ? 10 : 8, weight: ctx.tick?.label?.toString().startsWith('Year') ? 'bold' as const : 'normal' as const }),
+                  color: (ctx) => ctx.tick?.label?.toString().startsWith('Year') ? '#333' : '#aaa',
+                  maxRotation: 0,
+                },
+                grid: {
+                  color: (ctx) => ctx.tick?.label?.toString().startsWith('Year') ? '#e0e0e0' : 'transparent',
+                  lineWidth: (ctx) => ctx.tick?.label === 'Year 1' ? 2 : 1,
+                },
               },
               y: {
                 ticks: {
@@ -88,15 +101,19 @@ function TaxRunwayChart({ d }: { d: ReturnType<typeof calculate> }) {
                   color: '#888',
                   callback: (v) => {
                     const n = v as number
+                    if (n === 0) return '$0'
                     return n >= 1000 || n <= -1000 ? `$${(n / 1000).toFixed(0)}k` : `$${n}`
                   },
                 },
-                grid: { color: '#f0f0f0' },
+                grid: {
+                  color: (ctx) => ctx.tick.value === 0 ? '#666' : '#f0f0f0',
+                  lineWidth: (ctx) => ctx.tick.value === 0 ? 1.5 : 0.5,
+                },
               },
             },
           }} />
         </div>
-        <div className="flex items-center gap-4 mt-2 text-[10px]">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[10px]">
           <div className="flex items-center gap-1">
             <div className="w-2 h-2 rounded-full bg-green-600" />
             <span className="text-gray-500">Peak: <strong className="text-gray-700">{fmtDollar(data.peak)}</strong> at Month {data.peakIdx + 1}</span>
@@ -104,12 +121,14 @@ function TaxRunwayChart({ d }: { d: ReturnType<typeof calculate> }) {
           {extMonth && (
             <div className="flex items-center gap-1">
               <div className="w-2 h-2 rounded-full bg-red-600" />
-              <span className="text-gray-500">Benefit extinguished: <strong className="text-red-600">Month {extMonth} (Year {extYear})</strong></span>
+              <span className="text-gray-500">Exhausted: <strong className="text-red-600">Month {extMonth} (Year {extYear})</strong></span>
             </div>
           )}
           {!extMonth && (
-            <span className="text-green-600 font-medium">Benefit never extinguished within 10 years</span>
+            <span className="text-green-600 font-medium">Benefit never exhausted within 10 years</span>
           )}
+          <span className="text-gray-400">|</span>
+          <span className="text-gray-400">Dashed grid at Year 1 = bonus dep ends</span>
         </div>
       </div>
     </div>
@@ -817,16 +836,20 @@ export function ModelCalculator({
             </div>
             <div className="grid grid-cols-2 gap-2 mb-1">
               <InputField label="Total units" type="number" value={inputs.tu} min={1} max={100} step={1}
+                tooltip="Total number of rentable units in the property"
                 badge="OM" onChange={e => set('tu', +e.target.value)} />
               <InputField label="Units occupied" type="number" value={inputs.ou} min={0} max={inputs.tu} step={1}
+                tooltip="Units currently occupied. If less than total units, physical vacancy method is used instead of OM method"
                 badge="OM" onChange={e => set('ou', +e.target.value)} />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <InputField label="Avg rent / unit / mo ($)" type="number" dollar value={inputs.rent} min={500} step={25}
+                tooltip="Blended average monthly rent across all units"
                 badge="OM" onChange={e => set('rent', +e.target.value)} />
               <InputField
                 label={method === 'om' ? 'Vacancy % (of GSR)' : 'Turnover buffer %'}
                 type="number" value={inputs.vp} min={0} max={50} step={0.5}
+                tooltip="Economic vacancy allowance - used in OM method only. Typically 4-5% for stabilized properties"
                 badge="OM" onChange={e => set('vp', +e.target.value)} />
             </div>
             <div className="mt-2 space-y-1">
@@ -853,16 +876,22 @@ export function ModelCalculator({
             </SectionHeader>
             <div className="grid grid-cols-2 gap-2">
               <InputField {...omBadge('price')} label="Purchase price ($)" type="number" dollar value={inputs.price} step={10000}
+                tooltip="Total acquisition price. Drives loan amount, depreciation basis, and all return metrics"
                 badge="OM" onChange={e => set('price', +e.target.value)} />
               <InputField {...omBadge('ir')} label="Interest rate (%)" type="number" value={inputs.ir} step={0.125}
+                tooltip="Annual mortgage interest rate"
                 badge="OM" onChange={e => set('ir', +e.target.value)} />
               <InputField {...omBadge('lev')} label="Leverage / LTV (%)" type="number" value={inputs.lev} min={0} max={100} step={1}
+                tooltip="Loan-to-value ratio. e.g. 70 = 70% LTV, 30% down"
                 badge="OM" onChange={e => set('lev', +e.target.value)} />
               <InputField {...omBadge('am')} label="Amortization (years)" type="number" value={inputs.am} step={5}
+                tooltip="Loan term in years for payment calculation"
                 badge="OM" onChange={e => set('am', +e.target.value)} />
               <InputField {...omBadge('lf')} label="Lender fee (%)" type="number" value={inputs.lf} step={0.125}
+                tooltip="Origination fee as % of loan amount - added to cash to close"
                 onChange={e => set('lf', +e.target.value)} />
               <InputField {...omBadge('cc')} label="Closing costs (% of price)" type="number" value={inputs.cc} step={0.25}
+                tooltip="Additional closing costs as % of purchase price"
                 onChange={e => set('cc', +e.target.value)} />
             </div>
 
@@ -897,20 +926,28 @@ export function ModelCalculator({
             ) : (
               <div className="grid grid-cols-2 gap-2">
                 <InputField {...omBadge('tax')} label="Real estate taxes ($)" type="number" dollar value={inputs.tax} step={500}
+                  tooltip="Annual property tax bill. Should reflect post-sale reassessment - Florida reassesses at purchase price on sale"
                   badge="OM" onChange={e => set('tax', +e.target.value)} />
                 <InputField {...omBadge('ins')} label="Insurance ($/door/yr)" type="number" dollar value={inputs.ins} step={100}
+                  tooltip="Annual insurance premium per door. Age-adjusted benchmark: 90yr+ building = $3,000+/door"
                   badge="OM" onChange={e => set('ins', +e.target.value)} />
                 <InputField {...omBadge('util')} label="Utilities ($)" type="number" dollar value={inputs.util} step={500}
+                  tooltip="Landlord-paid utilities - water, trash, common area electric"
                   badge="OM" onChange={e => set('util', +e.target.value)} />
                 <InputField {...omBadge('rm')} label="R&M ($/unit/yr)" type="number" dollar value={inputs.rm} step={50}
+                  tooltip="Repairs and maintenance per unit/yr. Age-adjusted benchmark: 90yr+ building = $900/unit/yr"
                   badge="OM" onChange={e => set('rm', +e.target.value)} />
                 <InputField {...omBadge('cs')} label="Contract services ($)" type="number" dollar value={inputs.cs} step={100}
+                  tooltip="Landscaping, pest control, elevator, pool service etc."
                   badge="OM" onChange={e => set('cs', +e.target.value)} />
                 <InputField {...omBadge('ga')} label="G&A ($)" type="number" dollar value={inputs.ga} step={100}
+                  tooltip="General and administrative - office, phone, misc. Typically $75-100/unit"
                   badge="OM" onChange={e => set('ga', +e.target.value)} />
                 <InputField {...omBadge('res')} label="Reserves ($/unit/yr)" type="number" dollar value={inputs.res} step={50}
+                  tooltip="Capital replacement reserve per unit/yr. Age-adjusted benchmark: 90yr+ building = $700/unit/yr"
                   badge="OM" onChange={e => set('res', +e.target.value)} />
                 <InputField {...omBadge('pm')} label="Prop. mgmt (%)" type="number" value={inputs.pm} step={0.5}
+                  tooltip="Property management fee as % of effective gross income. Typically 8-10% for small multifamily"
                   badge="OM" onChange={e => set('pm', +e.target.value)} />
               </div>
             )}
@@ -934,12 +971,13 @@ export function ModelCalculator({
             <SectionHeader title="Tax" />
             <div className="grid grid-cols-2 gap-2">
               <InputField label="Tax bracket (%)" type="number" value={inputs.brk} step={1}
+                tooltip="Your marginal federal income tax rate. Used to calculate tax savings from depreciation deductions"
                 badgeColor="amber" badge="yours" onChange={e => set('brk', +e.target.value)} />
               <InputField label="Land % (non-depreciable)" type="number" value={inputs.land} step={1}
-                tooltip="Estimated % of purchase price allocated to land. Land is not depreciable. Typically 15\u201325% in Florida."
+                tooltip="Estimated % of purchase price allocated to land. Land is not depreciable. Typically 15-25% in Florida."
                 badgeColor="amber" badge="estimated" onChange={e => set('land', +e.target.value)} />
               <InputField label="Cost seg % (5/7/15yr)" type="number" value={inputs.costSeg} step={1}
-                tooltip="% of depreciable building value reclassified to 5/7/15-year property via cost segregation study. Qualifies for 100% bonus depreciation. Typically 20\u201330% of building value."
+                tooltip="% of depreciable building value reclassified to 5/7/15-year property via cost segregation study. Qualifies for 100% bonus depreciation. Typically 20-30% of building value."
                 badgeColor="amber" badge="estimated" onChange={e => set('costSeg', +e.target.value)} />
             </div>
             {omScenario?.id !== currentScenarioId && (
@@ -962,9 +1000,10 @@ export function ModelCalculator({
             {omScenario?.id !== currentScenarioId && inputs.is1031 && (
               <div className="mt-2 space-y-2">
                 <InputField label="1031 equity rolling in ($)" type="number" dollar value={inputs.equity1031} step={10000}
+                  tooltip="Net proceeds from your relinquished property rolling into this purchase. Reduces cash required at closing"
                   badgeColor="amber" badge="from relinquished sale" onChange={e => set('equity1031', +e.target.value)} />
                 <InputField label="Est. carryover adjusted basis ($)" type="number" dollar value={inputs.basis1031} step={10000} min={0}
-                  tooltip="In a 1031 exchange, your depreciation basis carries over from the relinquished property. Enter the remaining adjusted basis of the property you sold. This replaces the standard purchase-price basis for depreciation calculations."
+                  tooltip="In a 1031 exchange, your depreciation basis carries over from the relinquished property. Enter the remaining adjusted basis of the property you sold"
                   badgeColor="amber" badge="verify w/ CPA" onChange={e => set('basis1031', Math.max(0, +e.target.value))} />
                 <p className="text-[10px] text-amber-700 px-1">
                   ⚠ Carryover basis determines bonus dep — NOT purchase price. Equity rolling in reduces cash to close. Verify both with CPA.
