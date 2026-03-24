@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { Download, Save, RotateCcw } from 'lucide-react'
 import { calculate, OM_DEFAULTS, fmtDollar, fmtNeg, fmtPct, fmtX, fmtDelta, fmtDeltaPct } from '../../lib/calc'
 import type { ModelInputs, Method, Scenario } from '../../types'
@@ -7,6 +7,114 @@ import {
 } from '../ui'
 import { generatePDF } from '../pdf/PdfReport'
 import { loadCompareState, saveCompareState } from '../../lib/uiState'
+import { Line } from 'react-chartjs-2'
+import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
+
+ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
+
+// ── Tax Benefit Runway chart ──────────────────────────────────────────────
+function TaxRunwayChart({ d }: { d: ReturnType<typeof calculate> }) {
+  const data = useMemo(() => {
+    const months = 120
+    const monthlyCF = d.CF / 12
+    const y1MonthlyTax = d.ts / 12
+    const y2MonthlyTax = (d.sl * d.brk / 100) / 12
+    const cumulative: number[] = []
+    let bal = 0
+    for (let m = 1; m <= months; m++) {
+      const taxSav = m <= 12 ? y1MonthlyTax : y2MonthlyTax
+      bal += monthlyCF + taxSav
+      cumulative.push(Math.round(bal))
+    }
+    const peak = Math.max(...cumulative)
+    const peakIdx = cumulative.indexOf(peak)
+    const extinguishIdx = cumulative.findIndex((v, i) => i > peakIdx && v <= 0)
+    return { cumulative, peak, peakIdx, extinguishIdx }
+  }, [d.CF, d.ts, d.sl, d.brk])
+
+  const labels = Array.from({ length: 120 }, (_, i) => {
+    const m = i + 1
+    return m % 12 === 0 ? `Y${m / 12}` : ''
+  })
+
+  const chartData = {
+    labels,
+    datasets: [{
+      data: data.cumulative,
+      borderColor: data.cumulative.map(v => v >= 0 ? '#16a34a' : '#dc2626'),
+      segment: {
+        borderColor: (ctx: any) => {
+          const v = data.cumulative[ctx.p0DataIndex]
+          return v >= 0 ? '#16a34a' : '#dc2626'
+        },
+      },
+      backgroundColor: data.cumulative.map(v => v >= 0 ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.08)'),
+      fill: true,
+      tension: 0.3,
+      pointRadius: data.cumulative.map((_, i) => i === data.peakIdx ? 5 : 0),
+      pointBackgroundColor: '#16a34a',
+      borderWidth: 1.5,
+    }],
+  }
+
+  const extMonth = data.extinguishIdx >= 0 ? data.extinguishIdx + 1 : null
+  const extYear = extMonth ? Math.ceil(extMonth / 12) : null
+
+  return (
+    <div className="mt-3">
+      <SectionHeader title="Tax benefit runway — 10yr cumulative after-tax" />
+      <div className="border border-gray-100 rounded-lg p-3 bg-white">
+        <div style={{ height: 180 }}>
+          <Line data={chartData} options={{
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  title: (items) => `Month ${items[0].dataIndex + 1}`,
+                  label: (item) => fmtDollar(item.raw as number),
+                },
+              },
+              legend: { display: false },
+            },
+            scales: {
+              x: {
+                ticks: { font: { size: 9 }, color: '#888', maxRotation: 0 },
+                grid: { display: false },
+              },
+              y: {
+                ticks: {
+                  font: { size: 9 },
+                  color: '#888',
+                  callback: (v) => {
+                    const n = v as number
+                    return n >= 1000 || n <= -1000 ? `$${(n / 1000).toFixed(0)}k` : `$${n}`
+                  },
+                },
+                grid: { color: '#f0f0f0' },
+              },
+            },
+          }} />
+        </div>
+        <div className="flex items-center gap-4 mt-2 text-[10px]">
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-green-600" />
+            <span className="text-gray-500">Peak: <strong className="text-gray-700">{fmtDollar(data.peak)}</strong> at Month {data.peakIdx + 1}</span>
+          </div>
+          {extMonth && (
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-red-600" />
+              <span className="text-gray-500">Benefit extinguished: <strong className="text-red-600">Month {extMonth} (Year {extYear})</strong></span>
+            </div>
+          )}
+          {!extMonth && (
+            <span className="text-green-600 font-medium">Benefit never extinguished within 10 years</span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ── Column color palettes ────────────────────────────────────────────────
 const COL_STYLES = [
@@ -1038,7 +1146,10 @@ export function ModelCalculator({
                 valueColor={d.r1 < 10 ? 'text-amber-600' : 'text-green-700'} />
               <MetricCard label="Yr 2+ stabilized ROE" value={fmtPct(d.r2)} sub="dep shield + princ." />
             </div>
-            <p className="text-[10px] text-gray-400 leading-relaxed">
+            {d.brk > 0 && (inputs.costSeg > 0 || inputs.land < 100) && (
+              <TaxRunwayChart d={d} />
+            )}
+            <p className="text-[10px] text-gray-400 leading-relaxed mt-3">
               ⚠️ 1031 carryover basis — depreciable basis = relinquished property's remaining adjusted basis,
               NOT purchase price. Verify with CPA before projecting Year 1 tax savings.
             </p>
