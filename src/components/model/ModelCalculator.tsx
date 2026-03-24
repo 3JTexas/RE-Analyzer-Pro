@@ -62,7 +62,7 @@ function TaxRunwayChart({ d }: { d: ReturnType<typeof calculate> }) {
 
   return (
     <div className="mt-3">
-      <SectionHeader title="Tax benefit runway — 10yr cumulative after-tax" />
+      <SectionHeader title="Tax benefit runway — 10yr cumulative after-tax" tooltip="Shows how long the Y1 bonus depreciation tax benefit lasts when offset against ongoing cash flow and SL depreciation savings." />
       <div className="border border-gray-100 rounded-lg p-3 bg-white">
         <div style={{ height: 180 }}>
           <Line data={chartData} options={{
@@ -258,29 +258,23 @@ function CompareTab({ compareA, setCompareA, compareB, setCompareB,
               </tr>
             </thead>
             <tbody>
-              {/* Price / Offer headline row */}
+              {/* Purchase Price headline row — always inputs.price */}
               {(() => {
-                const prices = allCols.map(c => {
-                  const cap = c.inputs.targetCapRate ?? 0
-                  if (cap > 0 && c.data.NOI > 0) return { value: c.data.NOI / (cap / 100), label: 'Offer Price', sub: `at ${cap.toFixed(1)}% cap` }
-                  return { value: c.inputs.price, label: 'Ask Price', sub: 'purchase price' }
-                })
-                const basePrice = prices[0].value
+                const prices = allCols.map(c => c.inputs.price)
+                const basePrice = prices[0]
                 return (
-                  <tr className="border-b-2 border-green-300 bg-green-50">
+                  <tr className="border-b-2 border-blue-200 bg-blue-50">
                     <td className="px-3 py-2 font-semibold text-gray-900">
-                      Price
-                      <div className="text-[9px] font-normal text-gray-400">offer or asking</div>
+                      Purchase Price
                     </td>
                     {allCols.map((col, ci) => (
                       <td key={ci} className={`px-3 py-2 text-right font-bold text-sm ${col.style.val}`}>
-                        <div>{fmtDollar(prices[ci].value)}</div>
-                        <div className="text-[9px] font-normal text-gray-400">{prices[ci].label} · {prices[ci].sub}</div>
+                        {fmtDollar(prices[ci])}
                       </td>
                     ))}
                     <td className="px-3 py-2 text-right">
                       {allCols.slice(1).map((_, ci) => {
-                        const delta = prices[ci + 1].value - basePrice
+                        const delta = prices[ci + 1] - basePrice
                         return (
                           <div key={ci} className={`font-medium text-[10px] ${delta > 0 ? 'text-red-600' : delta < 0 ? 'text-green-700' : 'text-gray-400'}`}>
                             {allCols.length > 2 && <span className="opacity-50 mr-0.5">{COL_LABELS[ci+1]}:</span>}
@@ -584,6 +578,7 @@ export function ModelCalculator({
   const [omSnapshot, setOmSnapshot] = useState<ModelInputs | null>(null)
   const targetCap = inputs.targetCapRate ?? 0
   const setTargetCap = (v: number) => setInputs(prev => ({ ...prev, targetCapRate: v }))
+  const [applyConfirm, setApplyConfirm] = useState(false)
 
   // Compare tab: which two scenarios to diff
   const [compareA, setCompareA] = useState<string>(currentScenarioId ?? 'current')
@@ -1071,7 +1066,15 @@ export function ModelCalculator({
               return (
                 <div className="mt-3 border border-green-200 rounded-lg overflow-hidden">
                   <div className="bg-green-800 px-3 py-2 flex items-center justify-between">
-                    <p className="text-xs font-semibold text-white">Offer calculator</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs font-semibold text-white">Offer calculator</p>
+                      <span className="relative group">
+                        <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-green-700 text-[9px] text-green-300 cursor-help font-semibold leading-none">i</span>
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-52 px-2.5 py-2 text-[10px] leading-snug text-white bg-gray-800 rounded-lg shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50">
+                          Back-solve an offer price from your target cap rate, or check the implied cap at a specific price.
+                        </span>
+                      </span>
+                    </div>
                     <div className="flex bg-green-900/50 rounded-md overflow-hidden">
                       <button onClick={() => setMode('cap')}
                         className={`text-[9px] font-medium px-2.5 py-1 transition-colors ${mode === 'cap' ? 'bg-white/20 text-white' : 'text-green-400 hover:text-white'}`}>
@@ -1149,6 +1152,21 @@ export function ModelCalculator({
                             <div className="text-[9px] text-gray-400">{inputs.ir}% / {inputs.am}yr</div>
                           </div>
                         </div>
+                        <div className="mt-2.5">
+                          {applyConfirm ? (
+                            <p className="text-[10px] text-green-700 font-medium text-center py-1.5">Applied ✓ — loan, depreciation & tax recalculated</p>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setInputs(prev => ({ ...prev, price: Math.round(offerPrice), targetCapRate: 0, targetOfferPrice: 0 }))
+                                setApplyConfirm(true)
+                                setTimeout(() => setApplyConfirm(false), 2000)
+                              }}
+                              className="w-full text-[10px] font-semibold py-1.5 rounded-lg border border-green-400 text-green-700 bg-white hover:bg-green-100 transition-colors">
+                              Apply {fmtDollar(offerPrice)} as purchase price
+                            </button>
+                          )}
+                        </div>
                       </>
                     ) : (
                       <p className="text-[10px] text-gray-400 text-center py-2">
@@ -1165,7 +1183,7 @@ export function ModelCalculator({
         {/* ── TAX TAB ───────────────────────────────────────────────────── */}
         {activeTab === 'tax' && (
           <div>
-            <SectionHeader title="Tax analysis — REP · 100% bonus dep · 1031" />
+            <SectionHeader title="Tax analysis — REP · 100% bonus dep · 1031" tooltip="Year 1 tax impact assuming Real Estate Professional status, 100% bonus depreciation on cost-segregated components, and straight-line on the remainder." />
             <div className="border border-gray-100 rounded-lg p-3 mb-3">
               <PLRow label="NOI" value={fmtDollar(d.NOI)} variant="noi" />
               <PLRow label="Less: Y1 mortgage interest" value={`(${fmtDollar(d.int1)})`} variant="neg" indent />
@@ -1178,7 +1196,7 @@ export function ModelCalculator({
               <PLRow label="Principal reduction (Y1)" value={fmtDollar(d.prin1)} variant="pos" indent />
               <PLRow label="Total Y1 economic return" value={fmtDollar(d.y1)} variant="total" />
             </div>
-            <SectionHeader title="Return on equity" />
+            <SectionHeader title="Return on equity" tooltip="Cash-on-cash and total return metrics measured against your equity invested (down payment + lender fee)." />
             <div className="grid grid-cols-2 gap-2 mb-4">
               <MetricCard label="Pre-tax CoC" value={fmtPct(d.coc)} sub="CF / equity"
                 valueColor={d.coc < 0 ? 'text-red-600' : d.coc < 2 ? 'text-amber-600' : 'text-green-700'} />

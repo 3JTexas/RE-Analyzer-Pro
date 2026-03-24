@@ -150,9 +150,6 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
   const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
   const methodLabel = isOM ? 'OM Method' : 'Physical Occupancy'
   const dcrColor = d.dcr < 1 ? C.red : d.dcr < 1.2 ? C.amber : C.green
-  const targetCap = inputs.targetCapRate ?? 0
-  const offerPrice = targetCap > 0 && d.NOI > 0 ? d.NOI / (targetCap / 100) : 0
-
   const safeName = (propertyName || 'Investment Property').trim()
 
   // Build scenario columns for side-by-side — current scenario + siblings
@@ -186,9 +183,9 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
         {/* Key metrics grid */}
         <View style={s.coverMetricsRow}>
           <View style={s.coverMetricBox}>
-            <Text style={s.coverMetricLabel}>{offerPrice > 0 ? 'Offer Price' : 'List Price'}</Text>
-            <Text style={s.coverMetricValue}>{fmtDollar(offerPrice > 0 ? offerPrice : inputs.price)}</Text>
-            {offerPrice > 0 && <Text style={s.coverMetricSub}>at {targetCap.toFixed(1)}% cap</Text>}
+            <Text style={s.coverMetricLabel}>Purchase Price</Text>
+            <Text style={s.coverMetricValue}>{fmtDollar(inputs.price)}</Text>
+            {units > 0 && <Text style={s.coverMetricSub}>{fmtDollar(inputs.price / units)}/unit</Text>}
           </View>
           <View style={s.coverMetricBox}>
             <Text style={s.coverMetricLabel}>Units</Text>
@@ -206,33 +203,28 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
             <Text style={s.coverMetricSub}>{methodLabel.toLowerCase()}</Text>
           </View>
         </View>
-
-        {offerPrice > 0 && inputs.price > 0 && (
-          <View style={s.coverMetricsRow}>
-            <View style={s.coverMetricBox}>
-              <Text style={s.coverMetricLabel}>vs. Asking</Text>
-              <Text style={[s.coverMetricValue, { fontSize: 13, color: offerPrice < inputs.price ? C.green : C.red }]}>
-                {fmtDelta(offerPrice - inputs.price)} ({((offerPrice - inputs.price) / inputs.price * 100).toFixed(1)}%)
-              </Text>
-              <Text style={s.coverMetricSub}>asking {fmtDollar(inputs.price)}</Text>
-            </View>
-            <View style={s.coverMetricBox}>
-              <Text style={s.coverMetricLabel}>Price / Unit (offer)</Text>
-              <Text style={[s.coverMetricValue, { fontSize: 13 }]}>{units > 0 ? fmtDollar(offerPrice / units) : '—'}</Text>
-              <Text style={s.coverMetricSub}>{units > 0 ? `asking ${fmtDollar(inputs.price / units)}` : ''}</Text>
-            </View>
-            <View style={s.coverMetricBox}>
-              <Text style={s.coverMetricLabel}>DCR</Text>
-              <Text style={[s.coverMetricValue, { fontSize: 13, color: dcrColor }]}>{fmtX(d.dcr)}</Text>
-              <Text style={s.coverMetricSub}>lender min 1.20×</Text>
-            </View>
-            <View style={s.coverMetricBox}>
-              <Text style={s.coverMetricLabel}>Y1 Total ROE</Text>
-              <Text style={[s.coverMetricValue, { fontSize: 13, color: C.green }]}>{fmtPct(d.r1)}</Text>
-              <Text style={s.coverMetricSub}>REP + bonus dep</Text>
-            </View>
+        <View style={s.coverMetricsRow}>
+          <View style={s.coverMetricBox}>
+            <Text style={s.coverMetricLabel}>DCR</Text>
+            <Text style={[s.coverMetricValue, { fontSize: 13, color: dcrColor }]}>{fmtX(d.dcr)}</Text>
+            <Text style={s.coverMetricSub}>lender min 1.20×</Text>
           </View>
-        )}
+          <View style={s.coverMetricBox}>
+            <Text style={s.coverMetricLabel}>Y1 Total ROE</Text>
+            <Text style={[s.coverMetricValue, { fontSize: 13, color: C.green }]}>{fmtPct(d.r1)}</Text>
+            <Text style={s.coverMetricSub}>REP + bonus dep</Text>
+          </View>
+          <View style={s.coverMetricBox}>
+            <Text style={s.coverMetricLabel}>Pre-tax Cash Flow</Text>
+            <Text style={[s.coverMetricValue, { fontSize: 13, color: d.CF < 0 ? C.red : C.green }]}>{fmtNeg(d.CF)}</Text>
+            <Text style={s.coverMetricSub}>after debt service</Text>
+          </View>
+          <View style={s.coverMetricBox}>
+            <Text style={s.coverMetricLabel}>Equity Required</Text>
+            <Text style={[s.coverMetricValue, { fontSize: 13 }]}>{fmtDollar(d.eq)}</Text>
+            <Text style={s.coverMetricSub}>down + lender fee</Text>
+          </View>
+        </View>
 
         <Text style={s.coverFooter}>Scenario: {scenarioName}  ·  {methodLabel}  ·  Prepared {date}</Text>
         <Text style={s.coverConfidential}>CONFIDENTIAL — For Discussion Purposes Only</Text>
@@ -287,33 +279,6 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
             <Text style={s.metricSub}>REP + bonus dep</Text>
           </View>
         </View>
-
-        {offerPrice > 0 && (
-          <View style={s.metricsRow}>
-            <View style={[s.metricCard, { backgroundColor: '#EAF3DE', borderWidth: 0.5, borderColor: '#97c459' }]}>
-              <Text style={s.metricLabel}>Offer Price</Text>
-              <Text style={[s.metricValue, { color: C.green }]}>{fmtDollar(offerPrice)}</Text>
-              <Text style={s.metricSub}>at {targetCap.toFixed(1)}% cap</Text>
-            </View>
-            <View style={s.metricCard}>
-              <Text style={s.metricLabel}>vs. Asking</Text>
-              <Text style={[s.metricValue, { color: offerPrice < inputs.price ? C.green : C.red }]}>
-                {fmtDelta(offerPrice - inputs.price)}
-              </Text>
-              <Text style={s.metricSub}>{inputs.price > 0 ? `${((offerPrice - inputs.price) / inputs.price * 100).toFixed(1)}%` : ''}</Text>
-            </View>
-            <View style={s.metricCard}>
-              <Text style={s.metricLabel}>Price / unit (offer)</Text>
-              <Text style={s.metricValue}>{units > 0 ? fmtDollar(offerPrice / units) : '—'}</Text>
-              <Text style={s.metricSub}>{units > 0 && inputs.price > 0 ? `asking ${fmtDollar(inputs.price / units)}` : ''}</Text>
-            </View>
-            <View style={s.metricCard}>
-              <Text style={s.metricLabel}>Down payment (offer)</Text>
-              <Text style={s.metricValue}>{fmtDollar(offerPrice * (1 - inputs.lev / 100))}</Text>
-              <Text style={s.metricSub}>{(100 - inputs.lev).toFixed(0)}% equity</Text>
-            </View>
-          </View>
-        )}
 
         <View style={d.dcr < 1 ? s.alertRed : d.dcr < 1.2 ? s.alertAmber : s.alertGreen}>
           <Text style={s.alertText}>
