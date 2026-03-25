@@ -25,6 +25,24 @@ const FIELDS: { key: keyof ModelInputs; label: string; step: number; prefix?: st
   { key: 'pm',    label: 'Prop. mgmt %',          step: 0.5,  suffix: '%' },
 ]
 
+// ── Extraction quality tiers ──────────────────────────────────────────────
+const CRITICAL_FIELDS = [
+  { key: 'price', label: 'Purchase price' },
+  { key: 'tu', label: 'Total units' },
+  { key: 'tax', label: 'Real estate taxes' },
+  { key: 'ins', label: 'Insurance' },
+]
+const EXPECTED_FIELDS = [
+  { key: 'ir', label: 'Interest rate' },
+  { key: 'am', label: 'Amortization' },
+  { key: 'lev', label: 'LTV %' },
+  { key: 'pm', label: 'Prop mgmt %' },
+]
+const isFilled = (inp: ModelInputs, key: string) => {
+  const v = (inp as any)[key]
+  return v !== null && v !== undefined && v !== 0 && v !== ''
+}
+
 export interface OmConfirmMeta {
   scenarioName: string
   propertyName?: string
@@ -321,24 +339,72 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
           {pdfError} — <button onClick={() => setMode('manual')} className="underline">enter manually instead</button>
         </div>
       )}
-      {pdfStatus === 'done' && (
+      {pdfStatus === 'done' && (() => {
+        const missingCritical = CRITICAL_FIELDS.filter(f => !isFilled(inputs, f.key))
+        const missingRent = !isFilled(inputs, 'rent')
+        const missingExpected = EXPECTED_FIELDS.filter(f => !isFilled(inputs, f.key))
+        const hasMissing = missingCritical.length > 0 || missingRent || missingExpected.length > 0
+        const criticalBlocked = missingCritical.length > 0
+        return (
         <div className="mb-2">
           <div className="flex items-center gap-1.5 text-xs text-green-700 font-medium mb-3">
             <CheckCircle size={13} /> Extracted — review details then confirm
           </div>
+
+          {/* Extraction quality banner */}
+          {hasMissing ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+              {(missingCritical.length > 0 || missingRent) && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-2.5">
+                  <p className="text-[10px] font-semibold text-red-700 mb-1">
+                    {missingCritical.length + (missingRent ? 1 : 0)} critical field{missingCritical.length + (missingRent ? 1 : 0) !== 1 ? 's' : ''} not found
+                  </p>
+                  <ul className="text-[9px] text-red-600 space-y-0.5 mb-1">
+                    {missingCritical.map(f => <li key={f.key}>• {f.label}</li>)}
+                    {missingRent && <li>• Avg rent <span className="text-red-400">(not required if entering per-unit rents)</span></li>}
+                  </ul>
+                  <p className="text-[8px] text-red-400">Required for accurate underwriting — enter manually below</p>
+                </div>
+              )}
+              {missingExpected.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                  <p className="text-[10px] font-semibold text-amber-700 mb-1">
+                    {missingExpected.length} expected field{missingExpected.length !== 1 ? 's' : ''} not found
+                  </p>
+                  <ul className="text-[9px] text-amber-600 space-y-0.5 mb-1">
+                    {missingExpected.map(f => <li key={f.key}>• {f.label}</li>)}
+                  </ul>
+                  <p className="text-[8px] text-amber-400">Commonly in OMs — enter estimates if not shown</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-2.5 mb-3">
+              <p className="text-[10px] font-semibold text-green-700">All key fields extracted successfully</p>
+            </div>
+          )}
+
           <MetaFields />
           <OtherIncomeSection />
           <button onClick={() => setMode('manual')}
             className="w-full mb-2 border border-amber-300 text-amber-700 text-xs font-medium py-2 rounded-lg hover:bg-amber-100">
             Review / edit all fields
           </button>
-          <button onClick={confirm}
-            disabled={showPropertyFields && !propertyName.trim()}
-            className="w-full bg-navy text-white text-xs font-semibold py-2.5 rounded-lg disabled:opacity-40">
-            {showPropertyFields ? 'Create property + OM scenario' : 'Create OM scenario'}
-          </button>
+          <div className="relative group">
+            <button onClick={confirm}
+              disabled={(showPropertyFields && !propertyName.trim()) || criticalBlocked}
+              className="w-full bg-navy text-white text-xs font-semibold py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
+              {showPropertyFields ? 'Create property + OM scenario' : 'Create OM scenario'}
+            </button>
+            {criticalBlocked && (
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-52 px-2.5 py-2 text-[9px] leading-snug text-white bg-gray-800 rounded-lg shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 text-center">
+                Fill in the fields marked in red before continuing
+              </span>
+            )}
+          </div>
         </div>
-      )}
+        )
+      })()}
       <button onClick={onCancel} className="w-full bg-gray-100 text-gray-600 text-xs font-medium py-2 rounded-lg mt-1">
         Cancel
       </button>
@@ -356,19 +422,31 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
       </div>
       <MetaFields />
       <div className="grid grid-cols-2 gap-2 mb-3 max-h-64 overflow-y-auto pr-1">
-        {FIELDS.map(f => (
+        {FIELDS.map(f => {
+          const filled = isFilled(inputs, f.key)
+          const isCrit = !filled && CRITICAL_FIELDS.some(c => c.key === f.key)
+          const isRent = !filled && f.key === 'rent'
+          const isExp = !filled && EXPECTED_FIELDS.some(c => c.key === f.key)
+          const borderCls = isCrit ? 'border-red-300 bg-red-50' : (isRent || isExp) ? 'border-amber-300 bg-amber-50' : 'border-gray-200'
+          return (
           <div key={f.key}>
-            <label className="block text-[9px] text-gray-400 mb-0.5">{f.label}</label>
+            <label className="block text-[9px] text-gray-400 mb-0.5">
+              {f.label}
+              {isCrit && <span className="ml-1 text-red-500 font-medium">(not found)</span>}
+              {isRent && <span className="ml-1 text-amber-500 font-medium">(not found)</span>}
+              {isExp && <span className="ml-1 text-amber-500 font-medium">(not found)</span>}
+            </label>
             <div className="relative">
               {f.prefix && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">{f.prefix}</span>}
               <input type="number" step={f.step} value={inputs[f.key] as number}
                 onChange={e => set(f.key, +e.target.value)}
-                className={`w-full text-xs border border-gray-200 rounded-lg py-1.5 focus:outline-none focus:border-navy
-                  ${f.prefix ? 'pl-5 pr-2' : f.suffix ? 'pl-2 pr-5' : 'px-2'}`} />
+                className={`w-full text-xs border rounded-lg py-1.5 focus:outline-none focus:border-navy
+                  ${borderCls} ${f.prefix ? 'pl-5 pr-2' : f.suffix ? 'pl-2 pr-5' : 'px-2'}`} />
               {f.suffix && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">{f.suffix}</span>}
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
       <OtherIncomeSection />
       <div className="flex gap-2">
