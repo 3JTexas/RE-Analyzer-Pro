@@ -1,14 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ChevronLeft, Plus, BarChart3, Trash2, Copy, Camera, Loader2, FileText } from 'lucide-react'
+import { ChevronLeft, Plus, BarChart3, Trash2, Copy, Camera, Loader2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getScenariosForProperty, useScenario } from '../hooks/useScenario'
 import type { Property, Scenario, ModelInputs } from '../types'
 import { Spinner, EmptyState } from '../components/ui'
 import { OmSetupFlow } from '../components/OMSetupFlow'
 import type { OmConfirmMeta } from '../components/OMSetupFlow'
-import { LOIModal } from '../components/loi/LOIModal'
-import type { LOIData } from '../types/loi'
 
 export function PropertyPage() {
   const { id } = useParams<{ id: string }>()
@@ -21,8 +19,6 @@ export function PropertyPage() {
   const [duplicating, setDuplicating] = useState<Scenario | null>(null)
   const [dupName, setDupName] = useState('')
   const [photoUploading, setPhotoUploading] = useState(false)
-  const [showLOI, setShowLOI] = useState(false)
-  const [loiData, setLoiData] = useState<LOIData | null>(null)
   const photoRef = useRef<HTMLInputElement>(null)
 
   const loadData = async () => {
@@ -81,39 +77,6 @@ export function PropertyPage() {
     setPhotoUploading(false)
   }
 
-  const openLOI = () => {
-    const fmtPrice = (n: number) => `$${n.toLocaleString('en-US')}`
-    // Find non-default scenario with lowest price > 0
-    const nonDefault = scenarios.filter(s => !s.is_default && s.inputs.price > 0)
-    const bestPrice = nonDefault.length
-      ? Math.min(...nonDefault.map(s => s.inputs.price))
-      : scenarios.find(s => s.inputs.price > 0)?.inputs.price ?? 0
-    const loanMin = Math.round(bestPrice * 0.7)
-    const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-
-    const initial: LOIData = {
-      propertyName: property?.name ?? '',
-      propertyAddress: property?.address ?? '',
-      units: String(property?.units ?? ''),
-      purchasePrice: bestPrice > 0 ? fmtPrice(bestPrice) : '',
-      purchaserName: 'Andrew Schildcrout and/or assigns',
-      purchaserCounsel: "Purchaser's Counsel",
-      loanAmountMin: loanMin > 0 ? fmtPrice(loanMin) : '',
-      loanApprovalDays: '45',
-      closingDays: '60',
-      loiExpirationDays: '3',
-      date: today,
-      recipientNames: '',
-      sellerName: '',
-      earnestDeposit: '',
-      ddPeriodDays: '30',
-      ddDeliveryDays: '5',
-      template: 'original',
-    }
-    setLoiData(initial)
-    setShowLOI(true)
-  }
-
   if (loading) return <Spinner />
 
   return (
@@ -133,10 +96,6 @@ export function PropertyPage() {
           className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-medium text-gray-500 border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-500">
           {photoUploading ? <Loader2 size={11} className="animate-spin" /> : <Camera size={11} />}
           {photoUploading ? 'Uploading…' : 'Photo'}
-        </button>
-        <button onClick={openLOI}
-          className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-medium text-gray-500 border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-500">
-          <FileText size={11} /> LOI
         </button>
         <button onClick={() => setShowSetup(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-navy text-white rounded-lg">
@@ -214,9 +173,6 @@ export function PropertyPage() {
             </div>
           )}
         </div>
-      )}
-      {showLOI && loiData && (
-        <LOIModal initial={loiData} onClose={() => setShowLOI(false)} />
       )}
     </div>
   )

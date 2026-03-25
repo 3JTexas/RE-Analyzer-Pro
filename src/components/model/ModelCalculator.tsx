@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { Download, Save, RotateCcw } from 'lucide-react'
+import { Download, Save, RotateCcw, FileText } from 'lucide-react'
 import { calculate, OM_DEFAULTS, fmtDollar, fmtNeg, fmtPct, fmtX, fmtDelta, fmtDeltaPct } from '../../lib/calc'
 import type { ModelInputs, Method, Scenario } from '../../types'
 import {
@@ -7,6 +7,8 @@ import {
 } from '../ui'
 import { generatePDF } from '../pdf/PdfReport'
 import { loadCompareState, saveCompareState } from '../../lib/uiState'
+import { LOIModal } from '../loi/LOIModal'
+import type { LOIData } from '../../types/loi'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 
@@ -620,6 +622,8 @@ export function ModelCalculator({
   const targetCap = inputs.targetCapRate ?? 0
   const setTargetCap = (v: number) => setInputs(prev => ({ ...prev, targetCapRate: v }))
   const [applyConfirm, setApplyConfirm] = useState(false)
+  const [showLOI, setShowLOI] = useState(false)
+  const [loiData, setLoiData] = useState<LOIData | null>(null)
 
   // Compare tab: which two scenarios to diff
   const [compareA, setCompareA] = useState<string>(currentScenarioId ?? 'current')
@@ -744,6 +748,34 @@ export function ModelCalculator({
     if (s) window.location.href = `/scenario/${s.id}`
   }
 
+  const openLOI = () => {
+    const fmtPrice = (n: number) => `$${n.toLocaleString('en-US')}`
+    const price = inputs.price ?? 0
+    const loanMin = Math.round(price * (inputs.lev / 100))
+    const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    const initial: LOIData = {
+      propertyName,
+      propertyAddress,
+      units: String(propertyUnits ?? inputs.tu ?? ''),
+      purchasePrice: price > 0 ? fmtPrice(price) : '',
+      purchaserName: 'Andrew Schildcrout and/or assigns',
+      purchaserCounsel: "Purchaser's Counsel",
+      loanAmountMin: loanMin > 0 ? fmtPrice(loanMin) : '',
+      loanApprovalDays: '45',
+      closingDays: '60',
+      loiExpirationDays: '3',
+      date: today,
+      recipientNames: '',
+      sellerName: '',
+      earnestDeposit: '',
+      ddPeriodDays: '30',
+      ddDeliveryDays: '5',
+      template: 'original',
+    }
+    setLoiData(initial)
+    setShowLOI(true)
+  }
+
   // Scenario options for dropdowns
   const scenarioOptions = [
     { id: 'current', name: `${name} (this)` },
@@ -804,6 +836,12 @@ export function ModelCalculator({
           <Download size={12} />
           PDF
         </button>
+        {!isDefaultOM && (
+          <button onClick={openLOI}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-500 border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-500 whitespace-nowrap">
+            <FileText size={12} /> LOI
+          </button>
+        )}
       </div>
 
       
@@ -1417,6 +1455,9 @@ export function ModelCalculator({
         )}
 
       </div>
+      {showLOI && loiData && (
+        <LOIModal initial={loiData} onClose={() => setShowLOI(false)} />
+      )}
     </div>
   )
 }
