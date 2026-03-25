@@ -15,19 +15,15 @@ import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
 
 // ── Tax Benefit Runway — three-scenario chart ────────────────────────────
-const RUNWAY_COLORS = { bonus: '#0072B2', sl: '#E69F00', none: '#CC79A7' }
+const RC = { bonus: '#0072B2', exhaust: '#D85A30' }
 
 function computeRunway(d: ReturnType<typeof calculate>) {
   const monthlyCF = d.CF / 12
   const bracket = d.brk / 100
   const fullSL = d.deprBase / 27.5
-
-  // Line 1: Bonus + Cost Seg (current scenario)
   const y1Tax1 = d.ts / 12
   const y2Tax1 = (d.sl * bracket) / 12
-  // Line 2: SL only (no cost seg, full basis on 27.5yr)
   const slOnlyTax = (fullSL * bracket) / 12
-  // Line 3: No depreciation
   const line1: number[] = [], line2: number[] = [], line3: number[] = []
   let b1 = 0, b2 = 0, b3 = 0
   for (let m = 1; m <= 120; m++) {
@@ -38,12 +34,77 @@ function computeRunway(d: ReturnType<typeof calculate>) {
   }
   const peak1 = Math.max(...line1), peakIdx1 = line1.indexOf(peak1)
   const ext1 = line1.findIndex((v, i) => i > peakIdx1 && v <= 0)
-  const ext2 = line2.findIndex((v, i) => i > 0 && v <= 0)
   return {
-    line1, line2, line3, peak1, peakIdx1, ext1, ext2, monthlyCF,
+    line1, line2, line3, peak1, peakIdx1, ext1, monthlyCF,
     y1Net1: monthlyCF + y1Tax1, y2Net1: monthlyCF + y2Tax1,
-    slNet: monthlyCF + slOnlyTax, noneNet: monthlyCF,
+    slSavings: d.sl * bracket,
   }
+}
+
+// Custom Chart.js plugin for inline end-of-line labels + callout bubbles
+const runwayPlugin = {
+  id: 'runwayAnnotations',
+  afterDraw(chart: any) {
+    const ctx = chart.ctx
+    const meta0 = chart.getDatasetMeta(0) // bonus
+    const meta1 = chart.getDatasetMeta(1) // SL
+    const meta2 = chart.getDatasetMeta(2) // no dep
+    if (!meta0?.data?.length) return
+
+    // Inline end-of-line labels
+    const labels = [
+      { meta: meta0, text: 'Bonus+CS', color: RC.bonus },
+      { meta: meta1, text: 'SL only', color: '#999999' },
+      { meta: meta2, text: 'No dep', color: '#cccccc' },
+    ]
+    ctx.save()
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    ctx.font = '600 9px Inter, sans-serif'
+    for (const { meta, text, color } of labels) {
+      const last = meta.data[meta.data.length - 1]
+      if (!last) continue
+      ctx.fillStyle = color
+      ctx.fillText(text, last.x + 4, last.y)
+    }
+
+    // Peak callout at peakIdx
+    const peakData = chart.config._config.data._runwayMeta
+    if (!peakData) { ctx.restore(); return }
+    const { peakIdx, peakLabel, extIdx, extLabel } = peakData
+
+    if (peakIdx >= 0 && meta0.data[peakIdx]) {
+      const pt = meta0.data[peakIdx]
+      // White halo
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, 14, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fill()
+      // Blue circle
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, 11, 0, Math.PI * 2)
+      ctx.fillStyle = RC.bonus; ctx.fill()
+      // Value text
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 8px Inter, sans-serif'
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.fillText(peakLabel, pt.x, pt.y)
+      // "Peak" label above
+      ctx.fillStyle = RC.bonus; ctx.font = 'bold 9px Inter, sans-serif'
+      ctx.fillText('Peak', pt.x, pt.y - 18)
+    }
+
+    // Extinguish callout
+    if (extIdx >= 0 && meta0.data[extIdx]) {
+      const pt = meta0.data[extIdx]
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, 14, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fill()
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, 11, 0, Math.PI * 2)
+      ctx.fillStyle = RC.exhaust; ctx.fill()
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 8px Inter, sans-serif'
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.fillText(extLabel, pt.x, pt.y)
+      ctx.fillStyle = RC.exhaust; ctx.font = 'bold 9px Inter, sans-serif'
+      ctx.fillText('Exhausted', pt.x, pt.y - 18)
+    }
+    ctx.restore()
+  },
 }
 
 function TaxRunwayChart({ d }: { d: ReturnType<typeof calculate> }) {
@@ -57,30 +118,20 @@ function TaxRunwayChart({ d }: { d: ReturnType<typeof calculate> }) {
   })
 
   const ext1Month = data.ext1 >= 0 ? data.ext1 + 1 : null
-  const ext2Month = data.ext2 >= 0 ? data.ext2 + 1 : null
-
-  const makeLine = (vals: number[], color: string, label: string, showPeak?: number) => ({
-    label,
-    data: vals,
-    borderColor: color,
-    backgroundColor: 'transparent',
-    fill: false,
-    tension: 0.3,
-    pointRadius: vals.map((_, i) =>
-      (showPeak !== undefined && i === showPeak) ? 5 :
-      (data.ext1 >= 0 && i === data.ext1 && color === RUNWAY_COLORS.bonus) ? 5 : 0
-    ),
-    pointBackgroundColor: color,
-    borderWidth: color === RUNWAY_COLORS.bonus ? 2 : 1.5,
-    borderDash: color === RUNWAY_COLORS.none ? [4, 3] : undefined,
-  })
+  const fmtK = (n: number) => `$${Math.round(n / 1000)}k`
 
   const chartData = {
     labels,
+    _runwayMeta: {
+      peakIdx: data.peakIdx1,
+      peakLabel: fmtK(data.peak1),
+      extIdx: data.ext1,
+      extLabel: ext1Month ? `Mo ${ext1Month}` : '',
+    },
     datasets: [
-      makeLine(data.line1, RUNWAY_COLORS.bonus, 'Bonus + Cost Seg', data.peakIdx1),
-      makeLine(data.line2, RUNWAY_COLORS.sl, 'Straight-line only'),
-      makeLine(data.line3, RUNWAY_COLORS.none, 'No depreciation'),
+      { label: 'Bonus + Cost Seg', data: data.line1, borderColor: RC.bonus, borderWidth: 3, tension: 0.3, pointRadius: 0, fill: false },
+      { label: 'SL only', data: data.line2, borderColor: 'rgba(153,153,153,0.6)', borderWidth: 1, borderDash: [4, 3], tension: 0.3, pointRadius: 0, fill: false },
+      { label: 'No dep', data: data.line3, borderColor: 'rgba(204,204,204,0.4)', borderWidth: 1, borderDash: [2, 4], tension: 0.3, pointRadius: 0, fill: false },
     ],
   }
 
@@ -89,10 +140,11 @@ function TaxRunwayChart({ d }: { d: ReturnType<typeof calculate> }) {
       <SectionHeader title="Cumulative after-tax cash position — three depreciation scenarios" tooltip="Compares cumulative after-tax cash position under three depreciation strategies over 10 years." />
       <div className="border border-gray-100 rounded-lg p-3 bg-white">
         <div style={{ height: 220 }}>
-          <Line data={chartData} options={{
+          <Line data={chartData as any} plugins={[runwayPlugin]} options={{
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
+            layout: { padding: { right: 50 } },
             plugins: {
               tooltip: {
                 callbacks: {
@@ -112,48 +164,63 @@ function TaxRunwayChart({ d }: { d: ReturnType<typeof calculate> }) {
                 grid: {
                   color: (ctx) => {
                     const lbl = ctx.tick?.label?.toString() ?? ''
-                    if (lbl.startsWith('Yr')) return '#d0d0d0'
-                    if (lbl) return '#f0f0f0'
-                    return '#f8f8f8'
+                    return lbl.startsWith('Yr') ? '#d0d0d0' : '#f4f4f4'
                   },
-                  lineWidth: (ctx) => ctx.tick?.label?.toString().startsWith('Yr') ? 1.5 : 0.5,
+                  lineWidth: (ctx) => ctx.tick?.label?.toString().startsWith('Yr') ? 1.5 : 0.3,
                 },
               },
               y: {
                 ticks: {
-                  font: { size: 9 }, color: '#888',
-                  callback: (v) => { const n = v as number; return n === 0 ? '$0' : `$${(n / 1000).toFixed(0)}k` },
+                  font: { size: 9 }, color: '#888', maxTicksLimit: 8,
+                  callback: (v) => { const n = v as number; return n === 0 ? '$0' : `$${Math.abs(n) >= 1000 ? (n / 1000).toFixed(0) + 'k' : n}` },
                 },
                 grid: {
-                  color: (ctx) => ctx.tick.value === 0 ? '#111' : ctx.tick.value > 0 ? 'rgba(22,163,74,0.06)' : 'rgba(220,38,38,0.06)',
-                  lineWidth: (ctx) => ctx.tick.value === 0 ? 2 : 0.5,
+                  color: (ctx) => ctx.tick.value === 0 ? '#333333' : '#f0f0f0',
+                  lineWidth: (ctx) => ctx.tick.value === 0 ? 1.5 : 0.5,
                 },
               },
             },
           }} />
         </div>
-        {/* Legend */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[10px]">
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-0.5 rounded" style={{ backgroundColor: RUNWAY_COLORS.bonus }} />
-            <span className="text-gray-600"><strong>Bonus + Cost Seg</strong> — current scenario</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-0.5 rounded" style={{ backgroundColor: RUNWAY_COLORS.sl }} />
-            <span className="text-gray-600"><strong>SL only</strong> — no cost seg study</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-0.5 rounded border-t border-dashed" style={{ borderColor: RUNWAY_COLORS.none }} />
-            <span className="text-gray-600"><strong>No depreciation</strong> — pre-tax only</span>
-          </div>
-        </div>
-        {/* Key data points */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-[10px]">
-          <span className="text-gray-500">Peak (bonus): <strong className="text-gray-700">{fmtDollar(data.peak1)}</strong> at Mo {data.peakIdx1 + 1}</span>
-          {ext1Month && <span className="text-gray-500">Exhausted (bonus): <strong style={{ color: RUNWAY_COLORS.bonus }}>Mo {ext1Month} (Yr {Math.ceil(ext1Month / 12)})</strong></span>}
-          {!ext1Month && <span style={{ color: RUNWAY_COLORS.bonus }} className="font-medium">Bonus never exhausted in 10yr</span>}
-          {ext2Month && <span className="text-gray-500">SL-only crosses zero: <strong style={{ color: RUNWAY_COLORS.sl }}>Mo {ext2Month}</strong></span>}
-        </div>
+        {/* Simplified explanation grid — 5 rows */}
+        <table className="w-full text-[10px] mt-3 border-t border-gray-100">
+          <thead>
+            <tr className="text-left text-gray-400">
+              <th className="py-1.5 pr-2 w-6"></th>
+              <th className="py-1.5 font-medium">Metric</th>
+              <th className="py-1.5 text-right font-medium">Value</th>
+            </tr>
+          </thead>
+          <tbody className="text-gray-600">
+            <tr className="border-t border-gray-50">
+              <td className="py-1.5 pr-2"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: RC.bonus }} /></td>
+              <td className="py-1.5 font-medium">Peak cumulative balance</td>
+              <td className="py-1.5 text-right font-semibold text-gray-900">{fmtDollar(data.peak1)} <span className="text-gray-400 font-normal">(end of Mo {data.peakIdx1 + 1})</span></td>
+            </tr>
+            <tr className="border-t border-gray-50">
+              <td className="py-1.5 pr-2"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: RC.exhaust }} /></td>
+              <td className="py-1.5 font-medium">Month benefit exhausted</td>
+              <td className="py-1.5 text-right font-semibold" style={{ color: ext1Month ? RC.exhaust : '#16a34a' }}>
+                {ext1Month ? `Month ${ext1Month} (Year ${Math.ceil(ext1Month / 12)})` : 'Never within 10yr'}
+              </td>
+            </tr>
+            <tr className="border-t border-gray-50">
+              <td className="py-1.5 pr-2"><span className="text-gray-300">—</span></td>
+              <td className="py-1.5">Year 1 monthly net (after-tax)</td>
+              <td className="py-1.5 text-right font-medium">{fmtDollar(data.y1Net1)}/mo</td>
+            </tr>
+            <tr className="border-t border-gray-50">
+              <td className="py-1.5 pr-2"><span className="text-gray-300">—</span></td>
+              <td className="py-1.5">Year 2+ monthly net (after-tax)</td>
+              <td className="py-1.5 text-right font-medium">{fmtDollar(data.y2Net1)}/mo</td>
+            </tr>
+            <tr className="border-t border-gray-50">
+              <td className="py-1.5 pr-2"><span className="text-gray-300">—</span></td>
+              <td className="py-1.5">Annual straight-line dep savings</td>
+              <td className="py-1.5 text-right font-medium">{fmtDollar(data.slSavings)}/yr</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   )
