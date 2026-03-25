@@ -14,213 +14,249 @@ import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
 
-// ── Tax Benefit Runway — three-scenario chart ────────────────────────────
-const RC = { bonus: '#0072B2', exhaust: '#D85A30' }
+// ── Tax Benefit Section — 5yr table + 3-line chart ───────────────────────
+const LC = { bonus: '#0072B2', sl: '#E69F00', none: '#CC79A7', exhaust: '#D85A30' }
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-function computeRunway(d: ReturnType<typeof calculate>) {
-  const monthlyCF = d.CF / 12
-  const bracket = d.brk / 100
-  const fullSL = d.deprBase / 27.5
-  const y1Tax1 = d.ts / 12
-  const y2Tax1 = (d.sl * bracket) / 12
-  const slOnlyTax = (fullSL * bracket) / 12
-  const line1: number[] = [], line2: number[] = [], line3: number[] = []
-  let b1 = 0, b2 = 0, b3 = 0
-  for (let m = 1; m <= 120; m++) {
-    b1 += monthlyCF + (m <= 12 ? y1Tax1 : y2Tax1)
-    b2 += monthlyCF + slOnlyTax
-    b3 += monthlyCF
-    line1.push(Math.round(b1)); line2.push(Math.round(b2)); line3.push(Math.round(b3))
-  }
-  const peak1 = Math.max(...line1), peakIdx1 = line1.indexOf(peak1)
-  const ext1 = line1.findIndex((v, i) => i > peakIdx1 && v <= 0)
-  return {
-    line1, line2, line3, peak1, peakIdx1, ext1, monthlyCF,
-    y1Net1: monthlyCF + y1Tax1, y2Net1: monthlyCF + y2Tax1,
-    slSavings: d.sl * bracket,
-  }
+function fmtCell(v: number): string {
+  if (Math.abs(v) < 0.5) return '—'
+  return v < 0 ? `($${Math.abs(v).toLocaleString('en-US', { maximumFractionDigits: 0 })})` : `$${v.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 }
 
-// Custom Chart.js plugin for inline end-of-line labels + callout bubbles
+function ColTip({ text }: { text: string }) {
+  return (
+    <span className="relative group ml-0.5">
+      <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-gray-300 text-[7px] text-gray-600 cursor-help font-semibold leading-none">i</span>
+      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-48 px-2 py-1.5 text-[9px] leading-snug text-white bg-gray-800 rounded-lg shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50 normal-case tracking-normal font-normal">
+        {text}
+      </span>
+    </span>
+  )
+}
+
+// Chart.js afterDraw plugin for callout bubbles
 const runwayPlugin = {
-  id: 'runwayAnnotations',
+  id: 'runwayCallouts',
   afterDraw(chart: any) {
     const ctx = chart.ctx
-    const meta0 = chart.getDatasetMeta(0) // bonus
-    const meta1 = chart.getDatasetMeta(1) // SL
-    const meta2 = chart.getDatasetMeta(2) // no dep
+    const meta0 = chart.getDatasetMeta(0)
     if (!meta0?.data?.length) return
-
-    // Inline end-of-line labels
-    const labels = [
-      { meta: meta0, text: 'Bonus+CS', color: RC.bonus },
-      { meta: meta1, text: 'SL only', color: '#999999' },
-      { meta: meta2, text: 'No dep', color: '#cccccc' },
-    ]
+    const rm = chart.config._config.data._runwayMeta
+    if (!rm) return
     ctx.save()
-    ctx.textAlign = 'left'
-    ctx.textBaseline = 'middle'
-    ctx.font = '600 9px Inter, sans-serif'
-    for (const { meta, text, color } of labels) {
-      const last = meta.data[meta.data.length - 1]
-      if (!last) continue
-      ctx.fillStyle = color
-      ctx.fillText(text, last.x + 4, last.y)
-    }
 
-    // Peak callout at peakIdx
-    const peakData = chart.config._config.data._runwayMeta
-    if (!peakData) { ctx.restore(); return }
-    const { peakIdx, peakLabel, extIdx, extLabel } = peakData
-
-    if (peakIdx >= 0 && meta0.data[peakIdx]) {
-      const pt = meta0.data[peakIdx]
-      // White halo
-      ctx.beginPath(); ctx.arc(pt.x, pt.y, 14, 0, Math.PI * 2)
-      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fill()
-      // Blue circle
-      ctx.beginPath(); ctx.arc(pt.x, pt.y, 11, 0, Math.PI * 2)
-      ctx.fillStyle = RC.bonus; ctx.fill()
-      // Value text
-      ctx.fillStyle = '#fff'; ctx.font = 'bold 8px Inter, sans-serif'
+    // Peak callout
+    if (rm.peakIdx >= 0 && meta0.data[rm.peakIdx]) {
+      const pt = meta0.data[rm.peakIdx]
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, 13, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fill()
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, 10, 0, Math.PI * 2)
+      ctx.fillStyle = LC.bonus; ctx.fill()
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 7px Inter,sans-serif'
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-      ctx.fillText(peakLabel, pt.x, pt.y)
-      // "Peak" label above
-      ctx.fillStyle = RC.bonus; ctx.font = 'bold 9px Inter, sans-serif'
-      ctx.fillText('Peak', pt.x, pt.y - 18)
+      ctx.fillText(rm.peakLabel, pt.x, pt.y)
+      ctx.fillStyle = LC.bonus; ctx.font = 'bold 8px Inter,sans-serif'
+      ctx.fillText('Peak Balance', pt.x, pt.y - 17)
     }
 
     // Extinguish callout
-    if (extIdx >= 0 && meta0.data[extIdx]) {
-      const pt = meta0.data[extIdx]
-      ctx.beginPath(); ctx.arc(pt.x, pt.y, 14, 0, Math.PI * 2)
-      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fill()
-      ctx.beginPath(); ctx.arc(pt.x, pt.y, 11, 0, Math.PI * 2)
-      ctx.fillStyle = RC.exhaust; ctx.fill()
-      ctx.fillStyle = '#fff'; ctx.font = 'bold 8px Inter, sans-serif'
+    if (rm.extIdx >= 0 && meta0.data[rm.extIdx]) {
+      const pt = meta0.data[rm.extIdx]
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, 13, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fill()
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, 10, 0, Math.PI * 2)
+      ctx.fillStyle = LC.exhaust; ctx.fill()
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 7px Inter,sans-serif'
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-      ctx.fillText(extLabel, pt.x, pt.y)
-      ctx.fillStyle = RC.exhaust; ctx.font = 'bold 9px Inter, sans-serif'
-      ctx.fillText('Exhausted', pt.x, pt.y - 18)
+      ctx.fillText(rm.extLabel, pt.x, pt.y)
+      ctx.fillStyle = LC.exhaust; ctx.font = 'bold 8px Inter,sans-serif'
+      ctx.fillText('Balance Exhausted', pt.x, pt.y - 17)
+    }
+
+    // SL zero callout
+    const meta1 = chart.getDatasetMeta(1)
+    if (rm.slZeroIdx >= 0 && meta1?.data?.[rm.slZeroIdx]) {
+      const pt = meta1.data[rm.slZeroIdx]
+      ctx.fillStyle = LC.sl; ctx.font = '600 7px Inter,sans-serif'
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
+      ctx.fillText(`SL Zero Mo ${rm.slZeroIdx + 1}`, pt.x, pt.y - 5)
+      // Small diamond
+      ctx.beginPath()
+      ctx.moveTo(pt.x, pt.y - 4); ctx.lineTo(pt.x + 4, pt.y); ctx.lineTo(pt.x, pt.y + 4); ctx.lineTo(pt.x - 4, pt.y)
+      ctx.closePath(); ctx.fillStyle = LC.sl; ctx.fill()
     }
     ctx.restore()
   },
 }
 
-function TaxRunwayChart({ d }: { d: ReturnType<typeof calculate> }) {
-  const data = useMemo(() => computeRunway(d), [d.CF, d.ts, d.sl, d.brk, d.deprBase])
+function TaxBenefitSection({ d, inputs }: { d: ReturnType<typeof calculate>; inputs: ModelInputs }) {
+  const monthlyCF = d.CF / 12
+  const bracket = d.brk / 100
+  const bonusSav = d.bd * bracket
+  const slSavAnnual = d.sl * bracket
+  const fullSL = d.deprBase / 27.5
+  const slOnlyTax = fullSL * bracket
 
-  const labels = Array.from({ length: 120 }, (_, i) => {
-    const m = i + 1
-    if (m % 12 === 0) return `Yr ${m / 12}`
-    if (m % 12 === 6) return `${m}`
-    return ''
-  })
+  // Build table rows
+  const tableData = useMemo(() => {
+    const rows: { period: string; pretax: number; bonus: number; sl: number; total: number; cumBal: number; remBasis: number; isSub?: boolean; isTotal?: boolean }[] = []
+    let cum = 0
+    const bonusBase = d.bd
+    const slBase = d.deprBase * (1 - inputs.costSeg / 100)
 
-  const ext1Month = data.ext1 >= 0 ? data.ext1 + 1 : null
+    // 12 monthly rows for Y1
+    for (let m = 0; m < 12; m++) {
+      const pretax = monthlyCF
+      const bonus = bonusSav / 12
+      const sl = slSavAnnual / 12
+      const total = pretax + bonus + sl
+      cum += total
+      const remBonus = bonusBase * (1 - (m + 1) / 12)
+      rows.push({ period: `${MONTHS[m]} Y1`, pretax, bonus, sl, total, cumBal: cum, remBasis: remBonus + slBase })
+    }
+    // Y1 total subtotal
+    rows.push({ period: 'Year 1 Total', pretax: d.CF, bonus: bonusSav, sl: slSavAnnual, total: d.CF + bonusSav + slSavAnnual, cumBal: cum, remBasis: slBase, isSub: true })
+
+    // Y2-Y5 annual
+    for (let y = 2; y <= 5; y++) {
+      const pretax = d.CF
+      const sl = slSavAnnual
+      const total = pretax + sl
+      cum += total
+      const remSl = Math.max(0, slBase - (slBase / 27.5) * (y - 1))
+      rows.push({ period: `Year ${y}`, pretax, bonus: 0, sl, total, cumBal: cum, remBasis: remSl })
+    }
+    // 5yr total
+    const totPretax = d.CF * 5
+    const totBonus = bonusSav
+    const totSl = slSavAnnual * 5
+    rows.push({ period: '5-Year Total', pretax: totPretax, bonus: totBonus, sl: totSl, total: totPretax + totBonus + totSl, cumBal: cum, remBasis: Math.max(0, slBase - (slBase / 27.5) * 4), isTotal: true })
+
+    return rows
+  }, [d.CF, d.bd, d.sl, d.brk, d.deprBase, inputs.costSeg, monthlyCF, bonusSav, slSavAnnual])
+
+  // Chart data — 60 months
+  const chartInfo = useMemo(() => {
+    const line1: number[] = [], line2: number[] = [], line3: number[] = []
+    let b1 = 0, b2 = 0, b3 = 0
+    const y1Tax1 = d.ts / 12, y2Tax1 = (d.sl * bracket) / 12
+    const slOnly = (fullSL * bracket) / 12
+    for (let m = 1; m <= 60; m++) {
+      b1 += monthlyCF + (m <= 12 ? y1Tax1 : y2Tax1)
+      b2 += monthlyCF + slOnly
+      b3 += monthlyCF
+      line1.push(Math.round(b1)); line2.push(Math.round(b2)); line3.push(Math.round(b3))
+    }
+    const peak1 = Math.max(...line1), peakIdx1 = line1.indexOf(peak1)
+    const ext1 = line1.findIndex((v, i) => i > peakIdx1 && v <= 0)
+    const slZero = line2.findIndex((v, i) => i > 0 && v <= 0)
+    return { line1, line2, line3, peak1, peakIdx1, ext1, slZero }
+  }, [d.CF, d.ts, d.sl, d.brk, d.deprBase])
+
   const fmtK = (n: number) => `$${Math.round(n / 1000)}k`
+  const ext1Month = chartInfo.ext1 >= 0 ? chartInfo.ext1 + 1 : null
 
+  const labels = Array.from({ length: 60 }, () => '')
   const chartData = {
     labels,
     _runwayMeta: {
-      peakIdx: data.peakIdx1,
-      peakLabel: fmtK(data.peak1),
-      extIdx: data.ext1,
-      extLabel: ext1Month ? `Mo ${ext1Month}` : '',
+      peakIdx: chartInfo.peakIdx1, peakLabel: fmtK(chartInfo.peak1),
+      extIdx: chartInfo.ext1, extLabel: ext1Month ? `Mo ${ext1Month}` : '',
+      slZeroIdx: chartInfo.slZero,
     },
     datasets: [
-      { label: 'Bonus + Cost Seg', data: data.line1, borderColor: RC.bonus, borderWidth: 3, tension: 0.3, pointRadius: 0, fill: false },
-      { label: 'SL only', data: data.line2, borderColor: 'rgba(153,153,153,0.6)', borderWidth: 1, borderDash: [4, 3], tension: 0.3, pointRadius: 0, fill: false },
-      { label: 'No dep', data: data.line3, borderColor: 'rgba(204,204,204,0.4)', borderWidth: 1, borderDash: [2, 4], tension: 0.3, pointRadius: 0, fill: false },
+      { label: 'Bonus + Cost Seg', data: chartInfo.line1, borderColor: LC.bonus, borderWidth: 3, tension: 0.3, pointRadius: 0, fill: false },
+      { label: 'SL only', data: chartInfo.line2, borderColor: LC.sl, borderWidth: 1.5, borderDash: [6, 3], tension: 0.3, pointRadius: 0, fill: false },
+      { label: 'No dep', data: chartInfo.line3, borderColor: LC.none, borderWidth: 1, borderDash: [2, 4], tension: 0.3, pointRadius: 0, fill: false, backgroundColor: `${LC.none}15` },
     ],
   }
 
+  const cellColor = (v: number) => Math.abs(v) < 0.5 ? 'text-gray-400' : v < 0 ? 'text-red-600' : 'text-green-700'
+
   return (
     <div className="mt-3">
-      <SectionHeader title="Cumulative after-tax cash position — three depreciation scenarios" tooltip="Compares cumulative after-tax cash position under three depreciation strategies over 10 years." />
+      {/* ── PART 1: 5-Year Table ─────────────────────────── */}
+      <SectionHeader title="5-Year Tax Benefit Breakdown" tooltip="Monthly breakdown for Year 1 showing bonus depreciation impact, then annual summary for Years 2-5." />
+      <div className="border border-gray-100 rounded-lg overflow-hidden bg-white mb-4">
+        <div className="overflow-x-auto">
+          <table className="w-full text-[9px]" style={{ minWidth: 640 }}>
+            <thead className="sticky top-0 bg-white border-b border-gray-200">
+              <tr>
+                <th className="text-left px-2 py-1.5 font-semibold text-gray-600">Period</th>
+                <th className="text-right px-2 py-1.5 font-semibold text-gray-600">Pre-Tax CF<ColTip text="Net Operating Income minus annual debt service. Negative means the property does not cover its mortgage from operations alone." /></th>
+                <th className="text-right px-2 py-1.5 font-semibold text-gray-600">Bonus Dep<ColTip text="Tax savings from 100% bonus depreciation on cost-segregated short-life assets (5/7/15-year property). Taken entirely in Year 1." /></th>
+                <th className="text-right px-2 py-1.5 font-semibold text-gray-600">SL Dep<ColTip text="Annual tax savings from depreciating the remaining building basis over 27.5 years. Continues every year." /></th>
+                <th className="text-right px-2 py-1.5 font-semibold text-gray-600">Total After-Tax<ColTip text="Pre-tax cash flow plus all depreciation-related tax savings for the period." /></th>
+                <th className="text-right px-2 py-1.5 font-semibold text-gray-600">Cumulative<ColTip text="Running total of all after-tax cash flows since acquisition." /></th>
+                <th className="text-right px-2 py-1.5 font-semibold text-gray-600">Rem. Basis<ColTip text="Undepreciated building basis remaining. Bonus basis fully taken in Year 1." /></th>
+              </tr>
+            </thead>
+            <tbody>
+              {tableData.map((r, i) => {
+                const bg = r.isTotal ? 'bg-gray-800 text-white' : r.isSub ? 'bg-blue-50 font-semibold border-t-2 border-blue-200' : r.period.startsWith('Year') ? 'bg-gray-50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+                const valCls = r.isTotal ? 'text-white' : ''
+                return (
+                  <tr key={i} className={bg}>
+                    <td className={`px-2 py-1 ${r.isTotal || r.isSub ? 'font-bold' : ''}`}>{r.period}</td>
+                    <td className={`px-2 py-1 text-right ${valCls || cellColor(r.pretax)}`}>{fmtCell(r.pretax)}</td>
+                    <td className={`px-2 py-1 text-right ${valCls || cellColor(r.bonus)}`}>{fmtCell(r.bonus)}</td>
+                    <td className={`px-2 py-1 text-right ${valCls || cellColor(r.sl)}`}>{fmtCell(r.sl)}</td>
+                    <td className={`px-2 py-1 text-right font-medium ${valCls || cellColor(r.total)}`}>{fmtCell(r.total)}</td>
+                    <td className={`px-2 py-1 text-right font-medium ${valCls || cellColor(r.cumBal)}`}>{fmtCell(r.cumBal)}</td>
+                    <td className={`px-2 py-1 text-right ${valCls || 'text-gray-500'}`}>{fmtCell(r.remBasis)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── PART 2: 3-Line Chart ─────────────────────────── */}
+      <SectionHeader title="Cumulative after-tax cash position — 5 year projection" tooltip="Compares cumulative after-tax cash position under three depreciation strategies over 5 years." />
       <div className="border border-gray-100 rounded-lg p-3 bg-white">
+        {/* Legend pills */}
+        <div className="flex flex-wrap gap-3 mb-2 text-[9px]">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: LC.bonus }} />
+            <span className="text-gray-600">Bonus Depreciation + Cost Segregation</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm border border-dashed" style={{ borderColor: LC.sl, backgroundColor: `${LC.sl}30` }} />
+            <span className="text-gray-600">Straight-Line Only (no cost seg)</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm border border-dashed" style={{ borderColor: LC.none, backgroundColor: `${LC.none}20` }} />
+            <span className="text-gray-600">No Depreciation (pre-tax only)</span>
+          </div>
+        </div>
         <div style={{ height: 220 }}>
           <Line data={chartData as any} plugins={[runwayPlugin]} options={{
-            responsive: true,
-            maintainAspectRatio: false,
+            responsive: true, maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
-            layout: { padding: { right: 50 } },
-            plugins: {
-              tooltip: {
-                callbacks: {
-                  title: (items) => `Month ${items[0].dataIndex + 1}`,
-                  label: (item) => `${item.dataset.label}: ${fmtDollar(item.raw as number)}`,
-                },
-              },
-              legend: { display: false },
-            },
+            layout: { padding: { right: 10 } },
+            plugins: { tooltip: { callbacks: { title: (items) => `Month ${items[0].dataIndex + 1}`, label: (item) => `${item.dataset.label}: ${fmtDollar(item.raw as number)}` } }, legend: { display: false } },
             scales: {
               x: {
                 ticks: {
-                  font: (ctx) => ({ size: ctx.tick?.label?.toString().startsWith('Yr') ? 10 : 8, weight: ctx.tick?.label?.toString().startsWith('Yr') ? 'bold' as const : 'normal' as const }),
-                  color: (ctx) => ctx.tick?.label?.toString().startsWith('Yr') ? '#333' : '#bbb',
+                  callback: (_v, idx) => { if (idx % 12 === 0) return `Year ${idx / 12 + 1}`; if (idx % 6 === 0) return `Mo ${idx}`; return '' },
+                  font: (ctx) => { const lbl = ctx.tick?.label?.toString() ?? ''; return { size: lbl.startsWith('Year') ? 11 : 9, weight: lbl.startsWith('Year') ? 'bold' as const : 'normal' as const } },
+                  color: (ctx) => (ctx.tick?.label?.toString() ?? '').startsWith('Year') ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.35)',
                   maxRotation: 0,
                 },
                 grid: {
-                  color: (ctx) => {
-                    const lbl = ctx.tick?.label?.toString() ?? ''
-                    return lbl.startsWith('Yr') ? '#d0d0d0' : '#f4f4f4'
-                  },
-                  lineWidth: (ctx) => ctx.tick?.label?.toString().startsWith('Yr') ? 1.5 : 0.3,
+                  color: (ctx) => { const idx = ctx.index; return idx % 12 === 0 ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)' },
+                  lineWidth: (ctx) => ctx.index % 12 === 0 ? 1.5 : 0.5,
                 },
               },
               y: {
-                ticks: {
-                  font: { size: 9 }, color: '#888', maxTicksLimit: 8,
-                  callback: (v) => { const n = v as number; return n === 0 ? '$0' : `$${Math.abs(n) >= 1000 ? (n / 1000).toFixed(0) + 'k' : n}` },
-                },
-                grid: {
-                  color: (ctx) => ctx.tick.value === 0 ? '#333333' : '#f0f0f0',
-                  lineWidth: (ctx) => ctx.tick.value === 0 ? 1.5 : 0.5,
-                },
+                title: { display: true, text: 'Cumulative After-Tax Cash ($)', font: { size: 9 }, color: '#888' },
+                ticks: { font: { size: 9 }, color: '#888', maxTicksLimit: 8, callback: (v) => { const n = v as number; return n === 0 ? '$0' : `$${Math.abs(n) >= 1000 ? (n / 1000).toFixed(0) + 'k' : n}` } },
+                grid: { color: (ctx) => ctx.tick.value === 0 ? '#333333' : '#f0f0f0', lineWidth: (ctx) => ctx.tick.value === 0 ? 2 : 0.5 },
               },
             },
           }} />
         </div>
-        {/* Simplified explanation grid — 5 rows */}
-        <table className="w-full text-[10px] mt-3 border-t border-gray-100">
-          <thead>
-            <tr className="text-left text-gray-400">
-              <th className="py-1.5 pr-2 w-6"></th>
-              <th className="py-1.5 font-medium">Metric</th>
-              <th className="py-1.5 text-right font-medium">Value</th>
-            </tr>
-          </thead>
-          <tbody className="text-gray-600">
-            <tr className="border-t border-gray-50">
-              <td className="py-1.5 pr-2"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: RC.bonus }} /></td>
-              <td className="py-1.5 font-medium">Peak cumulative balance</td>
-              <td className="py-1.5 text-right font-semibold text-gray-900">{fmtDollar(data.peak1)} <span className="text-gray-400 font-normal">(end of Mo {data.peakIdx1 + 1})</span></td>
-            </tr>
-            <tr className="border-t border-gray-50">
-              <td className="py-1.5 pr-2"><span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: RC.exhaust }} /></td>
-              <td className="py-1.5 font-medium">Month benefit exhausted</td>
-              <td className="py-1.5 text-right font-semibold" style={{ color: ext1Month ? RC.exhaust : '#16a34a' }}>
-                {ext1Month ? `Month ${ext1Month} (Year ${Math.ceil(ext1Month / 12)})` : 'Never within 10yr'}
-              </td>
-            </tr>
-            <tr className="border-t border-gray-50">
-              <td className="py-1.5 pr-2"><span className="text-gray-300">—</span></td>
-              <td className="py-1.5">Year 1 monthly net (after-tax)</td>
-              <td className="py-1.5 text-right font-medium">{fmtDollar(data.y1Net1)}/mo</td>
-            </tr>
-            <tr className="border-t border-gray-50">
-              <td className="py-1.5 pr-2"><span className="text-gray-300">—</span></td>
-              <td className="py-1.5">Year 2+ monthly net (after-tax)</td>
-              <td className="py-1.5 text-right font-medium">{fmtDollar(data.y2Net1)}/mo</td>
-            </tr>
-            <tr className="border-t border-gray-50">
-              <td className="py-1.5 pr-2"><span className="text-gray-300">—</span></td>
-              <td className="py-1.5">Annual straight-line dep savings</td>
-              <td className="py-1.5 text-right font-medium">{fmtDollar(data.slSavings)}/yr</td>
-            </tr>
-          </tbody>
-        </table>
       </div>
     </div>
   )
@@ -1372,9 +1408,10 @@ export function ModelCalculator({
                 valueColor={d.r1 < 10 ? 'text-amber-600' : 'text-green-700'} />
               <MetricCard label="Yr 2+ stabilized ROE" value={fmtPct(d.r2)} sub="dep shield + princ." />
             </div>
-            {d.brk > 0 && (inputs.costSeg > 0 || inputs.land < 100) && (
-              <TaxRunwayChart d={d} />
-            )}
+            {d.brk > 0 && (inputs.costSeg > 0 || inputs.land < 100)
+              ? <TaxBenefitSection d={d} inputs={inputs} />
+              : <p className="text-[10px] text-gray-400 mt-3">Enter your tax bracket and depreciation inputs on the Inputs tab to see the tax benefit analysis.</p>
+            }
             <p className="text-[10px] text-gray-400 leading-relaxed mt-3">
               ⚠️ 1031 carryover basis — depreciable basis = relinquished property's remaining adjusted basis,
               NOT purchase price. Verify with CPA before projecting Year 1 tax savings.

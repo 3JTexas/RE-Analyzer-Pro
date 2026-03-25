@@ -34,7 +34,9 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 2000,
-        system: `You are a commercial real estate data extraction specialist. Extract investment property data from offering memorandum PDFs. Return ONLY a valid JSON object with no other text, preamble, or markdown backticks.
+        system: `You are a commercial real estate data extraction specialist. Extract investment property data from offering memorandum PDFs.
+
+You must respond with ONLY a valid JSON object. Do not include any explanation, preamble, markdown code fences, or text before or after the JSON. Your entire response must be parseable by JSON.parse(). Start your response with { and end with }.
 
 Extract these exact fields (use null if not found):
 {
@@ -78,8 +80,17 @@ Be precise with all other figures. Convert monthly figures to annual where neede
 
     const data = await response.json()
     const text = data.content?.find((b: any) => b.type === 'text')?.text ?? ''
-    const clean = text.replace(/```json|```/g, '').trim()
-    const parsed = JSON.parse(clean)
+
+    const extractJSON = (raw: string): string => {
+      const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/)
+      if (fenced) return fenced[1].trim()
+      const start = raw.indexOf('{')
+      const end = raw.lastIndexOf('}')
+      if (start !== -1 && end !== -1 && end > start) return raw.slice(start, end + 1)
+      return raw.trim()
+    }
+
+    const parsed = JSON.parse(extractJSON(text))
 
     // Image extraction from PDF is not supported via vision API — manual upload only
     parsed.propertyImageUrl = null
