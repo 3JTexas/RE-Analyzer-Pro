@@ -556,6 +556,30 @@ function computeFlags(inputs: ModelInputs, d: ReturnType<typeof calculate>, year
     }
   }
 
+  // Sub-metering flags
+  if (inputs.utilElecSubmetered) {
+    if ((inputs.utilElec ?? 0) > 500) {
+      flags.push({ severity: 'amber', title: 'Electric flagged as sub-metered but cost seems high',
+        detail: `Electric is marked sub-metered (tenants pay direct) but landlord cost is $${(inputs.utilElec ?? 0).toLocaleString()}/yr — verify this is common area only, not full building electric.`,
+        omVal: `$${(inputs.utilElec ?? 0).toLocaleString()}/yr`, benchmark: 'Common area electric typically $200-500/yr for small multifamily' })
+    } else {
+      flags.push({ severity: 'info', title: 'Electric: sub-metered — tenants pay direct',
+        detail: `Electric is individually metered. Landlord cost: $${(inputs.utilElec ?? 0).toLocaleString()}/yr (common areas only).`,
+        omVal: `$${(inputs.utilElec ?? 0).toLocaleString()}/yr`, benchmark: 'Tenants responsible for unit electric' })
+    }
+  }
+  if (inputs.utilWaterSubmetered) {
+    if ((inputs.utilWater ?? 0) > 1000) {
+      flags.push({ severity: 'amber', title: 'Water flagged as sub-metered but cost seems high',
+        detail: `Water is marked sub-metered (tenants billed separately) but landlord cost is $${(inputs.utilWater ?? 0).toLocaleString()}/yr — verify tenants are actually billed via RUBS or individual meters.`,
+        omVal: `$${(inputs.utilWater ?? 0).toLocaleString()}/yr`, benchmark: 'Common area water typically $500-1,000/yr' })
+    } else {
+      flags.push({ severity: 'info', title: 'Water: sub-metered — tenants billed separately',
+        detail: `Water is sub-metered or RUBS billed. Landlord cost: $${(inputs.utilWater ?? 0).toLocaleString()}/yr (common areas only).`,
+        omVal: `$${(inputs.utilWater ?? 0).toLocaleString()}/yr`, benchmark: 'Tenants responsible for unit water' })
+    }
+  }
+
   return flags
 }
 
@@ -1101,16 +1125,40 @@ export function ModelCalculator({
                 <div className="col-span-2 border-l-2 border-gray-200 pl-2 space-y-1.5">
                   <div className="grid grid-cols-3 gap-1.5">
                     <div>
-                      <InputField label="Electric ($)" type="number" dollar value={inputs.utilElec ?? 0} step={100}
-                        tooltip="Landlord-paid electric - common areas, exterior lighting"
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-[9px] text-gray-400">{inputs.utilElecSubmetered ? 'Electric — property only ($)' : 'Electric ($)'}</span>
+                        <span onClick={() => set('utilElecSubmetered', !inputs.utilElecSubmetered)}
+                          className={`text-[9px] px-1.5 py-0.5 rounded-full cursor-pointer transition-colors
+                            ${inputs.utilElecSubmetered ? 'border border-blue-400 bg-blue-50 text-blue-600 font-medium' : 'border border-gray-200 text-gray-400 hover:border-blue-300 hover:text-blue-500'}`}>
+                          {inputs.utilElecSubmetered ? 'sub-metered' : 'sub-meter?'}
+                        </span>
+                      </div>
+                      <InputField label="" type="number" dollar value={inputs.utilElec ?? 0} step={100}
+                        badge={inputs.utilElecSubmetered ? 'sub-metered' : undefined} badgeColor="blue"
+                        tooltip={inputs.utilElecSubmetered ? 'Property common area electric only — tenants pay their own' : 'Landlord-paid electric - common areas, exterior lighting'}
                         onChange={e => { const v = +e.target.value; setInputs(prev => ({ ...prev, utilElec: v, util: v + (prev.utilWater ?? 0) + (prev.utilTrash ?? 0) })) }} />
-                      <div className="text-[10px] text-gray-400 mt-0.5 h-3">{(inputs.utilElec ?? 0) > 0 && <>${Math.round((inputs.utilElec ?? 0) / 12).toLocaleString()}/mo</>}</div>
+                      {inputs.utilElecSubmetered
+                        ? <p className="text-[9px] text-blue-500 mt-0.5 leading-tight">Tenants pay direct. Common area only.</p>
+                        : <div className="text-[10px] text-gray-400 mt-0.5 h-3">{(inputs.utilElec ?? 0) > 0 && <>${Math.round((inputs.utilElec ?? 0) / 12).toLocaleString()}/mo</>}</div>
+                      }
                     </div>
                     <div>
-                      <InputField label="Water & Sewer ($)" type="number" dollar value={inputs.utilWater ?? 0} step={100}
-                        tooltip="Water and sewer - typically landlord-paid in multifamily"
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-[9px] text-gray-400">{inputs.utilWaterSubmetered ? 'Water — property only ($)' : 'Water & Sewer ($)'}</span>
+                        <span onClick={() => set('utilWaterSubmetered', !inputs.utilWaterSubmetered)}
+                          className={`text-[9px] px-1.5 py-0.5 rounded-full cursor-pointer transition-colors
+                            ${inputs.utilWaterSubmetered ? 'border border-blue-400 bg-blue-50 text-blue-600 font-medium' : 'border border-gray-200 text-gray-400 hover:border-blue-300 hover:text-blue-500'}`}>
+                          {inputs.utilWaterSubmetered ? 'sub-metered' : 'sub-meter?'}
+                        </span>
+                      </div>
+                      <InputField label="" type="number" dollar value={inputs.utilWater ?? 0} step={100}
+                        badge={inputs.utilWaterSubmetered ? 'sub-metered' : undefined} badgeColor="blue"
+                        tooltip={inputs.utilWaterSubmetered ? 'Property common area water only — tenants billed separately' : 'Water and sewer - typically landlord-paid in multifamily'}
                         onChange={e => { const v = +e.target.value; setInputs(prev => ({ ...prev, utilWater: v, util: (prev.utilElec ?? 0) + v + (prev.utilTrash ?? 0) })) }} />
-                      <div className="text-[10px] text-gray-400 mt-0.5 h-3">{(inputs.utilWater ?? 0) > 0 && <>${Math.round((inputs.utilWater ?? 0) / 12).toLocaleString()}/mo</>}</div>
+                      {inputs.utilWaterSubmetered
+                        ? <p className="text-[9px] text-blue-500 mt-0.5 leading-tight">Tenants billed separately. Common area only.</p>
+                        : <div className="text-[10px] text-gray-400 mt-0.5 h-3">{(inputs.utilWater ?? 0) > 0 && <>${Math.round((inputs.utilWater ?? 0) / 12).toLocaleString()}/mo</>}</div>
+                      }
                     </div>
                     <div>
                       <InputField label="Trash ($)" type="number" dollar value={inputs.utilTrash ?? 0} step={100}

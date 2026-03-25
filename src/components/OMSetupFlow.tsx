@@ -157,6 +157,10 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
         }
       }
 
+      // Map boolean sub-metering flags
+      if (parsed.utilElecSubmetered === true) merged.utilElecSubmetered = true
+      if (parsed.utilWaterSubmetered === true) merged.utilWaterSubmetered = true
+
       // Default ou to tu if not extracted (100% occupied assumption)
       if ((merged.ou === 0 || merged.ou === undefined) && merged.tu > 0) {
         merged.ou = merged.tu

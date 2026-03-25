@@ -4,7 +4,7 @@ import type { ModelInputs, ModelOutputs } from '../types'
 export const OM_DEFAULTS: ModelInputs = {
   tu: 0, ou: 0, rent: 0, vp: 0,
   price: 0, ir: 0, lev: 0, am: 0, lf: 0, cc: 0,
-  tax: 0, ins: 0, utilElec: 0, utilWater: 0, utilTrash: 0, util: 0, rm: 0, cs: 0,
+  tax: 0, ins: 0, utilElec: 0, utilElecSubmetered: false, utilWater: 0, utilWaterSubmetered: false, utilTrash: 0, util: 0, rm: 0, cs: 0,
   ga: 0, res: 0, pm: 0, expCollapse: false, expPct: 0,
   brk: 0, land: 0, costSeg: 0, is1031: false, basis1031: 0, equity1031: 0,
   otherIncome: [],
