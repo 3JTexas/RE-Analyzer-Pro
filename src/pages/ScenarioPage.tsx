@@ -51,11 +51,11 @@ export function ScenarioPage() {
   if (loading) return <Spinner />
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 flex-shrink-0">
+    <div className="flex flex-col h-full bg-[#f8f7f4]">
+      <div className="flex items-center gap-2 px-3 py-2.5 bg-white border-b border-gray-200 flex-shrink-0">
         <Link
           to={scenario ? `/property/${scenario.property_id}` : '/'}
-          className="p-1 -ml-1 text-gray-400 hover:text-gray-700">
+          className="p-1 -ml-1 text-gray-400 hover:text-[#1a1a2e] transition-colors">
           <ChevronLeft size={20} />
         </Link>
         <span className="text-xs text-gray-400">

@@ -80,25 +80,25 @@ export function PropertyPage() {
   if (loading) return <Spinner />
 
   return (
-    <div className="flex flex-col h-full bg-[#0d1117]">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-[#30363d] bg-[#0d1117]">
-        <Link to="/" className="p-1 -ml-1 text-[#8b949e] hover:text-[#c9a84c] transition-colors">
+    <div className="flex flex-col h-full bg-[#f8f7f4]">
+      <div className="flex items-center gap-2 px-4 py-3 bg-white border-b border-gray-200">
+        <Link to="/" className="p-1 -ml-1 text-gray-400 hover:text-[#1a1a2e] transition-colors">
           <ChevronLeft size={20} />
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-sm font-medium text-[#e6edf3] truncate">{property?.name}</h1>
-          {property?.address && <p className="text-xs text-[#8b949e] truncate">{property.address}</p>}
+          <h1 className="text-base font-semibold text-gray-900 truncate">{property?.name}</h1>
+          {property?.address && <p className="text-xs text-gray-400 truncate">{property.address}</p>}
         </div>
         <input ref={photoRef} type="file" accept="image/*" className="hidden"
           onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f) }} />
         <button onClick={() => photoRef.current?.click()}
           disabled={photoUploading}
-          className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-medium text-[#8b949e] border border-[#30363d] rounded-sm bg-transparent hover:border-[#c9a84c] hover:text-[#c9a84c] transition-colors">
+          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-500 border border-gray-200 rounded-sm hover:border-[#c9a84c] hover:text-[#c9a84c] transition-colors">
           {photoUploading ? <Loader2 size={11} className="animate-spin" /> : <Camera size={11} />}
           {photoUploading ? 'Uploading...' : 'Photo'}
         </button>
         <button onClick={() => setShowSetup(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-[#c9a84c] text-[#c9a84c] rounded-sm hover:bg-[#c9a84c] hover:text-[#0d1117] transition-colors">
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#1a1a2e] text-white rounded-sm hover:bg-[#c9a84c] hover:text-[#1a1a2e] transition-colors">
           <Plus size={13} /> Scenario
         </button>
       </div>
@@ -114,14 +114,14 @@ export function PropertyPage() {
       )}
 
       {duplicating && (
-        <div className="mx-4 mt-3 p-3 border border-[#30363d] rounded-sm bg-[#161b22]">
-          <p className="text-xs font-medium text-[#e6edf3] mb-1">Duplicating <span className="font-semibold">"{duplicating.name}"</span></p>
-          <p className="text-[10px] text-[#8b949e] mb-2">All inputs copied — adjust as needed after creating</p>
+        <div className="mx-4 mt-3 p-3 bg-white border border-gray-200 rounded-sm">
+          <p className="text-xs font-medium text-gray-800 mb-1">Duplicating <span className="font-semibold">"{duplicating.name}"</span></p>
+          <p className="text-[10px] text-gray-400 mb-2">All inputs copied — adjust as needed after creating</p>
           <input value={dupName} onChange={e => setDupName(e.target.value)} placeholder="Name for duplicate"
-            className="w-full text-sm border border-[#30363d] rounded-sm px-3 py-2 mb-3 focus:outline-none focus:border-[#c9a84c] bg-[#0d1117] text-[#e6edf3]" />
+            className="w-full text-sm border border-gray-300 rounded-sm px-3 py-2 mb-3 focus:outline-none focus:border-[#c9a84c] bg-white text-gray-800" />
           <div className="flex gap-2">
-            <button onClick={handleDuplicate} className="flex-1 bg-[#c9a84c] text-[#0d1117] text-xs font-medium py-2 rounded-sm">Duplicate</button>
-            <button onClick={() => setDuplicating(null)} className="flex-1 bg-[#0d1117] border border-[#30363d] text-[#8b949e] text-xs font-medium py-2 rounded-sm">Cancel</button>
+            <button onClick={handleDuplicate} className="flex-1 bg-[#1a1a2e] text-white text-xs font-medium py-2 rounded-sm hover:bg-[#c9a84c] hover:text-[#1a1a2e] transition-colors">Duplicate</button>
+            <button onClick={() => setDuplicating(null)} className="flex-1 bg-white border border-gray-200 text-gray-500 text-xs font-medium py-2 rounded-sm">Cancel</button>
           </div>
         </div>
       )}
@@ -130,39 +130,39 @@ export function PropertyPage() {
         <div className="flex-1 overflow-y-auto px-4 py-3">
           {scenarios.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
-              <BarChart3 size={40} className="text-[#30363d] mb-4" />
-              <h3 className="text-base font-light text-[#484f58]">No scenarios yet</h3>
-              <p className="text-xs text-[#484f58] mt-1">Import or enter the OM to start underwriting</p>
+              <BarChart3 size={40} className="text-gray-200 mb-4" />
+              <h3 className="text-base font-light text-gray-500">No scenarios yet</h3>
+              <p className="text-xs text-gray-400 mt-1">Import or enter the OM to start underwriting</p>
               <button onClick={() => setShowSetup(true)}
-                className="flex items-center gap-2 mt-6 px-5 py-2 text-xs font-medium border border-[#c9a84c] text-[#c9a84c] rounded-sm hover:bg-[#c9a84c] hover:text-[#0d1117] transition-colors">
+                className="flex items-center gap-2 mt-6 px-5 py-2 text-xs font-medium border border-[#c9a84c] text-[#c9a84c] rounded-sm hover:bg-[#c9a84c] hover:text-white transition-colors">
                 <Plus size={14} /> Add OM data
               </button>
             </div>
           ) : (
             <div className="space-y-2">
               {scenarios.map(s => (
-                <div key={s.id} className="bg-[#161b22] border border-[#30363d] rounded-sm hover:border-[#c9a84c]/50 transition-colors overflow-hidden">
+                <div key={s.id} className="bg-white border border-gray-200 rounded-sm hover:border-[#c9a84c] transition-colors overflow-hidden group">
                   <Link to={`/scenario/${s.id}`}
                     className="flex items-center px-4 py-3.5">
-                    <div className={`w-9 h-9 rounded-sm flex items-center justify-center mr-3 flex-shrink-0 border
-                      ${s.method === 'om' ? 'bg-[#0d1117] border-[#30363d]' : 'bg-[#0d1117] border-[#30363d]'}`}>
-                      <BarChart3 size={18} className={s.method === 'om' ? 'text-[#c9a84c]' : 'text-[#8b949e]'} />
+                    <div className={`w-9 h-9 rounded-sm flex items-center justify-center mr-3 flex-shrink-0 border border-gray-200
+                      ${s.method === 'om' ? 'bg-blue-50' : 'bg-amber-50'}`}>
+                      <BarChart3 size={18} className={s.method === 'om' ? 'text-blue-600' : 'text-amber-600'} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-[#e6edf3] truncate">{s.name}</div>
-                      <div className="text-[10px] text-[#8b949e] mt-0.5">
+                      <div className="text-sm font-medium text-gray-900 truncate">{s.name}</div>
+                      <div className="text-[10px] text-gray-400 mt-0.5">
                         {s.method === 'om' ? 'OM method' : 'Physical occupancy'} · {new Date(s.updated_at).toLocaleDateString()}
                       </div>
                     </div>
                   </Link>
-                  <div className="border-t border-[#30363d] flex">
+                  <div className="border-t border-gray-100 flex">
                     <button onClick={() => startDuplicate(s)}
-                      className="flex items-center gap-1 px-3 py-2 text-[10px] text-[#8b949e] hover:text-[#c9a84c] transition-colors">
+                      className="flex items-center gap-1 px-3 py-2 text-[10px] text-gray-400 hover:text-[#c9a84c] transition-colors">
                       <Copy size={11} /> Duplicate
                     </button>
-                    <div className="w-px bg-[#30363d]" />
+                    <div className="w-px bg-gray-100" />
                     <button onClick={() => handleDelete(s.id)}
-                      className="flex items-center gap-1 px-3 py-2 text-[10px] text-[#8b949e] hover:text-red-400 transition-colors">
+                      className="flex items-center gap-1 px-3 py-2 text-[10px] text-gray-400 hover:text-red-400 transition-colors">
                       <Trash2 size={11} /> Delete
                     </button>
                   </div>
