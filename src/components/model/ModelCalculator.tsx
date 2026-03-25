@@ -8,6 +8,7 @@ import {
 import { generatePDF } from '../pdf/PdfReport'
 import { loadCompareState, saveCompareState } from '../../lib/uiState'
 import { LOIModal } from '../loi/LOIModal'
+import { TaxRecordImport } from '../TaxRecordImport'
 import type { LOIData } from '../../types/loi'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
@@ -558,10 +559,11 @@ function computeFlags(inputs: ModelInputs, d: ReturnType<typeof calculate>, year
   return flags
 }
 
-function FlagsTab({ inputs, d, propertyYearBuilt }: {
+function FlagsTab({ inputs, d, propertyYearBuilt, onUpdateInputs }: {
   inputs: ModelInputs
   d: ReturnType<typeof calculate>
   propertyYearBuilt?: number | null
+  onUpdateInputs?: (updates: Partial<ModelInputs>) => void
 }) {
   const flags = computeFlags(inputs, d, propertyYearBuilt)
 
@@ -589,6 +591,17 @@ function FlagsTab({ inputs, d, propertyYearBuilt }: {
 
   return (
     <div className="mt-3">
+      {onUpdateInputs && (
+        <div className="flex justify-end mb-3">
+          <TaxRecordImport
+            currentTax={inputs.tax}
+            currentLand={inputs.land}
+            units={inputs.tu}
+            purchasePrice={inputs.price}
+            onApply={(tax, land) => onUpdateInputs({ tax, land })}
+          />
+        </div>
+      )}
       {flags.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <div className="text-4xl mb-3">✅</div>
@@ -1552,7 +1565,8 @@ export function ModelCalculator({
 
         {/* ── FLAGS TAB ────────────────────────────────────────────── */}
         {activeTab === 'flags' && (
-          <FlagsTab inputs={inputs} d={d} propertyYearBuilt={propertyYearBuilt} />
+          <FlagsTab inputs={inputs} d={d} propertyYearBuilt={propertyYearBuilt}
+            onUpdateInputs={updates => setInputs(prev => ({ ...prev, ...updates }))} />
         )}
 
         {/* ── COMPARE TAB ───────────────────────────────────────────────── */}

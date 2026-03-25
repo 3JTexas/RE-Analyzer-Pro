@@ -144,3 +144,17 @@ export interface DeltaRow {
   indent?: boolean
   bold?: boolean
 }
+
+export interface TaxRecordExtraction {
+  assessedValue: number | null
+  landValue: number | null
+  improvementValue: number | null
+  landPct: number | null
+  taxableValue: number | null
+  annualTaxBill: number | null
+  millageRate: number | null
+  taxYear: number | null
+  parcelId: string | null
+  ownerName: string | null
+  propertyAddress: string | null
+}
