@@ -96,7 +96,7 @@ function OriginalLOI({ data }: { data: LOIData }) {
           (iii) insurance loss runs for the prior five (5) years; and
           (iv) written disclosure of any pending or threatened litigation, code violations, liens, or governmental orders
           affecting the Property. As a condition of closing, Seller shall obtain and deliver a signed estoppel certificate
-          from each tenant confirming the terms of their tenancy and the absence of any landlord defaults or side
+          from each tenant confirming the terms of their tenancy, rent payment status, and the absence of any landlord defaults or side
           agreements not reflected in the lease.
         </Text>
 
@@ -243,7 +243,7 @@ function BuyerFriendlyLOI({ data }: { data: LOIData }) {
           (iii) insurance loss runs for the prior five (5) years; and
           (iv) written disclosure of any pending or threatened litigation, code violations, liens, or governmental orders
           affecting the Property. As a condition of closing, Seller shall obtain and deliver a signed estoppel certificate
-          from each tenant confirming the terms of their tenancy and the absence of any landlord defaults or side
+          from each tenant confirming the terms of their tenancy, rent payment status, and the absence of any landlord defaults or side
           agreements not reflected in the lease.
         </Text>
 
