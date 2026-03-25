@@ -1086,42 +1086,72 @@ export function ModelCalculator({
                 badgeColor="amber" badge="blended" onChange={e => set('expPct', +e.target.value)} />
             ) : (
               <div className="grid grid-cols-2 gap-2">
-                <InputField {...omBadge('tax')} label="Real Estate Taxes (annual $)" type="number" dollar value={inputs.tax} step={500}
-                  tooltip="Annual property tax bill. Should reflect post-sale reassessment - Florida reassesses at purchase price on sale"
-                  badge="OM" onChange={e => set('tax', +e.target.value)} />
-                <InputField {...omBadge('ins')} label="Insurance ($/unit/yr)" type="number" dollar value={inputs.ins} step={100}
-                  tooltip="Insurance cost per unit per year. Calc multiplies by total units for annual total. Benchmark: $2,000-$3,000+/unit depending on building age"
-                  badge="OM" onChange={e => set('ins', +e.target.value)} />
+                <div>
+                  <InputField {...omBadge('tax')} label="Real Estate Taxes (annual $)" type="number" dollar value={inputs.tax} step={500}
+                    tooltip="Annual property tax bill. Should reflect post-sale reassessment - Florida reassesses at purchase price on sale"
+                    badge="OM" onChange={e => set('tax', +e.target.value)} />
+                  <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.tax > 0 && <>${Math.round(inputs.tax / 12).toLocaleString()}/mo{inputs.tu > 0 ? ` · $${Math.round(inputs.tax / inputs.tu).toLocaleString()}/unit` : ''}</>}</div>
+                </div>
+                <div>
+                  <InputField {...omBadge('ins')} label="Insurance ($/unit/yr)" type="number" dollar value={inputs.ins} step={100}
+                    tooltip="Insurance cost per unit per year. Calc multiplies by total units for annual total. Benchmark: $2,000-$3,000+/unit depending on building age"
+                    badge="OM" onChange={e => set('ins', +e.target.value)} />
+                  <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.ins > 0 && inputs.tu > 0 && <>${Math.round(inputs.ins * inputs.tu / 12).toLocaleString()}/mo total · ${(inputs.ins * inputs.tu).toLocaleString()}/yr</>}</div>
+                </div>
                 <div className="col-span-2 border-l-2 border-gray-200 pl-2 space-y-1.5">
                   <div className="grid grid-cols-3 gap-1.5">
-                    <InputField label="Electric ($)" type="number" dollar value={inputs.utilElec ?? 0} step={100}
-                      tooltip="Landlord-paid electric - common areas, exterior lighting"
-                      onChange={e => { const v = +e.target.value; setInputs(prev => ({ ...prev, utilElec: v, util: v + (prev.utilWater ?? 0) + (prev.utilTrash ?? 0) })) }} />
-                    <InputField label="Water & Sewer ($)" type="number" dollar value={inputs.utilWater ?? 0} step={100}
-                      tooltip="Water and sewer - typically landlord-paid in multifamily"
-                      onChange={e => { const v = +e.target.value; setInputs(prev => ({ ...prev, utilWater: v, util: (prev.utilElec ?? 0) + v + (prev.utilTrash ?? 0) })) }} />
-                    <InputField label="Trash ($)" type="number" dollar value={inputs.utilTrash ?? 0} step={100}
-                      tooltip="Trash removal and waste hauling"
-                      onChange={e => { const v = +e.target.value; setInputs(prev => ({ ...prev, utilTrash: v, util: (prev.utilElec ?? 0) + (prev.utilWater ?? 0) + v })) }} />
+                    <div>
+                      <InputField label="Electric ($)" type="number" dollar value={inputs.utilElec ?? 0} step={100}
+                        tooltip="Landlord-paid electric - common areas, exterior lighting"
+                        onChange={e => { const v = +e.target.value; setInputs(prev => ({ ...prev, utilElec: v, util: v + (prev.utilWater ?? 0) + (prev.utilTrash ?? 0) })) }} />
+                      <div className="text-[10px] text-gray-400 mt-0.5 h-3">{(inputs.utilElec ?? 0) > 0 && <>${Math.round((inputs.utilElec ?? 0) / 12).toLocaleString()}/mo</>}</div>
+                    </div>
+                    <div>
+                      <InputField label="Water & Sewer ($)" type="number" dollar value={inputs.utilWater ?? 0} step={100}
+                        tooltip="Water and sewer - typically landlord-paid in multifamily"
+                        onChange={e => { const v = +e.target.value; setInputs(prev => ({ ...prev, utilWater: v, util: (prev.utilElec ?? 0) + v + (prev.utilTrash ?? 0) })) }} />
+                      <div className="text-[10px] text-gray-400 mt-0.5 h-3">{(inputs.utilWater ?? 0) > 0 && <>${Math.round((inputs.utilWater ?? 0) / 12).toLocaleString()}/mo</>}</div>
+                    </div>
+                    <div>
+                      <InputField label="Trash ($)" type="number" dollar value={inputs.utilTrash ?? 0} step={100}
+                        tooltip="Trash removal and waste hauling"
+                        onChange={e => { const v = +e.target.value; setInputs(prev => ({ ...prev, utilTrash: v, util: (prev.utilElec ?? 0) + (prev.utilWater ?? 0) + v })) }} />
+                      <div className="text-[10px] text-gray-400 mt-0.5 h-3">{(inputs.utilTrash ?? 0) > 0 && <>${Math.round((inputs.utilTrash ?? 0) / 12).toLocaleString()}/mo</>}</div>
+                    </div>
                   </div>
-                  <InputField {...omBadge('util')} label="Total Utilities (annual $)" type="number" dollar value={inputs.util} step={500}
-                    tooltip="Landlord-paid utilities - water, trash, common area electric"
-                    badge={inputs.util === ((inputs.utilElec ?? 0) + (inputs.utilWater ?? 0) + (inputs.utilTrash ?? 0)) ? 'auto' : undefined}
-                    badgeColor="blue"
-                    onChange={e => set('util', +e.target.value)} />
+                  <div>
+                    <InputField {...omBadge('util')} label="Total Utilities (annual $)" type="number" dollar value={inputs.util} step={500}
+                      tooltip="Landlord-paid utilities - water, trash, common area electric"
+                      badge={inputs.util === ((inputs.utilElec ?? 0) + (inputs.utilWater ?? 0) + (inputs.utilTrash ?? 0)) ? 'auto' : undefined}
+                      badgeColor="blue"
+                      onChange={e => set('util', +e.target.value)} />
+                    <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.util > 0 && <>${Math.round(inputs.util / 12).toLocaleString()}/mo{inputs.tu > 0 ? ` · $${Math.round(inputs.util / inputs.tu).toLocaleString()}/unit` : ''}</>}</div>
+                  </div>
                 </div>
-                <InputField {...omBadge('rm')} label="R&M ($/unit/yr)" type="number" dollar value={inputs.rm} step={50}
-                  tooltip="Repairs and maintenance per unit per year. Calc multiplies by total units. Benchmark: $400-$900/unit/yr depending on building age"
-                  badge="OM" onChange={e => set('rm', +e.target.value)} />
-                <InputField {...omBadge('cs')} label="Contract Services (annual)" type="number" dollar value={inputs.cs} step={100}
-                  tooltip="Annual contract services total — landscaping, pest control, elevator, pool service etc."
-                  badge="OM" onChange={e => set('cs', +e.target.value)} />
-                <InputField {...omBadge('ga')} label="General & Admin (annual)" type="number" dollar value={inputs.ga} step={100}
-                  tooltip="Annual G&A total — office, phone, misc. Typically $75-100/unit/yr"
-                  badge="OM" onChange={e => set('ga', +e.target.value)} />
-                <InputField {...omBadge('res')} label="Reserves ($/unit/yr)" type="number" dollar value={inputs.res} step={50}
-                  tooltip="Capital reserve per unit per year. Calc multiplies by total units. Benchmark: $250-$700/unit/yr depending on building age"
-                  badge="OM" onChange={e => set('res', +e.target.value)} />
+                <div>
+                  <InputField {...omBadge('rm')} label="R&M ($/unit/yr)" type="number" dollar value={inputs.rm} step={50}
+                    tooltip="Repairs and maintenance per unit per year. Calc multiplies by total units. Benchmark: $400-$900/unit/yr depending on building age"
+                    badge="OM" onChange={e => set('rm', +e.target.value)} />
+                  <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.rm > 0 && inputs.tu > 0 && <>${Math.round(inputs.rm * inputs.tu / 12).toLocaleString()}/mo total · ${(inputs.rm * inputs.tu).toLocaleString()}/yr</>}</div>
+                </div>
+                <div>
+                  <InputField {...omBadge('cs')} label="Contract Services (annual)" type="number" dollar value={inputs.cs} step={100}
+                    tooltip="Annual contract services total — landscaping, pest control, elevator, pool service etc."
+                    badge="OM" onChange={e => set('cs', +e.target.value)} />
+                  <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.cs > 0 && <>${Math.round(inputs.cs / 12).toLocaleString()}/mo{inputs.tu > 0 ? ` · $${Math.round(inputs.cs / inputs.tu).toLocaleString()}/unit` : ''}</>}</div>
+                </div>
+                <div>
+                  <InputField {...omBadge('ga')} label="General & Admin (annual)" type="number" dollar value={inputs.ga} step={100}
+                    tooltip="Annual G&A total — office, phone, misc. Typically $75-100/unit/yr"
+                    badge="OM" onChange={e => set('ga', +e.target.value)} />
+                  <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.ga > 0 && <>${Math.round(inputs.ga / 12).toLocaleString()}/mo{inputs.tu > 0 ? ` · $${Math.round(inputs.ga / inputs.tu).toLocaleString()}/unit` : ''}</>}</div>
+                </div>
+                <div>
+                  <InputField {...omBadge('res')} label="Reserves ($/unit/yr)" type="number" dollar value={inputs.res} step={50}
+                    tooltip="Capital reserve per unit per year. Calc multiplies by total units. Benchmark: $250-$700/unit/yr depending on building age"
+                    badge="OM" onChange={e => set('res', +e.target.value)} />
+                  <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.res > 0 && inputs.tu > 0 && <>${Math.round(inputs.res * inputs.tu / 12).toLocaleString()}/mo total · ${(inputs.res * inputs.tu).toLocaleString()}/yr</>}</div>
+                </div>
                 <InputField {...omBadge('pm')} label="Prop. mgmt (%)" type="number" value={inputs.pm} step={0.5}
                   tooltip="Property management fee as % of effective gross income. Typically 8-10% for small multifamily"
                   badge="OM" onChange={e => set('pm', +e.target.value)} />
