@@ -1076,8 +1076,8 @@ export function ModelCalculator({
                 <InputField {...omBadge('tax')} label="Real estate taxes ($)" type="number" dollar value={inputs.tax} step={500}
                   tooltip="Annual property tax bill. Should reflect post-sale reassessment - Florida reassesses at purchase price on sale"
                   badge="OM" onChange={e => set('tax', +e.target.value)} />
-                <InputField {...omBadge('ins')} label="Insurance ($/door/yr)" type="number" dollar value={inputs.ins} step={100}
-                  tooltip="Annual insurance premium per door. Age-adjusted benchmark: 90yr+ building = $3,000+/door"
+                <InputField {...omBadge('ins')} label="Insurance ($/unit/yr)" type="number" dollar value={inputs.ins} step={100}
+                  tooltip="Insurance cost per unit per year. Calc multiplies by total units for annual total. Benchmark: $2,000-$3,000+/unit depending on building age"
                   badge="OM" onChange={e => set('ins', +e.target.value)} />
                 <div className="col-span-2 border-l-2 border-gray-200 pl-2 space-y-1.5">
                   <div className="grid grid-cols-3 gap-1.5">
@@ -1098,16 +1098,16 @@ export function ModelCalculator({
                     onChange={e => set('util', +e.target.value)} />
                 </div>
                 <InputField {...omBadge('rm')} label="R&M ($/unit/yr)" type="number" dollar value={inputs.rm} step={50}
-                  tooltip="Repairs and maintenance per unit/yr. Age-adjusted benchmark: 90yr+ building = $900/unit/yr"
+                  tooltip="Repairs and maintenance per unit per year. Calc multiplies by total units. Benchmark: $400-$900/unit/yr depending on building age"
                   badge="OM" onChange={e => set('rm', +e.target.value)} />
-                <InputField {...omBadge('cs')} label="Contract services ($)" type="number" dollar value={inputs.cs} step={100}
-                  tooltip="Landscaping, pest control, elevator, pool service etc."
+                <InputField {...omBadge('cs')} label="Contract Services (annual)" type="number" dollar value={inputs.cs} step={100}
+                  tooltip="Annual contract services total — landscaping, pest control, elevator, pool service etc."
                   badge="OM" onChange={e => set('cs', +e.target.value)} />
-                <InputField {...omBadge('ga')} label="G&A ($)" type="number" dollar value={inputs.ga} step={100}
-                  tooltip="General and administrative - office, phone, misc. Typically $75-100/unit"
+                <InputField {...omBadge('ga')} label="General & Admin (annual)" type="number" dollar value={inputs.ga} step={100}
+                  tooltip="Annual G&A total — office, phone, misc. Typically $75-100/unit/yr"
                   badge="OM" onChange={e => set('ga', +e.target.value)} />
                 <InputField {...omBadge('res')} label="Reserves ($/unit/yr)" type="number" dollar value={inputs.res} step={50}
-                  tooltip="Capital replacement reserve per unit/yr. Age-adjusted benchmark: 90yr+ building = $700/unit/yr"
+                  tooltip="Capital reserve per unit per year. Calc multiplies by total units. Benchmark: $250-$700/unit/yr depending on building age"
                   badge="OM" onChange={e => set('res', +e.target.value)} />
                 <InputField {...omBadge('pm')} label="Prop. mgmt (%)" type="number" value={inputs.pm} step={0.5}
                   tooltip="Property management fee as % of effective gross income. Typically 8-10% for small multifamily"
@@ -1215,18 +1215,18 @@ export function ModelCalculator({
                 <PLRow key={i} label={item.label} value={`$${item.amount.toLocaleString()}`} variant="pos" indent />
               ))}
               <PLRow label="Effective gross income" value={fmtDollar(d.EGI)} variant="total" />
-              <PLRow label="Real estate taxes" value={`(${fmtDollar(d.taxTotal)})`} variant="neg" indent />
-              <PLRow label={`Insurance (${d.tu} doors)`} value={`(${fmtDollar(d.ins)})`} variant="neg" indent />
-              <PLRow label="Utilities" value={`(${fmtDollar(d.util)})`} variant="neg" indent />
-              <PLRow label="Repairs & maintenance" value={`(${fmtDollar(d.rm)})`} variant="neg" indent />
-              <PLRow label="Contract services" value={`(${fmtDollar(d.cs)})`} variant="neg" indent />
-              <PLRow label="G&A" value={`(${fmtDollar(d.ga)})`} variant="neg" indent />
-              <PLRow label="Reserves" value={`(${fmtDollar(d.res)})`} variant="neg" indent />
+              <PLRow label="Real estate taxes" value={`(${fmtDollar(d.taxTotal)})${d.tu > 0 ? `  $${Math.round(d.taxTotal / d.tu).toLocaleString()}/unit` : ''}`} variant="neg" indent />
+              <PLRow label="Insurance" value={`(${fmtDollar(d.ins)})${d.tu > 0 ? `  $${Math.round(d.ins / d.tu).toLocaleString()}/unit` : ''}`} variant="neg" indent />
+              <PLRow label="Utilities" value={`(${fmtDollar(d.util)})${d.tu > 0 ? `  $${Math.round(d.util / d.tu).toLocaleString()}/unit` : ''}`} variant="neg" indent />
+              <PLRow label="Repairs & maintenance" value={`(${fmtDollar(d.rm)})${d.tu > 0 ? `  $${Math.round(d.rm / d.tu).toLocaleString()}/unit` : ''}`} variant="neg" indent />
+              <PLRow label="Contract services" value={`(${fmtDollar(d.cs)})${d.tu > 0 ? `  $${Math.round(d.cs / d.tu).toLocaleString()}/unit` : ''}`} variant="neg" indent />
+              <PLRow label="G&A" value={`(${fmtDollar(d.ga)})${d.tu > 0 ? `  $${Math.round(d.ga / d.tu).toLocaleString()}/unit` : ''}`} variant="neg" indent />
+              <PLRow label="Reserves" value={`(${fmtDollar(d.res)})${d.tu > 0 ? `  $${Math.round(d.res / d.tu).toLocaleString()}/unit` : ''}`} variant="neg" indent />
               <PLRow label={`Prop. mgmt (${d.pmPct.toFixed(1)}% EGI)`} value={`(${fmtDollar(d.pm)})`} variant="neg" indent />
               {(inputs.otherExpenses ?? []).map((item, i) => (
                 <PLRow key={i} label={item.label} value={`(${fmtDollar(item.amount)})`} variant="neg" indent />
               ))}
-              <PLRow label="Total expenses" value={`(${fmtDollar(d.exp)})`} variant="total" />
+              <PLRow label="Total expenses" value={`(${fmtDollar(d.exp)})${d.tu > 0 ? `  $${Math.round(d.exp / d.tu).toLocaleString()}/unit` : ''}`} variant="total" />
               <PLRow label="Net operating income" value={fmtDollar(d.NOI)} variant="noi" />
               <PLRow label="Annual debt service" value={`(${fmtDollar(d.ds)})`} variant="neg" indent />
               <PLRow label="Pre-tax cash flow" value={fmtNeg(d.CF)} variant="cf" />
@@ -1463,7 +1463,7 @@ export function ModelCalculator({
                 <SectionHeader title="Expenses" />
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <InputField label="Real estate taxes ($)" type="number" dollar value={inputs.tax} step={500} onChange={e => set('tax', +e.target.value)} />
-                  <InputField label="Insurance ($/door/yr)" type="number" dollar value={inputs.ins} step={100} onChange={e => set('ins', +e.target.value)} />
+                  <InputField label="Insurance ($/unit/yr)" type="number" dollar value={inputs.ins} step={100} onChange={e => set('ins', +e.target.value)} />
                   <InputField label="Total Utilities ($)" type="number" dollar value={inputs.util} step={500} onChange={e => set('util', +e.target.value)} />
                   <InputField label="R&M ($/unit/yr)" type="number" dollar value={inputs.rm} step={50} onChange={e => set('rm', +e.target.value)} />
                   <InputField label="Contract services ($)" type="number" dollar value={inputs.cs} step={100} onChange={e => set('cs', +e.target.value)} />
