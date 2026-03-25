@@ -119,20 +119,32 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
       if (parsed.error) throw new Error(parsed.error)
 
       const merged: ModelInputs = { ...OM_DEFAULTS }
+      const numericKeys = new Set(['price','tu','ou','rent','vp','lev','ir','am','tax','ins','util','rm','cs','ga','res','pm','yearBuilt'])
       for (const [k, v] of Object.entries(parsed)) {
         if (v !== null && v !== undefined) {
-          if (typeof v === 'number') {
+          if (numericKeys.has(k)) {
+            const n = typeof v === 'number' ? v : parseFloat(String(v))
+            if (!isNaN(n)) (merged as any)[k] = n
+          } else if (typeof v === 'number') {
             (merged as any)[k] = v
           } else if (k === 'otherIncome' && Array.isArray(v)) {
-            merged.otherIncome = v as { label: string; amount: number }[]
+            merged.otherIncome = v.map((item: any) => ({
+              label: String(item.label ?? ''),
+              amount: typeof item.amount === 'number' ? item.amount : parseFloat(String(item.amount)) || 0,
+            }))
           }
         }
       }
 
+      console.log('FORM STATE AFTER MAP:', JSON.stringify(merged, null, 2))
+
       // Auto-populate property name/address from extraction
-      if (parsed.propertyName && typeof parsed.propertyName === 'string') setPropertyName(parsed.propertyName)
-      if (parsed.propertyAddress && typeof parsed.propertyAddress === 'string') setPropertyAddress(parsed.propertyAddress)
-      if (parsed.yearBuilt && typeof parsed.yearBuilt === 'number') setPropertyYearBuilt(parsed.yearBuilt)
+      if (parsed.propertyName) setPropertyName(String(parsed.propertyName))
+      if (parsed.propertyAddress) setPropertyAddress(String(parsed.propertyAddress))
+      if (parsed.yearBuilt) {
+        const yb = typeof parsed.yearBuilt === 'number' ? parsed.yearBuilt : parseInt(String(parsed.yearBuilt))
+        if (!isNaN(yb)) setPropertyYearBuilt(yb)
+      }
 
       setInputs(merged)
       setPdfStatus('done')
