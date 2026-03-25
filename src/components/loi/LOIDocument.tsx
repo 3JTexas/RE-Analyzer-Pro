@@ -83,9 +83,20 @@ function OriginalLOI({ data }: { data: LOIData }) {
         <Text style={s.sectionHead}>Due Diligence Period</Text>
         <Text style={s.normal}>
           {InlineV({ v: d.ddPeriodDays })} days from the date of execution of the Purchase and Sale Agreement.
-          Seller shall deliver all due diligence documents within {InlineV({ v: d.ddDeliveryDays })} business days of LOI execution,
-          including but not limited to: current rent roll, 24-month operating statements, all leases, utility bills,
-          tax bills, inspection reports, environmental reports, survey, insurance loss runs, and service contracts.
+          Seller shall deliver the following within {InlineV({ v: d.ddDeliveryDays })} business days of LOI execution:
+          current certified rent roll, trailing 24-month operating statements, copies of all leases, trailing 24-month
+          utility bills, current and prior year property tax bills, and all service contracts, vendor agreements, and warranties.
+        </Text>
+        <Text style={s.normal}>
+          Within two (2) business days of PSA execution, Seller shall deliver copies of Seller's existing title insurance
+          policy, all recorded documents referenced therein, and Seller's existing survey. Seller shall also deliver:
+          (i) certificate of occupancy and all existing building, fire, and life-safety inspection reports;
+          (ii) any existing environmental, engineering, or survey reports in Seller's possession;
+          (iii) insurance loss runs for the prior five (5) years; and
+          (iv) written disclosure of any pending or threatened litigation, code violations, liens, or governmental orders
+          affecting the Property. As a condition of closing, Seller shall obtain and deliver a signed estoppel certificate
+          from each tenant confirming the terms of their tenancy, rent payment status, and the absence of any landlord
+          defaults or side agreements not reflected in the lease.
         </Text>
 
         <Text style={s.sectionHead}>Financing</Text>
@@ -220,14 +231,18 @@ function BuyerFriendlyLOI({ data }: { data: LOIData }) {
         <Text style={s.bullet}>• Copies of all residential and commercial leases</Text>
         <Text style={s.bullet}>• Trailing 24-month utility bills (water, electric, gas, trash)</Text>
         <Text style={s.bullet}>• Current and prior year property tax bills</Text>
-        <Text style={s.bullet}>• Certificate of occupancy, building inspection reports</Text>
-        <Text style={s.bullet}>• Existing environmental, engineering, and survey reports</Text>
-        <Text style={s.bullet}>• Insurance loss runs (trailing 5 years)</Text>
         <Text style={s.bullet}>• All service contracts, vendor agreements, and warranties</Text>
-        <Text style={s.bullet}>• Disclosure of any pending or threatened litigation, code violations, or government orders</Text>
         <Text style={[s.bold, { marginTop: 4, marginBottom: 2 }]}>(b) Deliverables Upon PSA Execution</Text>
         <Text style={s.normal}>
-          Owner's title insurance commitment, ALTA survey, and tenant estoppel certificates (as a condition to Closing).
+          Within two (2) business days of PSA execution, Seller shall deliver copies of Seller's existing title insurance
+          policy, all recorded documents referenced therein, and Seller's existing survey. Seller shall also deliver:
+          (i) certificate of occupancy and all existing building, fire, and life-safety inspection reports;
+          (ii) any existing environmental, engineering, or survey reports in Seller's possession;
+          (iii) insurance loss runs for the prior five (5) years; and
+          (iv) written disclosure of any pending or threatened litigation, code violations, liens, or governmental orders
+          affecting the Property. As a condition of closing, Seller shall obtain and deliver a signed estoppel certificate
+          from each tenant confirming the terms of their tenancy, rent payment status, and the absence of any landlord
+          defaults or side agreements not reflected in the lease.
         </Text>
 
         {/* 6. FINANCING */}
