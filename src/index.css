@@ -5,6 +5,7 @@
 @layer base {
   html, body, #root {
     height: 100%;
+    overflow-x: hidden;
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior: none;
   }
