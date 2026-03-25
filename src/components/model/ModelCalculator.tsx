@@ -1079,9 +1079,24 @@ export function ModelCalculator({
                 <InputField {...omBadge('ins')} label="Insurance ($/door/yr)" type="number" dollar value={inputs.ins} step={100}
                   tooltip="Annual insurance premium per door. Age-adjusted benchmark: 90yr+ building = $3,000+/door"
                   badge="OM" onChange={e => set('ins', +e.target.value)} />
-                <InputField {...omBadge('util')} label="Utilities ($)" type="number" dollar value={inputs.util} step={500}
-                  tooltip="Landlord-paid utilities - water, trash, common area electric"
-                  badge="OM" onChange={e => set('util', +e.target.value)} />
+                <div className="col-span-2 border-l-2 border-gray-200 pl-2 space-y-1.5">
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <InputField label="Electric ($)" type="number" dollar value={inputs.utilElec ?? 0} step={100}
+                      tooltip="Landlord-paid electric - common areas, exterior lighting"
+                      onChange={e => { const v = +e.target.value; setInputs(prev => ({ ...prev, utilElec: v, util: v + (prev.utilWater ?? 0) + (prev.utilTrash ?? 0) })) }} />
+                    <InputField label="Water & Sewer ($)" type="number" dollar value={inputs.utilWater ?? 0} step={100}
+                      tooltip="Water and sewer - typically landlord-paid in multifamily"
+                      onChange={e => { const v = +e.target.value; setInputs(prev => ({ ...prev, utilWater: v, util: (prev.utilElec ?? 0) + v + (prev.utilTrash ?? 0) })) }} />
+                    <InputField label="Trash ($)" type="number" dollar value={inputs.utilTrash ?? 0} step={100}
+                      tooltip="Trash removal and waste hauling"
+                      onChange={e => { const v = +e.target.value; setInputs(prev => ({ ...prev, utilTrash: v, util: (prev.utilElec ?? 0) + (prev.utilWater ?? 0) + v })) }} />
+                  </div>
+                  <InputField {...omBadge('util')} label="Total Utilities ($)" type="number" dollar value={inputs.util} step={500}
+                    tooltip="Landlord-paid utilities - water, trash, common area electric"
+                    badge={inputs.util === ((inputs.utilElec ?? 0) + (inputs.utilWater ?? 0) + (inputs.utilTrash ?? 0)) ? 'auto' : undefined}
+                    badgeColor="blue"
+                    onChange={e => set('util', +e.target.value)} />
+                </div>
                 <InputField {...omBadge('rm')} label="R&M ($/unit/yr)" type="number" dollar value={inputs.rm} step={50}
                   tooltip="Repairs and maintenance per unit/yr. Age-adjusted benchmark: 90yr+ building = $900/unit/yr"
                   badge="OM" onChange={e => set('rm', +e.target.value)} />
@@ -1449,7 +1464,7 @@ export function ModelCalculator({
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <InputField label="Real estate taxes ($)" type="number" dollar value={inputs.tax} step={500} onChange={e => set('tax', +e.target.value)} />
                   <InputField label="Insurance ($/door/yr)" type="number" dollar value={inputs.ins} step={100} onChange={e => set('ins', +e.target.value)} />
-                  <InputField label="Utilities ($)" type="number" dollar value={inputs.util} step={500} onChange={e => set('util', +e.target.value)} />
+                  <InputField label="Total Utilities ($)" type="number" dollar value={inputs.util} step={500} onChange={e => set('util', +e.target.value)} />
                   <InputField label="R&M ($/unit/yr)" type="number" dollar value={inputs.rm} step={50} onChange={e => set('rm', +e.target.value)} />
                   <InputField label="Contract services ($)" type="number" dollar value={inputs.cs} step={100} onChange={e => set('cs', +e.target.value)} />
                   <InputField label="G&A ($)" type="number" dollar value={inputs.ga} step={100} onChange={e => set('ga', +e.target.value)} />

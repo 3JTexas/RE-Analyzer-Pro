@@ -15,7 +15,10 @@ export interface ModelInputs {
   // Expenses
   tax: number      // real estate taxes $
   ins: number      // insurance $/door/yr
-  util: number     // utilities $
+  utilElec: number  // Electric (landlord-paid)
+  utilWater: number // Water & Sewer
+  utilTrash: number // Trash Removal
+  util: number      // Total utilities — auto-sum of above three, but editable
   rm: number       // repairs & maintenance $/unit/yr
   cs: number       // contract services $
   ga: number       // G&A $

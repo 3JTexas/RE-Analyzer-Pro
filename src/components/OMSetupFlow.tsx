@@ -14,7 +14,10 @@ const FIELDS: { key: keyof ModelInputs; label: string; step: number; prefix?: st
   { key: 'am',    label: 'Amortization (yrs)',    step: 5 },
   { key: 'tax',   label: 'Real estate taxes',     step: 500,  prefix: '$' },
   { key: 'ins',   label: 'Insurance $/door/yr',   step: 100,  prefix: '$' },
-  { key: 'util',  label: 'Utilities',             step: 500,  prefix: '$' },
+  { key: 'utilElec',  label: 'Electric',           step: 100,  prefix: '$' },
+  { key: 'utilWater', label: 'Water & Sewer',     step: 100,  prefix: '$' },
+  { key: 'utilTrash', label: 'Trash',             step: 100,  prefix: '$' },
+  { key: 'util',  label: 'Total Utilities',       step: 500,  prefix: '$' },
   { key: 'rm',    label: 'R&M $/unit/yr',         step: 50,   prefix: '$' },
   { key: 'cs',    label: 'Contract services',     step: 100,  prefix: '$' },
   { key: 'ga',    label: 'G&A',                   step: 100,  prefix: '$' },
@@ -119,7 +122,7 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
       if (parsed.error) throw new Error(parsed.error)
 
       const merged: ModelInputs = { ...OM_DEFAULTS }
-      const numericKeys = new Set(['price','tu','ou','rent','vp','lev','ir','am','tax','ins','util','rm','cs','ga','res','pm','yearBuilt'])
+      const numericKeys = new Set(['price','tu','ou','rent','vp','lev','ir','am','tax','ins','utilElec','utilWater','utilTrash','util','rm','cs','ga','res','pm','yearBuilt'])
       for (const [k, v] of Object.entries(parsed)) {
         if (v !== null && v !== undefined) {
           if (numericKeys.has(k)) {
@@ -139,6 +142,12 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
       // Default ou to tu if not extracted (100% occupied assumption)
       if ((merged.ou === 0 || merged.ou === undefined) && merged.tu > 0) {
         merged.ou = merged.tu
+      }
+
+      // Auto-sum utility sub-fields if util wasn't extracted directly
+      const utilSub = (merged.utilElec ?? 0) + (merged.utilWater ?? 0) + (merged.utilTrash ?? 0)
+      if (utilSub > 0 && !merged.util) {
+        merged.util = utilSub
       }
 
       console.log('FORM STATE AFTER MAP:', JSON.stringify(merged, null, 2))
