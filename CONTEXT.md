@@ -99,6 +99,8 @@ brk, land, costSeg, is1031, basis1031, equity1031
 
 // Offer calculator
 targetCapRate?: number
+targetOfferPrice?: number
+offerCalcMode?: 'cap' | 'price'
 ```
 
 **All defaults are zero.** No hardcoded values anywhere.
@@ -156,11 +158,12 @@ Stressed scenario card at bottom shows NOI/cap/DCR/CoC with all benchmarks appli
 
 ## Offer Calculator
 
-Located at bottom of P&L tab (hidden on OM scenario). User enters target cap rate (step 0.01) → shows:
-- Implied offer price + delta vs. asking ($ and %)
-- Price per unit vs. asking
-- Down payment, loan amount, DCR at offer price
-- `targetCapRate` persists in `ModelInputs` — saved with scenario automatically
+Located at bottom of P&L tab (hidden on OM scenario). Two modes via pill toggle:
+- **Target cap rate** → solve implied offer price (NOI / cap%)
+- **Target price** → solve implied cap rate (NOI / price)
+Both modes show: price, cap rate, delta vs asking ($ and %), price/unit, DCR, down payment, loan amount.
+"Apply to Inputs" button writes offer price to `inputs.price`, clears calculator, requires manual Save.
+Fields: `targetCapRate`, `targetOfferPrice`, `offerCalcMode` persist in `ModelInputs`.
 
 ---
 
@@ -235,9 +238,8 @@ When `is1031` toggled on (hidden on OM scenario):
 2. **Settings / User Defaults page** — gear icon; user_defaults table; seeds new scenarios with preferred defaults (bracket, IR, LTV, land%, costSeg%).
 3. **Per-unit rent roll** — individual unit rows replacing blended avg. OM import maps rent roll table to unit rows.
 4. **Tax assessor PDF import** — upload county appraiser PDF → extract assessed value, land/improvement split, tax bill → auto-populate corrected tax and land% in Flags tab.
-5. **Fix `vite.config.ts` base path for local dev** — set to `process.env.NODE_ENV === 'production' ? '/RE-Analyzer-Pro/' : '/'` so `npm run dev` serves from `/` instead of `/RE-Analyzer-Pro/`.
-6. **Update Node.js 20 → 24 in `deploy.yml`** — before June 2026 when Node 20 reaches EOL in GitHub Actions.
-7. **Responsive layout** — proper breakpoint-aware design for desktop.
+5. **Update Node.js 20 → 24 in `deploy.yml`** — before June 2026 when Node 20 reaches EOL in GitHub Actions.
+6. **Responsive layout** — proper breakpoint-aware design for desktop.
 
 ---
 
@@ -268,7 +270,7 @@ When `is1031` toggled on (hidden on OM scenario):
 
 ---
 
-## Latest Session — March 24, 2026
+## Session — March 24, 2026
 
 - Added `compare_state jsonb` column to `properties` table (migration run successfully in Supabase SQL Editor)
 - Created `src/lib/uiState.ts` with `loadCompareState` / `saveCompareState` helpers
@@ -277,9 +279,81 @@ When `is1031` toggled on (hidden on OM scenario):
 - GitHub Pages deployment live at https://3jtexas.github.io/RE-Analyzer-Pro/
 - Repo made public to enable GitHub Pages free tier
 - Claude Code confirmed working — all future code changes use Claude Code directly, never patch files in chat
-- **Pending:** Fix `vite.config.ts` base path for local dev (`process.env.NODE_ENV === 'production' ? '/RE-Analyzer-Pro/' : '/'`)
-- **Pending:** Update Node.js 20 → 24 in `deploy.yml` before June 2026
+- Fixed `vite.config.ts` base path: `'/'` for dev, `'/RE-Analyzer-Pro/'` for production
+- Number input UX: auto-select on focus, strip leading zeros, restore 0 on empty blur
+- Dollar fields display with comma separators (price, rent, tax, ins, util, rm, cs, ga, res, equity1031, basis1031)
+- Info tooltips on Land %, Cost Seg %, and Est. Carryover Basis fields
 
 ---
 
-*Last updated: March 24, 2026*
+## Latest Session — March 25, 2026
+
+**OM Method Fix**
+- OM As-Presented scenario (is_default=true) now always forces `'om'` method regardless of `ou/tu` values
+- Fixed `effectiveMethod` derivation to check `omScenario?.id === currentScenarioId` before auto-deriving
+
+**PDF Cover Page Redesign**
+- White background, Chai Holdings logo top-left (~180px wide), property photo (or placeholder)
+- Key metrics grid: Purchase Price (with price/unit), Units, Cap Rate, NOI, DCR, Y1 ROE, Pre-tax CF, Equity
+- All pages use light theme: section headers on `#F8F8F8`, table headers light gray, text `#1a1a2e`
+- `Chai_Logo.jpeg` in `public/` (sourced from Outlook attachments, 851x240px)
+
+**Property Photo Upload**
+- OMSetupFlow review screen: optional photo upload with Camera icon
+- PropertyPage: "Photo" button in header uploads to `property-images` Supabase Storage bucket
+- `property_image_url text` column added to `properties` table
+- Supabase Storage RLS policies: INSERT/UPDATE for authenticated, SELECT for public
+- Photos pre-fetched as base64 data URLs to bypass CORS in `@react-pdf/renderer`
+- Edge function returns `propertyImageUrl: null` (manual upload only — vision API can't extract photos)
+
+**Bidirectional Offer Calculator**
+- Two pill-toggle modes: "Target cap rate" (solve price) and "Target price" (solve cap rate)
+- Both modes show: offer price, cap rate, delta vs asking, price/unit, DCR, down payment, loan amount
+- "Apply to Inputs" button: writes implied offer price to `inputs.price`, clears `targetCapRate` and `targetOfferPrice`, shows 2-sec confirmation, requires manual Save
+- New `ModelInputs` fields: `targetOfferPrice?: number`, `offerCalcMode?: 'cap' | 'price'`
+
+**Compare Tab & PDF Price Consistency**
+- Compare tab price row: always shows `inputs.price` as "Purchase Price" (blue highlight, no back-calculated offer prices)
+- PDF: removed all back-calculated offer price references; cover page and page 2 use `inputs.price` throughout
+- PDF comparison table: "Purchase Price" added as bold first row
+- PDF method label: `deriveMethodLabel()` checks scenario name for "OM As-Presented", then auto-derives from `ou/tu`
+
+**Tooltips on All Input Fields**
+- Fixed Unicode escapes (`\u2013` → `-`) in Land % and Cost Seg % tooltips
+- Added info tooltips to all 20+ InputField instances in Inputs tab (Income, Financing, Expenses, Tax sections)
+- `SectionHeader` component now accepts optional `tooltip` prop
+- Tooltips on Tax Analysis, Return on Equity, Tax Benefit Runway, and Offer Calculator section headers
+
+**Tax Benefit Runway — Three-Scenario Chart**
+- Chart.js line chart with three color-blind-safe lines:
+  - Bonus + Cost Seg (`#0072B2` blue) — Y1 bonus dep cliff, then SL only
+  - Straight-line only (`#E69F00` amber) — no cost seg, full 27.5yr schedule
+  - No depreciation (`#CC79A7` pink, dashed) — pure pre-tax cash flow
+- Monthly vertical gridlines, heavier year boundaries, mid-year month labels
+- Bold zero line, peak/extinguish data points with labels, color-swatch legend
+- Interactive tooltip shows all three values at each month
+- Chart only renders when bracket > 0 and depreciation is active
+
+**PDF Tax Benefit Runway**
+- SVG three-line chart with monthly gridlines, year separators, peak/extinguish dots
+- Legend with color swatches below chart
+- Explanation grid with 5 columns: Component, Bonus+CS Y1, Bonus+CS Y2+, SL only, No dep
+- All values computed from live inputs (pre-tax CF/mo, tax savings/mo, net monthly, peak cumulative, months to zero)
+
+**Debug Logs (to remove)**
+- Console.logs removed from photo pipeline (PropertyPage, ScenarioPage, PdfReport)
+
+---
+
+## Pending Features / Known Issues (updated)
+
+1. **Method refactor** — remove `method` field from DB/types; derive purely from inputs
+2. **Settings / User Defaults page** — gear icon; user_defaults table; seeds new scenarios with preferred defaults
+3. **Per-unit rent roll** — individual unit rows replacing blended avg
+4. **Tax assessor PDF import** — upload county appraiser PDF → extract assessed value, land/improvement split
+5. **Update Node.js 20 → 24 in `deploy.yml`** — before June 2026 when Node 20 reaches EOL
+6. **Responsive layout** — proper breakpoint-aware design for desktop
+
+---
+
+*Last updated: March 25, 2026*
