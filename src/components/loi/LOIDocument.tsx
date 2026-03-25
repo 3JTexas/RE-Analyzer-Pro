@@ -129,8 +129,8 @@ function OriginalLOI({ data }: { data: LOIData }) {
 
         <Text style={s.normal}>
           This LOI is intended to be non-binding and is for discussion purposes only, except for the provisions
-          regarding confidentiality and exclusivity, which shall be binding. This LOI shall expire if not executed
-          by both parties within {InlineV({ v: d.loiExpirationDays })} business days from the date hereof.
+          regarding confidentiality, which shall be binding. This LOI shall expire if not executed by both parties
+          within {InlineV({ v: d.loiExpirationDays })} business days from the date hereof.
         </Text>
 
         <Text style={[s.normal, { marginTop: 12 }]}>Sincerely,</Text>
@@ -293,19 +293,12 @@ function BuyerFriendlyLOI({ data }: { data: LOIData }) {
           the Property in the ordinary course and maintain current insurance coverage.
         </Text>
 
-        {/* 14. EXPIRATION */}
-        <Text style={s.numberedHead}>14. LOI EXPIRATION</Text>
+        {/* 14. NON-BINDING NATURE AND EXPIRATION */}
+        <Text style={s.numberedHead}>14. NON-BINDING NATURE AND EXPIRATION</Text>
         <Text style={s.normal}>
-          This LOI shall expire if not executed by both parties within {InlineV({ v: d.loiExpirationDays })} business days
-          from the date hereof.
-        </Text>
-
-        {/* 15. NON-BINDING */}
-        <Text style={s.numberedHead}>15. NON-BINDING NATURE</Text>
-        <Text style={s.normal}>
-          This LOI is non-binding and is for discussion purposes only, except that the provisions of Section 14
-          (LOI Expiration) shall be binding upon the parties. No binding obligation shall arise until execution of
-          a definitive Purchase and Sale Agreement.
+          This LOI is intended to be non-binding and is for discussion purposes only, except for the provisions
+          regarding confidentiality, which shall be binding. This LOI shall expire if not executed by both parties
+          within {InlineV({ v: d.loiExpirationDays })} business days from the date hereof.
         </Text>
 
         <View style={s.hr} />
