@@ -109,7 +109,19 @@ export function LOIModal({ initial, onClose }: Props) {
             <Field label="Date" value={data.date} onChange={v => set('date', v)} />
             <Field label="Recipient Names (broker)" value={data.recipientNames} onChange={v => set('recipientNames', v)} placeholder="John Smith, Jane Doe" />
             <Field label="Seller Entity Name" value={data.sellerName} onChange={v => set('sellerName', v)} placeholder="Seller LLC" wide />
-            <Field label="Earnest Deposit" value={data.earnestDeposit} onChange={v => set('earnestDeposit', v)} placeholder="Fifty Thousand Dollars ($50,000)" wide />
+            <div className="col-span-2">
+              <label className="block text-[9px] text-gray-500 mb-0.5 font-medium uppercase tracking-wide">Earnest Deposit</label>
+              <input
+                value={data.earnestDeposit}
+                onChange={e => set('earnestDeposit', e.target.value)}
+                onBlur={e => {
+                  const n = parseFloat(e.target.value.replace(/[^0-9.]/g, ''))
+                  if (!isNaN(n) && n > 0) set('earnestDeposit', `$${n.toLocaleString('en-US')}`)
+                }}
+                placeholder="e.g. 100,000"
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-400 bg-white"
+              />
+            </div>
             <Field label="Due Diligence (days)" value={data.ddPeriodDays} onChange={v => set('ddPeriodDays', v)} />
             <Field label="DD Doc Delivery (biz days)" value={data.ddDeliveryDays} onChange={v => set('ddDeliveryDays', v)} />
           </div>
