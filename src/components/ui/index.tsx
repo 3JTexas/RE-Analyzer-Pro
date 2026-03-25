@@ -149,7 +149,7 @@ export function MetricCard({ label, value, sub, valueColor }:
 
 // ── P&L row ───────────────────────────────────────────────────────────────
 export function PLRow({ label, value, variant = 'normal', indent = false }:
-  { label: string; value: string; variant?: 'normal'|'neg'|'pos'|'total'|'noi'|'cf'; indent?: boolean }) {
+  { label: string; value: React.ReactNode; variant?: 'normal'|'neg'|'pos'|'total'|'noi'|'cf'; indent?: boolean }) {
   const valueColor = {
     normal: 'text-gray-900',
     neg: 'text-red-700',

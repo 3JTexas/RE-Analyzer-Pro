@@ -1073,7 +1073,7 @@ export function ModelCalculator({
                 badgeColor="amber" badge="blended" onChange={e => set('expPct', +e.target.value)} />
             ) : (
               <div className="grid grid-cols-2 gap-2">
-                <InputField {...omBadge('tax')} label="Real estate taxes ($)" type="number" dollar value={inputs.tax} step={500}
+                <InputField {...omBadge('tax')} label="Real Estate Taxes (annual $)" type="number" dollar value={inputs.tax} step={500}
                   tooltip="Annual property tax bill. Should reflect post-sale reassessment - Florida reassesses at purchase price on sale"
                   badge="OM" onChange={e => set('tax', +e.target.value)} />
                 <InputField {...omBadge('ins')} label="Insurance ($/unit/yr)" type="number" dollar value={inputs.ins} step={100}
@@ -1091,7 +1091,7 @@ export function ModelCalculator({
                       tooltip="Trash removal and waste hauling"
                       onChange={e => { const v = +e.target.value; setInputs(prev => ({ ...prev, utilTrash: v, util: (prev.utilElec ?? 0) + (prev.utilWater ?? 0) + v })) }} />
                   </div>
-                  <InputField {...omBadge('util')} label="Total Utilities ($)" type="number" dollar value={inputs.util} step={500}
+                  <InputField {...omBadge('util')} label="Total Utilities (annual $)" type="number" dollar value={inputs.util} step={500}
                     tooltip="Landlord-paid utilities - water, trash, common area electric"
                     badge={inputs.util === ((inputs.utilElec ?? 0) + (inputs.utilWater ?? 0) + (inputs.utilTrash ?? 0)) ? 'auto' : undefined}
                     badgeColor="blue"
@@ -1215,18 +1215,36 @@ export function ModelCalculator({
                 <PLRow key={i} label={item.label} value={`$${item.amount.toLocaleString()}`} variant="pos" indent />
               ))}
               <PLRow label="Effective gross income" value={fmtDollar(d.EGI)} variant="total" />
-              <PLRow label="Real estate taxes" value={`(${fmtDollar(d.taxTotal)})${d.tu > 0 ? `  $${Math.round(d.taxTotal / d.tu).toLocaleString()}/unit` : ''}`} variant="neg" indent />
-              <PLRow label="Insurance" value={`(${fmtDollar(d.ins)})${d.tu > 0 ? `  $${Math.round(d.ins / d.tu).toLocaleString()}/unit` : ''}`} variant="neg" indent />
-              <PLRow label="Utilities" value={`(${fmtDollar(d.util)})${d.tu > 0 ? `  $${Math.round(d.util / d.tu).toLocaleString()}/unit` : ''}`} variant="neg" indent />
-              <PLRow label="Repairs & maintenance" value={`(${fmtDollar(d.rm)})${d.tu > 0 ? `  $${Math.round(d.rm / d.tu).toLocaleString()}/unit` : ''}`} variant="neg" indent />
-              <PLRow label="Contract services" value={`(${fmtDollar(d.cs)})${d.tu > 0 ? `  $${Math.round(d.cs / d.tu).toLocaleString()}/unit` : ''}`} variant="neg" indent />
-              <PLRow label="G&A" value={`(${fmtDollar(d.ga)})${d.tu > 0 ? `  $${Math.round(d.ga / d.tu).toLocaleString()}/unit` : ''}`} variant="neg" indent />
-              <PLRow label="Reserves" value={`(${fmtDollar(d.res)})${d.tu > 0 ? `  $${Math.round(d.res / d.tu).toLocaleString()}/unit` : ''}`} variant="neg" indent />
+              {[
+                { label: 'Real estate taxes', v: d.taxTotal },
+                { label: 'Insurance', v: d.ins },
+                { label: 'Utilities', v: d.util },
+                { label: 'Repairs & maintenance', v: d.rm },
+                { label: 'Contract services', v: d.cs },
+                { label: 'G&A', v: d.ga },
+                { label: 'Reserves', v: d.res },
+              ].map((row, i) => (
+                <PLRow key={i} label={row.label} variant="neg" indent value={
+                  <div className="text-right">
+                    <span className="text-xs font-medium">${Math.round(row.v / 12).toLocaleString()}/mo</span>
+                    <span className="block text-[10px] text-gray-400 mt-0.5">
+                      (${row.v.toLocaleString()}/yr{d.tu > 0 ? ` · $${Math.round(row.v / d.tu).toLocaleString()}/unit` : ''})
+                    </span>
+                  </div>
+                } />
+              ))}
               <PLRow label={`Prop. mgmt (${d.pmPct.toFixed(1)}% EGI)`} value={`(${fmtDollar(d.pm)})`} variant="neg" indent />
               {(inputs.otherExpenses ?? []).map((item, i) => (
                 <PLRow key={i} label={item.label} value={`(${fmtDollar(item.amount)})`} variant="neg" indent />
               ))}
-              <PLRow label="Total expenses" value={`(${fmtDollar(d.exp)})${d.tu > 0 ? `  $${Math.round(d.exp / d.tu).toLocaleString()}/unit` : ''}`} variant="total" />
+              <PLRow label="Total expenses" variant="total" value={
+                <div className="text-right">
+                  <span className="text-xs font-semibold">${Math.round(d.exp / 12).toLocaleString()}/mo</span>
+                  <span className="block text-[10px] text-gray-400 mt-0.5">
+                    (${d.exp.toLocaleString()}/yr{d.tu > 0 ? ` · $${Math.round(d.exp / d.tu).toLocaleString()}/unit` : ''})
+                  </span>
+                </div>
+              } />
               <PLRow label="Net operating income" value={fmtDollar(d.NOI)} variant="noi" />
               <PLRow label="Annual debt service" value={`(${fmtDollar(d.ds)})`} variant="neg" indent />
               <PLRow label="Pre-tax cash flow" value={fmtNeg(d.CF)} variant="cf" />
