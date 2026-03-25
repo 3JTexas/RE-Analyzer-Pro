@@ -85,7 +85,8 @@ function OriginalLOI({ data }: { data: LOIData }) {
           {InlineV({ v: d.ddPeriodDays })} days from the date of execution of the Purchase and Sale Agreement.
           Seller shall deliver the following within {InlineV({ v: d.ddDeliveryDays })} business days of LOI execution:
           current certified rent roll, trailing 24-month operating statements, copies of all leases, trailing 24-month
-          utility bills, current and prior year property tax bills, and all service contracts, vendor agreements, and warranties.
+          utility bills, current and prior year property tax bills, all service contracts, vendor agreements, and warranties,
+          and current rent payment status for all units including any delinquencies, partial payments, or payment plans in effect.
         </Text>
         <Text style={s.normal}>
           Within two (2) business days of PSA execution, Seller shall deliver copies of Seller's existing title insurance
@@ -95,8 +96,8 @@ function OriginalLOI({ data }: { data: LOIData }) {
           (iii) insurance loss runs for the prior five (5) years; and
           (iv) written disclosure of any pending or threatened litigation, code violations, liens, or governmental orders
           affecting the Property. As a condition of closing, Seller shall obtain and deliver a signed estoppel certificate
-          from each tenant confirming the terms of their tenancy, rent payment status, and the absence of any landlord
-          defaults or side agreements not reflected in the lease.
+          from each tenant confirming the terms of their tenancy and the absence of any landlord defaults or side
+          agreements not reflected in the lease.
         </Text>
 
         <Text style={s.sectionHead}>Financing</Text>
@@ -232,6 +233,7 @@ function BuyerFriendlyLOI({ data }: { data: LOIData }) {
         <Text style={s.bullet}>• Trailing 24-month utility bills (water, electric, gas, trash)</Text>
         <Text style={s.bullet}>• Current and prior year property tax bills</Text>
         <Text style={s.bullet}>• All service contracts, vendor agreements, and warranties</Text>
+        <Text style={s.bullet}>• Current rent payment status for all units — including any delinquencies, partial payments, or payment plans in effect</Text>
         <Text style={[s.bold, { marginTop: 4, marginBottom: 2 }]}>(b) Deliverables Upon PSA Execution</Text>
         <Text style={s.normal}>
           Within two (2) business days of PSA execution, Seller shall deliver copies of Seller's existing title insurance
@@ -241,8 +243,8 @@ function BuyerFriendlyLOI({ data }: { data: LOIData }) {
           (iii) insurance loss runs for the prior five (5) years; and
           (iv) written disclosure of any pending or threatened litigation, code violations, liens, or governmental orders
           affecting the Property. As a condition of closing, Seller shall obtain and deliver a signed estoppel certificate
-          from each tenant confirming the terms of their tenancy, rent payment status, and the absence of any landlord
-          defaults or side agreements not reflected in the lease.
+          from each tenant confirming the terms of their tenancy and the absence of any landlord defaults or side
+          agreements not reflected in the lease.
         </Text>
 
         {/* 6. FINANCING */}

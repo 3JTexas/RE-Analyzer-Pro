@@ -19,27 +19,15 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Strip data URI prefix if present, ensure clean base64
+    const cleanBase64 = (raw: string) => raw.replace(/^data:application\/pdf;base64,/, '')
+
     const pdfContents = pdfs.map((base64: string) => ({
       type: 'document',
-      source: { type: 'base64', media_type: 'application/pdf', data: base64 }
+      source: { type: 'base64', media_type: 'application/pdf', data: cleanBase64(base64) }
     }))
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': Deno.env.get('ANTHROPIC_API_KEY') ?? '',
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        system: `You are a real estate underwriting data extractor. You will be given one or more pages of a commercial real estate Offering Memorandum (OM). Your job is to extract specific financial and property data and return it as a single valid JSON object with no other text, preamble, explanation, or markdown. Start your response with { and end with }.`,
-        messages: [{
-          role: 'user',
-          content: [
-            ...pdfContents,
-            { type: 'text', text: `Extract the following fields from this Offering Memorandum. Return ONLY a JSON object with these exact keys. Use null for any field you cannot find. Do not guess — only return values clearly stated in the document.
+    const extractionPrompt = `Extract the following fields from this Offering Memorandum. Return ONLY a JSON object with these exact keys. Use null for any field you cannot find. Do not guess — only return values clearly stated in the document.
 
 {
   "propertyName": "Name of the property (string)",
@@ -73,7 +61,27 @@ Important extraction tips:
 - If you see a pro forma or T12 operating statement, prefer the T12 (trailing 12 months) figures over pro forma projections
 - Insurance is sometimes shown as $/unit/year — multiply by units for annual total
 - On Crexi-format OMs, financial data is often in tables labeled 'Financial Summary', 'Income & Expenses', 'Operating Statement', or 'Financials'
-- Look at ALL pages of the document — expenses and financing details are often on page 2 or 3` }
+- Look at ALL pages of the document — expenses and financing details are often on page 2 or 3`
+
+    // Diagnostic log — structure verification
+    console.error(`[extract-om] Sending ${pdfContents.length} PDF document block(s), base64 lengths: ${pdfs.map((p: string) => cleanBase64(p).length).join(', ')}, prompt starts: "${extractionPrompt.slice(0, 200)}..."`)
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': Deno.env.get('ANTHROPIC_API_KEY') ?? '',
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4000,
+        system: `You are a real estate underwriting data extractor. You will be given one or more pages of a commercial real estate Offering Memorandum (OM). Your job is to extract specific financial and property data and return it as a single valid JSON object with no other text, preamble, explanation, or markdown. Start your response with { and end with }.`,
+        messages: [{
+          role: 'user',
+          content: [
+            ...pdfContents,
+            { type: 'text', text: extractionPrompt }
           ]
         }]
       })
