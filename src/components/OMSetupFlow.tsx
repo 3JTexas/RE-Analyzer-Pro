@@ -136,6 +136,11 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
         }
       }
 
+      // Default ou to tu if not extracted (100% occupied assumption)
+      if ((merged.ou === 0 || merged.ou === undefined) && merged.tu > 0) {
+        merged.ou = merged.tu
+      }
+
       console.log('FORM STATE AFTER MAP:', JSON.stringify(merged, null, 2))
 
       // Auto-populate property name/address from extraction
