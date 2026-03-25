@@ -367,48 +367,53 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
           </View>
         </View>
 
-        {/* ── Tax Benefit — Annual Table + 3-Line Chart ─────────────── */}
+        {/* ── Tax Benefit Bank ─────────────────────────────────────── */}
         {d.brk > 0 && (inputs.costSeg > 0 || inputs.land < 100) && (() => {
-          const monthlyCF = d.CF / 12
           const bracket = d.brk / 100
-          const fullSL = d.deprBase / 27.5
           const bonusSav = d.bd * bracket
-          const slSavAnnual = d.sl * bracket
-          const slOnlyTax = fullSL * bracket
-          const slBase = d.deprBase * (1 - inputs.costSeg / 100)
-
-          // Annual table: Y1-Y5 + total
-          let cum = 0
-          const yr1 = { pretax: d.CF, bonus: bonusSav, sl: slSavAnnual, total: d.CF + bonusSav + slSavAnnual }
-          cum += yr1.total
-          const annualRows = [{ period: 'Year 1', ...yr1, cumBal: cum, remBasis: slBase, highlight: true }]
-          for (let y = 2; y <= 5; y++) {
-            const total = d.CF + slSavAnnual
-            cum += total
-            annualRows.push({ period: `Year ${y}`, pretax: d.CF, bonus: 0, sl: slSavAnnual, total, cumBal: cum, remBasis: Math.max(0, slBase - (slBase / 27.5) * (y - 1)), highlight: false })
-          }
-          const totRow = { period: '5-Year Total', pretax: d.CF * 5, bonus: bonusSav, sl: slSavAnnual * 5, total: d.CF * 5 + bonusSav + slSavAnnual * 5, cumBal: cum, remBasis: Math.max(0, slBase - (slBase / 27.5) * 4), highlight: false }
+          const slAnnual = d.sl * bracket
+          const monthlyCF = d.CF / 12
+          const fullSL = d.deprBase / 27.5
+          const slMonthly = slAnnual / 12
 
           const fmtV = (v: number) => Math.abs(v) < 0.5 ? '—' : v < 0 ? `(${fmtDollar(Math.abs(v))})` : fmtDollar(v)
           const negColor = (v: number) => Math.abs(v) < 0.5 ? C.textMuted : v < 0 ? '#DC2626' : '#15803D'
 
-          // Chart: 60 months
-          const line1: number[] = [], line2: number[] = [], line3: number[] = []
-          let b1 = 0, b2 = 0, b3 = 0
-          const y1Tax1 = d.ts / 12, y2Tax1 = (d.sl * bracket) / 12, slOnly = (fullSL * bracket) / 12
-          for (let m = 1; m <= 60; m++) {
-            b1 += monthlyCF + (m <= 12 ? y1Tax1 : y2Tax1)
-            b2 += monthlyCF + slOnly
-            b3 += monthlyCF
-            line1.push(Math.round(b1)); line2.push(Math.round(b2)); line3.push(Math.round(b3))
+          // Annual benefit bank rows
+          type AR = { period: string; pretax: number; slAdded: number; drawn: number; balance: number; note: string; negBal?: boolean; exhaustRow?: boolean }
+          const aRows: AR[] = []
+          let bal = bonusSav
+          let exhausted = false
+          // Y1
+          for (let m = 0; m < 12; m++) { bal += slMonthly + monthlyCF }
+          const y1Drawn = d.CF < 0 ? Math.abs(d.CF) : 0
+          let note1 = ''
+          if (bal < 0 && !exhausted) { note1 = 'Shield exhausted'; exhausted = true }
+          aRows.push({ period: 'Year 1', pretax: d.CF, slAdded: slAnnual, drawn: y1Drawn, balance: bal, note: note1, negBal: bal < -0.5, exhaustRow: note1 !== '' })
+          // Y2-5
+          for (let y = 2; y <= 5; y++) {
+            bal += slAnnual + d.CF
+            let note = ''
+            if (bal < 0 && !exhausted) { note = 'Shield exhausted'; exhausted = true }
+            aRows.push({ period: `Year ${y}`, pretax: d.CF, slAdded: slAnnual, drawn: d.CF < 0 ? Math.abs(d.CF) : 0, balance: bal, note, negBal: bal < -0.5, exhaustRow: note !== '' })
           }
-          const peak1 = Math.max(...line1), peakIdx1 = line1.indexOf(peak1)
-          const ext1 = line1.findIndex((v, i) => i > peakIdx1 && v <= 0)
-          const allVals = [...line1, ...line2, ...line3]
-          const yMax = Math.max(...allVals, 1000)
-          const yMin = Math.min(...allVals, 0) - 500
-          const yRange = yMax - yMin
-          const PC = { bonus: '#0072B2', sl: '#E69F00', none: '#CC79A7', exhaust: '#D85A30' }
+          const totDrawn = aRows.reduce((s, r) => s + r.drawn, 0)
+          const totRow = { period: '5-Year Total', pretax: d.CF * 5, slAdded: slAnnual * 5, drawn: totDrawn, balance: bal }
+
+          // Chart lines — benefit bank model, 60 months
+          const line1: number[] = [], line2: number[] = []
+          let b1 = bonusSav, b2 = 0
+          const slOnlyMo = (fullSL * bracket) / 12
+          for (let m = 0; m < 60; m++) {
+            b1 += slMonthly + monthlyCF
+            b2 += slOnlyMo + monthlyCF
+            line1.push(Math.round(b1)); line2.push(Math.round(b2))
+          }
+          const ext1 = line1.findIndex(v => v < 0)
+          const allVals = [...line1, ...line2]
+          const yMax = Math.max(...allVals, 1000), yMin = Math.min(...allVals, -1000)
+          const yRange = yMax - yMin || 1
+          const PC = { bonus: '#0072B2', sl: '#E69F00', exhaust: '#D85A30' }
           const W = 480, H = 110, PX = 30, PY = 8
           const toX = (i: number) => PX + (i / 59) * (W - PX * 2)
           const toY = (v: number) => PY + (1 - (v - yMin) / yRange) * (H - PY * 2)
@@ -417,66 +422,72 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
 
           return (
             <>
-              {/* Annual summary table */}
-              <SectionHdr title="5-Year Tax Benefit Summary" />
-              <View style={[s.table, { marginBottom: 8 }]}>
+              {/* Opening balance banner */}
+              <View style={{ backgroundColor: '#EFF6FF', borderWidth: 0.5, borderColor: '#93C5FD', borderRadius: 4, padding: '6 10', marginTop: 8, marginBottom: 6 }}>
+                <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#1E40AF' }}>Day 1 Tax Benefit Bank: {fmtDollar(bonusSav)}</Text>
+                <Text style={{ fontSize: 7.5, color: '#3B82F6', marginTop: 1 }}>Funded by bonus depreciation on {fmtDollar(d.bd)} of cost-segregated assets at {d.brk}% bracket</Text>
+              </View>
+
+              {/* Annual table */}
+              <SectionHdr title="5-Year Benefit Bank" />
+              <View style={[s.table, { marginBottom: 6 }]}>
                 <View style={[s.tableHdrRow, { backgroundColor: '#1a1a2e' }]}>
-                  <Text style={[s.tableHdrCell, { flex: 1.2, color: 'white' }]}>Period</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1, color: 'white' }]}>Period</Text>
                   <Text style={[s.tableHdrCell, { flex: 1.2, textAlign: 'right', color: 'white' }]}>Pre-Tax CF</Text>
-                  <Text style={[s.tableHdrCell, { flex: 1.2, textAlign: 'right', color: 'white' }]}>Bonus Dep</Text>
-                  <Text style={[s.tableHdrCell, { flex: 1.2, textAlign: 'right', color: 'white' }]}>SL Dep</Text>
-                  <Text style={[s.tableHdrCell, { flex: 1.2, textAlign: 'right', color: 'white' }]}>Total AT</Text>
-                  <Text style={[s.tableHdrCell, { flex: 1.2, textAlign: 'right', color: 'white' }]}>Cumulative</Text>
-                  <Text style={[s.tableHdrCell, { flex: 1.2, textAlign: 'right', color: 'white' }]}>Rem. Basis</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1.2, textAlign: 'right', color: 'white' }]}>SL Dep Added</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1.2, textAlign: 'right', color: 'white' }]}>Drawn</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1.3, textAlign: 'right', color: 'white' }]}>Balance</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1.2, color: 'white' }]}>Notes</Text>
                 </View>
-                {annualRows.map((r, i) => (
-                  <View key={i} style={[s.tableRow, { backgroundColor: r.highlight ? '#EFF6FF' : i % 2 === 0 ? '#fff' : '#f8f8f8' }]}>
-                    <Text style={[s.tableCell, { flex: 1.2, fontFamily: 'Helvetica-Bold' }]}>{r.period}</Text>
+                {aRows.map((r, i) => (
+                  <View key={i} style={[s.tableRow, { backgroundColor: r.exhaustRow ? '#FFFBEB' : r.negBal ? '#FEF2F2' : i === 0 ? '#EFF6FF' : i % 2 === 0 ? '#fff' : '#f8f8f8' }]}>
+                    <Text style={[s.tableCell, { flex: 1, fontFamily: 'Helvetica-Bold' }]}>{r.period}</Text>
                     <Text style={[s.tableCellR, { flex: 1.2, color: negColor(r.pretax) }]}>{fmtV(r.pretax)}</Text>
-                    <Text style={[s.tableCellR, { flex: 1.2, color: negColor(r.bonus) }]}>{fmtV(r.bonus)}</Text>
-                    <Text style={[s.tableCellR, { flex: 1.2, color: negColor(r.sl) }]}>{fmtV(r.sl)}</Text>
-                    <Text style={[s.tableCellR, { flex: 1.2, fontFamily: 'Helvetica-Bold', color: negColor(r.total) }]}>{fmtV(r.total)}</Text>
-                    <Text style={[s.tableCellR, { flex: 1.2, fontFamily: 'Helvetica-Bold', color: negColor(r.cumBal) }]}>{fmtV(r.cumBal)}</Text>
-                    <Text style={[s.tableCellR, { flex: 1.2, color: C.textMuted }]}>{fmtV(r.remBasis)}</Text>
+                    <Text style={[s.tableCellR, { flex: 1.2, color: negColor(r.slAdded) }]}>{fmtV(r.slAdded)}</Text>
+                    <Text style={[s.tableCellR, { flex: 1.2, color: r.drawn > 0.5 ? '#DC2626' : C.textMuted }]}>{r.drawn > 0.5 ? `(${fmtDollar(r.drawn)})` : '—'}</Text>
+                    <Text style={[s.tableCellR, { flex: 1.3, fontFamily: 'Helvetica-Bold', color: negColor(r.balance) }]}>{fmtV(r.balance)}</Text>
+                    <Text style={[s.tableCell, { flex: 1.2, fontSize: 7, color: r.note ? '#DC2626' : C.textMuted }]}>{r.note}</Text>
                   </View>
                 ))}
                 <View style={[s.tableRow, { backgroundColor: '#1a1a2e' }]}>
-                  <Text style={[s.tableCell, { flex: 1.2, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{totRow.period}</Text>
+                  <Text style={[s.tableCell, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{totRow.period}</Text>
                   <Text style={[s.tableCellR, { flex: 1.2, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totRow.pretax)}</Text>
-                  <Text style={[s.tableCellR, { flex: 1.2, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totRow.bonus)}</Text>
-                  <Text style={[s.tableCellR, { flex: 1.2, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totRow.sl)}</Text>
-                  <Text style={[s.tableCellR, { flex: 1.2, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totRow.total)}</Text>
-                  <Text style={[s.tableCellR, { flex: 1.2, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totRow.cumBal)}</Text>
-                  <Text style={[s.tableCellR, { flex: 1.2, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totRow.remBasis)}</Text>
+                  <Text style={[s.tableCellR, { flex: 1.2, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totRow.slAdded)}</Text>
+                  <Text style={[s.tableCellR, { flex: 1.2, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{totRow.drawn > 0.5 ? `(${fmtDollar(totRow.drawn)})` : '—'}</Text>
+                  <Text style={[s.tableCellR, { flex: 1.3, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totRow.balance)}</Text>
+                  <Text style={[s.tableCell, { flex: 1.2, color: 'white' }]}></Text>
                 </View>
               </View>
 
-              {/* SVG 3-line chart */}
-              <SectionHdr title="Cumulative after-tax cash — 5 year projection" />
+              {/* SVG chart — Lines 1 & 2 only */}
+              <SectionHdr title="Tax Benefit Bank — 5 Year Projection" />
               <Svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-                {Array.from({ length: 5 }, (_, i) => (
-                  <SvgLine key={i} x1={toX(i * 12 + 11)} y1={PY} x2={toX(i * 12 + 11)} y2={H - PY} strokeWidth={0.8} stroke="#999" />
+                {Array.from({ length: 60 }, (_, i) => (
+                  <SvgLine key={i} x1={toX(i)} y1={PY} x2={toX(i)} y2={H - PY}
+                    strokeWidth={(i + 1) % 12 === 0 ? 1 : 0.3} stroke={(i + 1) % 12 === 0 ? '#999' : '#ddd'} />
                 ))}
                 <SvgLine x1={PX} y1={zeroY} x2={W - PX} y2={zeroY} strokeWidth={1.5} stroke="#333" />
-                <Path d={toPath(line3)} fill="none" stroke={PC.none} strokeWidth={1} strokeDasharray="2,4" opacity={0.6} />
                 <Path d={toPath(line2)} fill="none" stroke={PC.sl} strokeWidth={1.5} strokeDasharray="6,3" />
                 <Path d={toPath(line1)} fill="none" stroke={PC.bonus} strokeWidth={2.5} />
-                <Circle cx={toX(peakIdx1)} cy={toY(peak1)} r={5} fill={PC.bonus} />
-                {ext1 >= 0 && <Circle cx={toX(ext1)} cy={toY(0)} r={5} fill={PC.exhaust} />}
+                {/* Day 1 dot */}
+                <Circle cx={toX(0)} cy={toY(line1[0])} r={5} fill={PC.bonus} />
+                {/* Exhaustion dot */}
+                {ext1 >= 0 && <Circle cx={toX(ext1)} cy={toY(line1[ext1])} r={5} fill={PC.exhaust} />}
               </Svg>
-              {/* Legend */}
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 3, marginBottom: 4 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  <View style={{ width: 8, height: 8, backgroundColor: PC.bonus, borderRadius: 1 }} />
-                  <Text style={{ fontSize: 6.5, color: C.text }}>Bonus Dep + Cost Seg</Text>
+              {/* Inline end labels + legend */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2, marginBottom: 4 }}>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <View style={{ width: 8, height: 8, backgroundColor: PC.bonus, borderRadius: 1 }} />
+                    <Text style={{ fontSize: 6.5, color: C.text }}>Bonus Dep + Cost Seg — benefit loaded Day 1</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <View style={{ width: 8, height: 8, backgroundColor: PC.sl, borderRadius: 1 }} />
+                    <Text style={{ fontSize: 6.5, color: C.text }}>SL Only — accrues monthly over 27.5yr</Text>
+                  </View>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  <View style={{ width: 8, height: 8, backgroundColor: PC.sl, borderRadius: 1 }} />
-                  <Text style={{ fontSize: 6.5, color: C.text }}>SL Only (no cost seg)</Text>
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  <View style={{ width: 8, height: 8, backgroundColor: PC.none, borderRadius: 1 }} />
-                  <Text style={{ fontSize: 6.5, color: C.text }}>No Depreciation</Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {ext1 >= 0 && <Text style={{ fontSize: 6.5, color: PC.exhaust }}>Shield exhausted Mo {ext1 + 1}</Text>}
                 </View>
               </View>
             </>

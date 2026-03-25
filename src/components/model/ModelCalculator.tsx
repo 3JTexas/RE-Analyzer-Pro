@@ -14,196 +14,185 @@ import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
 
-// ── Tax Benefit Section — 5yr table + 3-line chart ───────────────────────
+// ── Tax Benefit Bank — table + chart ─────────────────────────────────────
 const LC = { bonus: '#0072B2', sl: '#E69F00', none: '#CC79A7', exhaust: '#D85A30' }
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 function fmtCell(v: number): string {
   if (Math.abs(v) < 0.5) return '—'
-  return v < 0 ? `($${Math.abs(v).toLocaleString('en-US', { maximumFractionDigits: 0 })})` : `$${v.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+  return v < 0 ? `($${Math.abs(v).toLocaleString('en-US',{maximumFractionDigits:0})})` : `$${v.toLocaleString('en-US',{maximumFractionDigits:0})}`
 }
-
 function ColTip({ text }: { text: string }) {
   return (
     <span className="relative group ml-0.5">
       <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-gray-300 text-[7px] text-gray-600 cursor-help font-semibold leading-none">i</span>
-      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-48 px-2 py-1.5 text-[9px] leading-snug text-white bg-gray-800 rounded-lg shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50 normal-case tracking-normal font-normal">
-        {text}
-      </span>
+      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-48 px-2 py-1.5 text-[9px] leading-snug text-white bg-gray-800 rounded-lg shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50 normal-case tracking-normal font-normal">{text}</span>
     </span>
   )
 }
 
-// Chart.js afterDraw plugin for callout bubbles
-const runwayPlugin = {
-  id: 'runwayCallouts',
+const bankPlugin = {
+  id: 'bankCallouts',
   afterDraw(chart: any) {
     const ctx = chart.ctx
-    const meta0 = chart.getDatasetMeta(0)
-    if (!meta0?.data?.length) return
-    const rm = chart.config._config.data._runwayMeta
+    const m0 = chart.getDatasetMeta(0)
+    if (!m0?.data?.length) return
+    const rm = chart.config._config.data._bankMeta
     if (!rm) return
     ctx.save()
-
-    // Peak callout
-    if (rm.peakIdx >= 0 && meta0.data[rm.peakIdx]) {
-      const pt = meta0.data[rm.peakIdx]
-      ctx.beginPath(); ctx.arc(pt.x, pt.y, 13, 0, Math.PI * 2)
-      ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fill()
-      ctx.beginPath(); ctx.arc(pt.x, pt.y, 10, 0, Math.PI * 2)
-      ctx.fillStyle = LC.bonus; ctx.fill()
-      ctx.fillStyle = '#fff'; ctx.font = 'bold 7px Inter,sans-serif'
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-      ctx.fillText(rm.peakLabel, pt.x, pt.y)
-      ctx.fillStyle = LC.bonus; ctx.font = 'bold 8px Inter,sans-serif'
-      ctx.fillText('Peak Balance', pt.x, pt.y - 17)
+    // Day 1 callout
+    if (m0.data[0]) {
+      const pt = m0.data[0]
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, 13, 0, Math.PI*2); ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.fill()
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, 10, 0, Math.PI*2); ctx.fillStyle=LC.bonus; ctx.fill()
+      ctx.fillStyle='#fff'; ctx.font='bold 7px Inter,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'
+      ctx.fillText(rm.day1Label, pt.x, pt.y)
+      ctx.fillStyle=LC.bonus; ctx.font='bold 8px Inter,sans-serif'
+      ctx.fillText('Day 1 balance', pt.x, pt.y - 17)
     }
-
-    // Extinguish callout
-    if (rm.extIdx >= 0 && meta0.data[rm.extIdx]) {
-      const pt = meta0.data[rm.extIdx]
-      ctx.beginPath(); ctx.arc(pt.x, pt.y, 13, 0, Math.PI * 2)
-      ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fill()
-      ctx.beginPath(); ctx.arc(pt.x, pt.y, 10, 0, Math.PI * 2)
-      ctx.fillStyle = LC.exhaust; ctx.fill()
-      ctx.fillStyle = '#fff'; ctx.font = 'bold 7px Inter,sans-serif'
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-      ctx.fillText(rm.extLabel, pt.x, pt.y)
-      ctx.fillStyle = LC.exhaust; ctx.font = 'bold 8px Inter,sans-serif'
-      ctx.fillText('Balance Exhausted', pt.x, pt.y - 17)
+    // Exhaustion callout
+    if (rm.extIdx >= 0 && m0.data[rm.extIdx]) {
+      const pt = m0.data[rm.extIdx]
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, 13, 0, Math.PI*2); ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.fill()
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, 10, 0, Math.PI*2); ctx.fillStyle=LC.exhaust; ctx.fill()
+      ctx.fillStyle='#fff'; ctx.font='bold 7px Inter,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'
+      ctx.fillText(`Mo ${rm.extIdx+1}`, pt.x, pt.y)
+      ctx.fillStyle=LC.exhaust; ctx.font='bold 8px Inter,sans-serif'
+      ctx.fillText('Shield exhausted', pt.x, pt.y - 17)
     }
-
-    // SL zero callout
-    const meta1 = chart.getDatasetMeta(1)
-    if (rm.slZeroIdx >= 0 && meta1?.data?.[rm.slZeroIdx]) {
-      const pt = meta1.data[rm.slZeroIdx]
-      ctx.fillStyle = LC.sl; ctx.font = '600 7px Inter,sans-serif'
-      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
-      ctx.fillText(`SL Zero Mo ${rm.slZeroIdx + 1}`, pt.x, pt.y - 5)
-      // Small diamond
-      ctx.beginPath()
-      ctx.moveTo(pt.x, pt.y - 4); ctx.lineTo(pt.x + 4, pt.y); ctx.lineTo(pt.x, pt.y + 4); ctx.lineTo(pt.x - 4, pt.y)
-      ctx.closePath(); ctx.fillStyle = LC.sl; ctx.fill()
+    // SL peak
+    const m1 = chart.getDatasetMeta(1)
+    if (rm.slPeakIdx >= 0 && m1?.data?.[rm.slPeakIdx]) {
+      const pt = m1.data[rm.slPeakIdx]
+      ctx.fillStyle=LC.sl; ctx.font='600 7px Inter,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='bottom'
+      ctx.fillText(`SL peak $${Math.round(rm.slPeakVal/1000)}k`, pt.x, pt.y - 5)
+      ctx.beginPath(); ctx.moveTo(pt.x,pt.y-4); ctx.lineTo(pt.x+4,pt.y); ctx.lineTo(pt.x,pt.y+4); ctx.lineTo(pt.x-4,pt.y)
+      ctx.closePath(); ctx.fillStyle=LC.sl; ctx.fill()
     }
     ctx.restore()
   },
 }
 
+interface BankRow { period: string; pretax: number; slAdded: number; drawn: number; balance: number; note: string; isSub?: boolean; isTotal?: boolean }
+
 function TaxBenefitSection({ d, inputs }: { d: ReturnType<typeof calculate>; inputs: ModelInputs }) {
-  const monthlyCF = d.CF / 12
   const bracket = d.brk / 100
   const bonusSav = d.bd * bracket
-  const slSavAnnual = d.sl * bracket
+  const slMonthly = (d.sl * bracket) / 12
+  const slAnnual = d.sl * bracket
+  const monthlyCF = d.CF / 12
   const fullSL = d.deprBase / 27.5
-  const slOnlyTax = fullSL * bracket
 
-  // Build table rows
-  const tableData = useMemo(() => {
-    const rows: { period: string; pretax: number; bonus: number; sl: number; total: number; cumBal: number; remBasis: number; isSub?: boolean; isTotal?: boolean }[] = []
-    let cum = 0
-    const bonusBase = d.bd
-    const slBase = d.deprBase * (1 - inputs.costSeg / 100)
+  const { rows, chartLines } = useMemo(() => {
+    const rows: BankRow[] = []
+    let bal = bonusSav // Day 1: bonus loaded
+    let exhausted = false
 
-    // 12 monthly rows for Y1
+    // Y1 — 12 monthly rows
     for (let m = 0; m < 12; m++) {
-      const pretax = monthlyCF
-      const bonus = bonusSav / 12
-      const sl = slSavAnnual / 12
-      const total = pretax + bonus + sl
-      cum += total
-      const remBonus = bonusBase * (1 - (m + 1) / 12)
-      rows.push({ period: `${MONTHS[m]} Y1`, pretax, bonus, sl, total, cumBal: cum, remBasis: remBonus + slBase })
+      const sl = slMonthly
+      bal += sl
+      const drawn = monthlyCF < 0 ? Math.abs(monthlyCF) : 0
+      const added = monthlyCF >= 0 ? monthlyCF : 0
+      bal = bal - drawn + added
+      let note = ''
+      if (m === 0) note = `Bonus dep loaded — ${fmtCell(bonusSav)} tax shield`
+      if (!exhausted && bal < 0) { note = 'Shield exhausted — cash losses begin'; exhausted = true }
+      rows.push({ period: `${MO[m]} Y1`, pretax: monthlyCF, slAdded: sl, drawn, balance: bal, note })
     }
-    // Y1 total subtotal
-    rows.push({ period: 'Year 1 Total', pretax: d.CF, bonus: bonusSav, sl: slSavAnnual, total: d.CF + bonusSav + slSavAnnual, cumBal: cum, remBasis: slBase, isSub: true })
+    // Y1 subtotal
+    const y1Pretax = d.CF, y1Sl = slAnnual, y1Drawn = monthlyCF < 0 ? Math.abs(monthlyCF) * 12 : 0
+    rows.push({ period: 'Year 1 Total', pretax: y1Pretax, slAdded: y1Sl, drawn: y1Drawn, balance: bal, note: '', isSub: true })
 
-    // Y2-Y5 annual
+    // Y2-5 annual
     for (let y = 2; y <= 5; y++) {
-      const pretax = d.CF
-      const sl = slSavAnnual
-      const total = pretax + sl
-      cum += total
-      const remSl = Math.max(0, slBase - (slBase / 27.5) * (y - 1))
-      rows.push({ period: `Year ${y}`, pretax, bonus: 0, sl, total, cumBal: cum, remBasis: remSl })
+      const sl = slAnnual
+      bal += sl
+      const drawn = d.CF < 0 ? Math.abs(d.CF) : 0
+      const added = d.CF >= 0 ? d.CF : 0
+      bal = bal - drawn + added
+      let note = y === 2 ? 'Bonus dep fully utilized' : ''
+      if (!exhausted && bal < 0) { note = 'Shield exhausted — cash losses begin'; exhausted = true }
+      rows.push({ period: `Year ${y}`, pretax: d.CF, slAdded: sl, drawn, balance: bal, note })
     }
     // 5yr total
-    const totPretax = d.CF * 5
-    const totBonus = bonusSav
-    const totSl = slSavAnnual * 5
-    rows.push({ period: '5-Year Total', pretax: totPretax, bonus: totBonus, sl: totSl, total: totPretax + totBonus + totSl, cumBal: cum, remBasis: Math.max(0, slBase - (slBase / 27.5) * 4), isTotal: true })
+    const totPretax = d.CF * 5, totSl = slAnnual * 5, totDrawn = rows.filter(r => !r.isSub && !r.isTotal).reduce((s, r) => s + r.drawn, 0)
+    rows.push({ period: '5-Year Total', pretax: totPretax, slAdded: totSl, drawn: totDrawn, balance: bal, note: '', isTotal: true })
 
-    return rows
-  }, [d.CF, d.bd, d.sl, d.brk, d.deprBase, inputs.costSeg, monthlyCF, bonusSav, slSavAnnual])
-
-  // Chart data — 60 months
-  const chartInfo = useMemo(() => {
+    // Chart lines — 60 months, benefit bank model
     const line1: number[] = [], line2: number[] = [], line3: number[] = []
-    let b1 = 0, b2 = 0, b3 = 0
-    const y1Tax1 = d.ts / 12, y2Tax1 = (d.sl * bracket) / 12
-    const slOnly = (fullSL * bracket) / 12
-    for (let m = 1; m <= 60; m++) {
-      b1 += monthlyCF + (m <= 12 ? y1Tax1 : y2Tax1)
-      b2 += monthlyCF + slOnly
+    let b1 = bonusSav, b2 = 0, b3 = 0
+    const slOnlyMonthly = (fullSL * bracket) / 12
+    for (let m = 0; m < 60; m++) {
+      // Line 1: bonus bank
+      b1 += slMonthly + monthlyCF
+      // Line 2: SL only bank (no bonus)
+      b2 += slOnlyMonthly + monthlyCF
+      // Line 3: no tax benefit, pure cumulative pretax
       b3 += monthlyCF
       line1.push(Math.round(b1)); line2.push(Math.round(b2)); line3.push(Math.round(b3))
     }
-    const peak1 = Math.max(...line1), peakIdx1 = line1.indexOf(peak1)
-    const ext1 = line1.findIndex((v, i) => i > peakIdx1 && v <= 0)
-    const slZero = line2.findIndex((v, i) => i > 0 && v <= 0)
-    return { line1, line2, line3, peak1, peakIdx1, ext1, slZero }
-  }, [d.CF, d.ts, d.sl, d.brk, d.deprBase])
+    const ext1 = line1.findIndex(v => v < 0)
+    const slPeakVal = Math.max(...line2), slPeakIdx = line2.indexOf(slPeakVal)
+    return { rows, chartLines: { line1, line2, line3, ext1, slPeakIdx, slPeakVal } }
+  }, [d.CF, d.bd, d.sl, d.brk, d.deprBase, bonusSav, slMonthly, slAnnual, monthlyCF, fullSL, bracket])
 
-  const fmtK = (n: number) => `$${Math.round(n / 1000)}k`
-  const ext1Month = chartInfo.ext1 >= 0 ? chartInfo.ext1 + 1 : null
+  const fmtK = (n: number) => n >= 0 ? `$${Math.round(n/1000)}k` : `($${Math.round(Math.abs(n)/1000)}k)`
+  const cellColor = (v: number) => Math.abs(v) < 0.5 ? 'text-gray-400' : v < 0 ? 'text-red-600' : 'text-green-700'
 
   const labels = Array.from({ length: 60 }, () => '')
   const chartData = {
     labels,
-    _runwayMeta: {
-      peakIdx: chartInfo.peakIdx1, peakLabel: fmtK(chartInfo.peak1),
-      extIdx: chartInfo.ext1, extLabel: ext1Month ? `Mo ${ext1Month}` : '',
-      slZeroIdx: chartInfo.slZero,
-    },
+    _bankMeta: { day1Label: fmtK(bonusSav), extIdx: chartLines.ext1, slPeakIdx: chartLines.slPeakIdx, slPeakVal: chartLines.slPeakVal },
     datasets: [
-      { label: 'Bonus + Cost Seg', data: chartInfo.line1, borderColor: LC.bonus, borderWidth: 3, tension: 0.3, pointRadius: 0, fill: false },
-      { label: 'SL only', data: chartInfo.line2, borderColor: LC.sl, borderWidth: 1.5, borderDash: [6, 3], tension: 0.3, pointRadius: 0, fill: false },
-      { label: 'No dep', data: chartInfo.line3, borderColor: LC.none, borderWidth: 1, borderDash: [2, 4], tension: 0.3, pointRadius: 0, fill: false, backgroundColor: `${LC.none}15` },
+      { label: 'Bonus Dep + Cost Seg', data: chartLines.line1, borderColor: LC.bonus, borderWidth: 3, tension: 0.3, pointRadius: 0, fill: false },
+      { label: 'SL Only', data: chartLines.line2, borderColor: LC.sl, borderWidth: 1.5, borderDash: [6, 3], tension: 0.3, pointRadius: 0, fill: false },
+      { label: 'No Tax Benefit', data: chartLines.line3, borderColor: LC.none, borderWidth: 1, borderDash: [2, 4], tension: 0.3, pointRadius: 0, fill: false },
     ],
   }
 
-  const cellColor = (v: number) => Math.abs(v) < 0.5 ? 'text-gray-400' : v < 0 ? 'text-red-600' : 'text-green-700'
-
   return (
     <div className="mt-3">
-      {/* ── PART 1: 5-Year Table ─────────────────────────── */}
-      <SectionHeader title="5-Year Tax Benefit Breakdown" tooltip="Monthly breakdown for Year 1 showing bonus depreciation impact, then annual summary for Years 2-5." />
+      {/* Opening balance card */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 mb-3">
+        <p className="text-sm font-bold text-blue-800">Day 1 Tax Benefit Bank: {fmtCell(bonusSav)}</p>
+        <p className="text-[10px] text-blue-600 mt-0.5">Funded by bonus depreciation on {fmtCell(d.bd)} of cost-segregated assets at {d.brk}% tax bracket</p>
+      </div>
+
+      {/* ── PART 1: Benefit Bank Table ──────────────────── */}
+      <SectionHeader title="5-Year Benefit Bank" tooltip="Tracks your tax benefit balance like a bank account — loaded Day 1 with bonus depreciation, replenished monthly by SL dep, drained by operating losses." />
       <div className="border border-gray-100 rounded-lg overflow-hidden bg-white mb-4">
         <div className="overflow-x-auto">
-          <table className="w-full text-[9px]" style={{ minWidth: 640 }}>
+          <table className="w-full text-[9px]" style={{ minWidth: 620 }}>
             <thead className="sticky top-0 bg-white border-b border-gray-200">
               <tr>
                 <th className="text-left px-2 py-1.5 font-semibold text-gray-600">Period</th>
-                <th className="text-right px-2 py-1.5 font-semibold text-gray-600">Pre-Tax CF<ColTip text="Net Operating Income minus annual debt service. Negative means the property does not cover its mortgage from operations alone." /></th>
-                <th className="text-right px-2 py-1.5 font-semibold text-gray-600">Bonus Dep<ColTip text="Tax savings from 100% bonus depreciation on cost-segregated short-life assets (5/7/15-year property). Taken entirely in Year 1." /></th>
-                <th className="text-right px-2 py-1.5 font-semibold text-gray-600">SL Dep<ColTip text="Annual tax savings from depreciating the remaining building basis over 27.5 years. Continues every year." /></th>
-                <th className="text-right px-2 py-1.5 font-semibold text-gray-600">Total After-Tax<ColTip text="Pre-tax cash flow plus all depreciation-related tax savings for the period." /></th>
-                <th className="text-right px-2 py-1.5 font-semibold text-gray-600">Cumulative<ColTip text="Running total of all after-tax cash flows since acquisition." /></th>
-                <th className="text-right px-2 py-1.5 font-semibold text-gray-600">Rem. Basis<ColTip text="Undepreciated building basis remaining. Bonus basis fully taken in Year 1." /></th>
+                <th className="text-right px-2 py-1.5 font-semibold text-gray-600">Pre-Tax CF<ColTip text="Net Operating Income minus debt service. Negative means the property loses money before tax benefits are applied." /></th>
+                <th className="text-right px-2 py-1.5 font-semibold text-gray-600">SL Dep Added<ColTip text="Straight-line depreciation tax savings added to the benefit bank each period. Equals remaining building basis / 27.5 years x tax bracket / 12 for monthly." /></th>
+                <th className="text-right px-2 py-1.5 font-semibold text-gray-600">Drawn<ColTip text="Amount the operating loss draws from your tax benefit bank each period. Only applies when pre-tax cash flow is negative." /></th>
+                <th className="text-right px-2 py-1.5 font-semibold text-gray-600">Balance<ColTip text="Your running depreciation tax shield balance. Starts at full bonus dep value on Day 1, grows with SL savings, drains from operating losses. Goes negative when shield is exhausted." /></th>
+                <th className="text-left px-2 py-1.5 font-semibold text-gray-600">Notes<ColTip text="Key milestone events in the benefit timeline." /></th>
               </tr>
             </thead>
             <tbody>
-              {tableData.map((r, i) => {
-                const bg = r.isTotal ? 'bg-gray-800 text-white' : r.isSub ? 'bg-blue-50 font-semibold border-t-2 border-blue-200' : r.period.startsWith('Year') ? 'bg-gray-50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
-                const valCls = r.isTotal ? 'text-white' : ''
+              {rows.map((r, i) => {
+                const exhaustRow = !r.isSub && !r.isTotal && r.note.includes('exhausted')
+                const negBal = !r.isSub && !r.isTotal && r.balance < -0.5 && !exhaustRow
+                const bg = r.isTotal ? 'bg-gray-800 text-white'
+                  : r.isSub ? 'bg-blue-50 font-semibold border-t-2 border-blue-200'
+                  : exhaustRow ? 'bg-amber-50'
+                  : negBal ? 'bg-red-50'
+                  : r.period.startsWith('Year') ? 'bg-gray-50'
+                  : i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+                const vc = r.isTotal ? 'text-white' : ''
                 return (
                   <tr key={i} className={bg}>
                     <td className={`px-2 py-1 ${r.isTotal || r.isSub ? 'font-bold' : ''}`}>{r.period}</td>
-                    <td className={`px-2 py-1 text-right ${valCls || cellColor(r.pretax)}`}>{fmtCell(r.pretax)}</td>
-                    <td className={`px-2 py-1 text-right ${valCls || cellColor(r.bonus)}`}>{fmtCell(r.bonus)}</td>
-                    <td className={`px-2 py-1 text-right ${valCls || cellColor(r.sl)}`}>{fmtCell(r.sl)}</td>
-                    <td className={`px-2 py-1 text-right font-medium ${valCls || cellColor(r.total)}`}>{fmtCell(r.total)}</td>
-                    <td className={`px-2 py-1 text-right font-medium ${valCls || cellColor(r.cumBal)}`}>{fmtCell(r.cumBal)}</td>
-                    <td className={`px-2 py-1 text-right ${valCls || 'text-gray-500'}`}>{fmtCell(r.remBasis)}</td>
+                    <td className={`px-2 py-1 text-right ${vc || cellColor(r.pretax)}`}>{fmtCell(r.pretax)}</td>
+                    <td className={`px-2 py-1 text-right ${vc || cellColor(r.slAdded)}`}>{fmtCell(r.slAdded)}</td>
+                    <td className={`px-2 py-1 text-right ${vc || (r.drawn > 0.5 ? 'text-red-600' : 'text-gray-400')}`}>{r.drawn > 0.5 ? fmtCell(-r.drawn) : '—'}</td>
+                    <td className={`px-2 py-1 text-right font-medium ${vc || cellColor(r.balance)}`}>{fmtCell(r.balance)}</td>
+                    <td className={`px-2 py-1 text-[8px] ${r.note.includes('exhausted') ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>{r.note}</td>
                   </tr>
                 )
               })}
@@ -212,47 +201,43 @@ function TaxBenefitSection({ d, inputs }: { d: ReturnType<typeof calculate>; inp
         </div>
       </div>
 
-      {/* ── PART 2: 3-Line Chart ─────────────────────────── */}
-      <SectionHeader title="Cumulative after-tax cash position — 5 year projection" tooltip="Compares cumulative after-tax cash position under three depreciation strategies over 5 years." />
+      {/* ── PART 2: Chart ──────────────────────────────── */}
+      <SectionHeader title="Tax Benefit Bank — Running Balance Over 5 Years" tooltip="Compares benefit bank balance under three depreciation strategies. Line 1 starts loaded with bonus dep; Line 2 accrues SL only; Line 3 has no tax offset." />
       <div className="border border-gray-100 rounded-lg p-3 bg-white">
-        {/* Legend pills */}
         <div className="flex flex-wrap gap-3 mb-2 text-[9px]">
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: LC.bonus }} />
-            <span className="text-gray-600">Bonus Depreciation + Cost Segregation</span>
+            <span className="text-gray-600">Bonus Dep + Cost Seg — full benefit loaded Day 1</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded-sm border border-dashed" style={{ borderColor: LC.sl, backgroundColor: `${LC.sl}30` }} />
-            <span className="text-gray-600">Straight-Line Only (no cost seg)</span>
+            <span className="text-gray-600">SL Only — benefit accrues monthly over 27.5 years</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded-sm border border-dashed" style={{ borderColor: LC.none, backgroundColor: `${LC.none}20` }} />
-            <span className="text-gray-600">No Depreciation (pre-tax only)</span>
+            <span className="text-gray-600">No Tax Benefit — pre-tax cash flow only</span>
           </div>
         </div>
         <div style={{ height: 220 }}>
-          <Line data={chartData as any} plugins={[runwayPlugin]} options={{
+          <Line data={chartData as any} plugins={[bankPlugin]} options={{
             responsive: true, maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
-            layout: { padding: { right: 10 } },
             plugins: { tooltip: { callbacks: { title: (items) => `Month ${items[0].dataIndex + 1}`, label: (item) => `${item.dataset.label}: ${fmtDollar(item.raw as number)}` } }, legend: { display: false } },
             scales: {
               x: {
                 ticks: {
-                  callback: (_v, idx) => { if (idx % 12 === 0) return `Year ${idx / 12 + 1}`; if (idx % 6 === 0) return `Mo ${idx}`; return '' },
-                  font: (ctx) => { const lbl = ctx.tick?.label?.toString() ?? ''; return { size: lbl.startsWith('Year') ? 11 : 9, weight: lbl.startsWith('Year') ? 'bold' as const : 'normal' as const } },
+                  callback: (_v, idx) => { if (idx % 12 === 0) return `Year ${idx/12+1}`; if (idx % 6 === 0) return `Mo ${idx}`; return '' },
+                  font: (ctx) => { const l = ctx.tick?.label?.toString() ?? ''; return { size: l.startsWith('Year') ? 11 : 9, weight: l.startsWith('Year') ? 'bold' as const : 'normal' as const } },
                   color: (ctx) => (ctx.tick?.label?.toString() ?? '').startsWith('Year') ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.35)',
                   maxRotation: 0,
                 },
-                grid: {
-                  color: (ctx) => { const idx = ctx.index; return idx % 12 === 0 ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)' },
-                  lineWidth: (ctx) => ctx.index % 12 === 0 ? 1.5 : 0.5,
-                },
+                grid: { color: (ctx) => ctx.index % 12 === 0 ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)', lineWidth: (ctx) => ctx.index % 12 === 0 ? 1.5 : 0.5 },
               },
               y: {
-                title: { display: true, text: 'Cumulative After-Tax Cash ($)', font: { size: 9 }, color: '#888' },
-                ticks: { font: { size: 9 }, color: '#888', maxTicksLimit: 8, callback: (v) => { const n = v as number; return n === 0 ? '$0' : `$${Math.abs(n) >= 1000 ? (n / 1000).toFixed(0) + 'k' : n}` } },
-                grid: { color: (ctx) => ctx.tick.value === 0 ? '#333333' : '#f0f0f0', lineWidth: (ctx) => ctx.tick.value === 0 ? 2 : 0.5 },
+                title: { display: true, text: 'Benefit Bank Balance ($)', font: { size: 9 }, color: '#888' },
+                ticks: { font: { size: 9 }, color: '#888', maxTicksLimit: 10,
+                  callback: (v) => { const n = v as number; if (n === 0) return '$0'; return n < 0 ? `($${Math.abs(n)>=1000?(Math.abs(n)/1000).toFixed(0)+'k':Math.abs(n)})` : `$${n>=1000?(n/1000).toFixed(0)+'k':n}` } },
+                grid: { color: (ctx) => ctx.tick.value === 0 ? '#333333' : ctx.tick.value > 0 ? 'rgba(0,150,0,0.03)' : 'rgba(200,0,0,0.03)', lineWidth: (ctx) => ctx.tick.value === 0 ? 2 : 0.5 },
               },
             },
           }} />
