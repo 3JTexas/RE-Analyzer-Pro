@@ -1,4 +1,4 @@
-import { Document, Page, Text, View, Image, StyleSheet, pdf, Svg, Path, Line as SvgLine, Circle } from '@react-pdf/renderer'
+import { Document, Page, Text, View, Image, StyleSheet, pdf } from '@react-pdf/renderer'
 import type { ModelInputs, Method } from '../../types'
 import { calculate, fmtDollar, fmtNeg, fmtPct, fmtX, fmtDelta, fmtDeltaPct } from '../../lib/calc'
 
@@ -367,129 +367,128 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
           </View>
         </View>
 
-        {/* ── Tax Benefit Bank ─────────────────────────────────────── */}
+        {/* ── Tax Benefit — Dynamic Table ─────────────────────────── */}
         {d.brk > 0 && (inputs.costSeg > 0 || inputs.land < 100) && (() => {
           const bracket = d.brk / 100
-          const bonusSav = d.bd * bracket
-          const slAnnual = d.sl * bracket
-          const monthlyCF = d.CF / 12
-          const fullSL = d.deprBase / 27.5
-          const slMonthly = slAnnual / 12
+          const bonusDeprBase = d.deprBase * (inputs.costSeg / 100)
+          const slDeprBase = d.deprBase - bonusDeprBase
+          const bonusDeprSavings = bonusDeprBase * bracket
+          const slAnnualDepr = slDeprBase / 27.5
+          const slAnnualSavings = slAnnualDepr * bracket
+          const preTaxCF = d.NOI - d.ds
+          const preTaxTaxSavings = Math.abs(Math.min(preTaxCF, 0)) * bracket
+          const afterTaxY1 = preTaxCF + bonusDeprSavings + slAnnualSavings + preTaxTaxSavings
+          const afterTaxY2 = preTaxCF + slAnnualSavings + preTaxTaxSavings
 
-          const fmtV = (v: number) => Math.abs(v) < 0.5 ? '—' : v < 0 ? `(${fmtDollar(Math.abs(v))})` : fmtDollar(v)
-          const negColor = (v: number) => Math.abs(v) < 0.5 ? C.textMuted : v < 0 ? '#DC2626' : '#15803D'
-
-          // Annual benefit bank rows
-          type AR = { period: string; pretax: number; slAdded: number; drawn: number; balance: number; note: string; negBal?: boolean; exhaustRow?: boolean }
-          const aRows: AR[] = []
-          let bal = bonusSav
-          let exhausted = false
-          // Y1
-          for (let m = 0; m < 12; m++) { bal += slMonthly + monthlyCF }
-          const y1Drawn = d.CF < 0 ? Math.abs(d.CF) : 0
-          let note1 = ''
-          if (bal < 0 && !exhausted) { note1 = 'Shield exhausted'; exhausted = true }
-          aRows.push({ period: 'Year 1', pretax: d.CF, slAdded: slAnnual, drawn: y1Drawn, balance: bal, note: note1, negBal: bal < -0.5, exhaustRow: note1 !== '' })
-          // Y2-5
-          for (let y = 2; y <= 5; y++) {
-            bal += slAnnual + d.CF
-            let note = ''
-            if (bal < 0 && !exhausted) { note = 'Shield exhausted'; exhausted = true }
-            aRows.push({ period: `Year ${y}`, pretax: d.CF, slAdded: slAnnual, drawn: d.CF < 0 ? Math.abs(d.CF) : 0, balance: bal, note, negBal: bal < -0.5, exhaustRow: note !== '' })
+          // Build rows until cumulative <= 0 or max 30yr, min 3yr
+          type TR = { yr: number; ptCF: number; bonus: number; sl: number; opLoss: number; total: number; cum: number; isExhaust: boolean }
+          const rows: TR[] = []
+          let cum = 0
+          let exhaustYear = 0
+          for (let yr = 1; yr <= 30; yr++) {
+            const bonus = yr === 1 ? bonusDeprSavings : 0
+            const total = yr === 1 ? afterTaxY1 : afterTaxY2
+            cum += total
+            const isExhaust = exhaustYear === 0 && cum <= 0 && yr > 1
+            if (isExhaust) exhaustYear = yr
+            rows.push({ yr, ptCF: preTaxCF, bonus, sl: slAnnualSavings, opLoss: preTaxTaxSavings, total, cum, isExhaust })
+            if (exhaustYear > 0 && yr >= Math.max(exhaustYear, 3)) break
+            if (yr >= 30) break
           }
-          const totDrawn = aRows.reduce((s, r) => s + r.drawn, 0)
-          const totRow = { period: '5-Year Total', pretax: d.CF * 5, slAdded: slAnnual * 5, drawn: totDrawn, balance: bal }
+          // If never exhausted and rows > 10, trim to 10
+          const showRows = exhaustYear > 0 ? rows : rows.slice(0, 10)
+          const neverExhausted = exhaustYear === 0
 
-          // Chart lines — benefit bank model, 60 months
-          const line1: number[] = [], line2: number[] = []
-          let b1 = bonusSav, b2 = 0
-          const slOnlyMo = (fullSL * bracket) / 12
-          for (let m = 0; m < 60; m++) {
-            b1 += slMonthly + monthlyCF
-            b2 += slOnlyMo + monthlyCF
-            line1.push(Math.round(b1)); line2.push(Math.round(b2))
-          }
-          const ext1 = line1.findIndex(v => v < 0)
-          const allVals = [...line1, ...line2]
-          const yMax = Math.max(...allVals, 1000), yMin = Math.min(...allVals, -1000)
-          const yRange = yMax - yMin || 1
-          const PC = { bonus: '#0072B2', sl: '#E69F00', exhaust: '#D85A30' }
-          const W = 480, H = 110, PX = 30, PY = 8
-          const toX = (i: number) => PX + (i / 59) * (W - PX * 2)
-          const toY = (v: number) => PY + (1 - (v - yMin) / yRange) * (H - PY * 2)
-          const zeroY = toY(0)
-          const toPath = (vals: number[]) => vals.map((v, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')
+          const fmtV = (v: number) => Math.abs(v) < 0.5 ? '\u2014' : v < 0 ? `(${fmtDollar(Math.abs(v))})` : fmtDollar(v)
+          const vc = (v: number) => Math.abs(v) < 0.5 ? '#9CA3AF' : v < 0 ? '#DC2626' : '#15803D'
+
+          // Totals
+          const totPt = showRows.reduce((s, r) => s + r.ptCF, 0)
+          const totBonus = bonusDeprSavings
+          const totSl = showRows.reduce((s, r) => s + r.sl, 0)
+          const totOp = showRows.reduce((s, r) => s + r.opLoss, 0)
+          const totTotal = showRows.reduce((s, r) => s + r.total, 0)
+
+          const y1Total = bonusDeprSavings + slAnnualSavings + preTaxTaxSavings
+          const y2Total = slAnnualSavings + preTaxTaxSavings
+          const exLabel = neverExhausted ? '30+ Years' : `Year ${exhaustYear}`
 
           return (
             <>
-              {/* Opening balance banner */}
-              <View style={{ backgroundColor: '#EFF6FF', borderWidth: 0.5, borderColor: '#93C5FD', borderRadius: 4, padding: '6 10', marginTop: 8, marginBottom: 6 }}>
-                <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#1E40AF' }}>Day 1 Tax Benefit Bank: {fmtDollar(bonusSav)}</Text>
-                <Text style={{ fontSize: 7.5, color: '#3B82F6', marginTop: 1 }}>Funded by bonus depreciation on {fmtDollar(d.bd)} of cost-segregated assets at {d.brk}% bracket</Text>
+              {/* Summary narrative */}
+              <Text style={{ fontSize: 9, color: '#444444', marginBottom: 4, marginTop: 8, lineHeight: 1.5 }}>
+                Year 1 delivers a one-time tax benefit of {fmtDollar(y1Total)} through bonus depreciation on {fmtDollar(bonusDeprBase)} of cost-segregated assets at a {d.brk}% bracket — a real cash return from reduced tax liability on other income.
+              </Text>
+              <Text style={{ fontSize: 9, color: '#444444', marginBottom: 10, lineHeight: 1.5 }}>
+                Ongoing straight-line depreciation generates {fmtDollar(slAnnualSavings)}/year through Year {Math.floor(27.5)} before the depreciable basis is fully recovered.{' '}
+                {neverExhausted
+                  ? 'The after-tax benefit is not exhausted within 30 years.'
+                  : `The after-tax benefit exhausts in Year ${exhaustYear} when the cumulative balance reaches zero.`}
+              </Text>
+
+              {/* Three metric cards */}
+              <View style={s.metricsRow}>
+                <View style={[s.metricCard, { backgroundColor: '#f8f8f8', borderWidth: 0.5, borderColor: '#e0e0e0' }]}>
+                  <Text style={{ fontSize: 7, color: '#888', marginBottom: 3 }}>Year 1 Tax Benefit</Text>
+                  <Text style={{ fontSize: 15, fontFamily: 'Helvetica-Bold', color: '#1a1a2e' }}>{fmtDollar(y1Total)}</Text>
+                  <Text style={{ fontSize: 7, color: '#888', marginTop: 3 }}>Bonus dep + SL dep + op loss savings</Text>
+                </View>
+                <View style={[s.metricCard, { backgroundColor: '#f8f8f8', borderWidth: 0.5, borderColor: '#e0e0e0' }]}>
+                  <Text style={{ fontSize: 7, color: '#888', marginBottom: 3 }}>Annual Ongoing (Yr 2+)</Text>
+                  <Text style={{ fontSize: 15, fontFamily: 'Helvetica-Bold', color: '#1a1a2e' }}>{fmtDollar(y2Total)}</Text>
+                  <Text style={{ fontSize: 7, color: '#888', marginTop: 3 }}>SL dep savings each year after Year 1</Text>
+                </View>
+                <View style={[s.metricCard, { backgroundColor: '#f8f8f8', borderWidth: 0.5, borderColor: '#e0e0e0' }]}>
+                  <Text style={{ fontSize: 7, color: '#888', marginBottom: 3 }}>Benefit Exhausted</Text>
+                  <Text style={{ fontSize: 15, fontFamily: 'Helvetica-Bold', color: '#1a1a2e' }}>{exLabel}</Text>
+                  <Text style={{ fontSize: 7, color: '#888', marginTop: 3 }}>When cumulative after-tax returns to zero</Text>
+                </View>
               </View>
 
-              {/* Annual table */}
-              <SectionHdr title="5-Year Benefit Bank" />
-              <View style={[s.table, { marginBottom: 6 }]}>
+              {/* Dynamic after-tax table */}
+              <SectionHdr title="After-Tax Cash Flow — Year-by-Year" />
+              <View style={[s.table, { marginBottom: 4 }]}>
                 <View style={[s.tableHdrRow, { backgroundColor: '#1a1a2e' }]}>
-                  <Text style={[s.tableHdrCell, { flex: 1, color: 'white' }]}>Period</Text>
-                  <Text style={[s.tableHdrCell, { flex: 1.2, textAlign: 'right', color: 'white' }]}>Pre-Tax CF</Text>
-                  <Text style={[s.tableHdrCell, { flex: 1.2, textAlign: 'right', color: 'white' }]}>SL Dep Added</Text>
-                  <Text style={[s.tableHdrCell, { flex: 1.2, textAlign: 'right', color: 'white' }]}>Drawn</Text>
-                  <Text style={[s.tableHdrCell, { flex: 1.3, textAlign: 'right', color: 'white' }]}>Balance</Text>
-                  <Text style={[s.tableHdrCell, { flex: 1.2, color: 'white' }]}>Notes</Text>
+                  <Text style={[s.tableHdrCell, { width: 28, color: 'white' }]}>Yr</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>Pre-Tax CF</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>Bonus Dep</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>SL Dep</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>Op. Loss</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>After-Tax</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>Cumulative</Text>
                 </View>
-                {aRows.map((r, i) => (
-                  <View key={i} style={[s.tableRow, { backgroundColor: r.exhaustRow ? '#FFFBEB' : r.negBal ? '#FEF2F2' : i === 0 ? '#EFF6FF' : i % 2 === 0 ? '#fff' : '#f8f8f8' }]}>
-                    <Text style={[s.tableCell, { flex: 1, fontFamily: 'Helvetica-Bold' }]}>{r.period}</Text>
-                    <Text style={[s.tableCellR, { flex: 1.2, color: negColor(r.pretax) }]}>{fmtV(r.pretax)}</Text>
-                    <Text style={[s.tableCellR, { flex: 1.2, color: negColor(r.slAdded) }]}>{fmtV(r.slAdded)}</Text>
-                    <Text style={[s.tableCellR, { flex: 1.2, color: r.drawn > 0.5 ? '#DC2626' : C.textMuted }]}>{r.drawn > 0.5 ? `(${fmtDollar(r.drawn)})` : '—'}</Text>
-                    <Text style={[s.tableCellR, { flex: 1.3, fontFamily: 'Helvetica-Bold', color: negColor(r.balance) }]}>{fmtV(r.balance)}</Text>
-                    <Text style={[s.tableCell, { flex: 1.2, fontSize: 7, color: r.note ? '#DC2626' : C.textMuted }]}>{r.note}</Text>
+                {showRows.map((r, i) => (
+                  <View key={i} style={[s.tableRow, { backgroundColor: r.isExhaust ? '#FEF2F2' : r.yr === 1 ? '#EFF6FF' : i % 2 === 0 ? '#fff' : '#f9f9f9' }]}>
+                    <Text style={[s.tableCell, { width: 28, fontFamily: 'Helvetica-Bold' }]}>{r.yr}</Text>
+                    <Text style={[s.tableCellR, { flex: 1, color: vc(r.ptCF) }]}>{fmtV(r.ptCF)}</Text>
+                    <Text style={[s.tableCellR, { flex: 1, color: r.bonus > 0.5 ? '#15803D' : '#9CA3AF' }]}>{r.bonus > 0.5 ? fmtDollar(r.bonus) : '\u2014'}</Text>
+                    <Text style={[s.tableCellR, { flex: 1, color: '#15803D' }]}>{fmtV(r.sl)}</Text>
+                    <Text style={[s.tableCellR, { flex: 1, color: r.opLoss > 0.5 ? '#15803D' : '#9CA3AF' }]}>{r.opLoss > 0.5 ? fmtDollar(r.opLoss) : '\u2014'}</Text>
+                    <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: vc(r.total) }]}>{fmtV(r.total)}</Text>
+                    <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: vc(r.cum) }]}>{fmtV(r.cum)}{r.isExhaust ? ' *' : ''}</Text>
                   </View>
                 ))}
+                {/* Totals row */}
                 <View style={[s.tableRow, { backgroundColor: '#1a1a2e' }]}>
-                  <Text style={[s.tableCell, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{totRow.period}</Text>
-                  <Text style={[s.tableCellR, { flex: 1.2, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totRow.pretax)}</Text>
-                  <Text style={[s.tableCellR, { flex: 1.2, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totRow.slAdded)}</Text>
-                  <Text style={[s.tableCellR, { flex: 1.2, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{totRow.drawn > 0.5 ? `(${fmtDollar(totRow.drawn)})` : '—'}</Text>
-                  <Text style={[s.tableCellR, { flex: 1.3, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totRow.balance)}</Text>
-                  <Text style={[s.tableCell, { flex: 1.2, color: 'white' }]}></Text>
+                  <Text style={[s.tableCell, { width: 28, fontFamily: 'Helvetica-Bold', color: 'white' }]}>Tot</Text>
+                  <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totPt)}</Text>
+                  <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtDollar(totBonus)}</Text>
+                  <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totSl)}</Text>
+                  <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{totOp > 0.5 ? fmtDollar(totOp) : '\u2014'}</Text>
+                  <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totTotal)}</Text>
+                  <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(showRows[showRows.length - 1].cum)}</Text>
                 </View>
               </View>
 
-              {/* SVG chart — Lines 1 & 2 only */}
-              <SectionHdr title="Tax Benefit Bank — 5 Year Projection" />
-              <Svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-                {Array.from({ length: 60 }, (_, i) => (
-                  <SvgLine key={i} x1={toX(i)} y1={PY} x2={toX(i)} y2={H - PY}
-                    strokeWidth={(i + 1) % 12 === 0 ? 1 : 0.3} stroke={(i + 1) % 12 === 0 ? '#999' : '#ddd'} />
-                ))}
-                <SvgLine x1={PX} y1={zeroY} x2={W - PX} y2={zeroY} strokeWidth={1.5} stroke="#333" />
-                <Path d={toPath(line2)} fill="none" stroke={PC.sl} strokeWidth={1.5} strokeDasharray="6,3" />
-                <Path d={toPath(line1)} fill="none" stroke={PC.bonus} strokeWidth={2.5} />
-                {/* Day 1 dot */}
-                <Circle cx={toX(0)} cy={toY(line1[0])} r={5} fill={PC.bonus} />
-                {/* Exhaustion dot */}
-                {ext1 >= 0 && <Circle cx={toX(ext1)} cy={toY(line1[ext1])} r={5} fill={PC.exhaust} />}
-              </Svg>
-              {/* Inline end labels + legend */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2, marginBottom: 4 }}>
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                    <View style={{ width: 8, height: 8, backgroundColor: PC.bonus, borderRadius: 1 }} />
-                    <Text style={{ fontSize: 6.5, color: C.text }}>Bonus Dep + Cost Seg — benefit loaded Day 1</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                    <View style={{ width: 8, height: 8, backgroundColor: PC.sl, borderRadius: 1 }} />
-                    <Text style={{ fontSize: 6.5, color: C.text }}>SL Only — accrues monthly over 27.5yr</Text>
-                  </View>
-                </View>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  {ext1 >= 0 && <Text style={{ fontSize: 6.5, color: PC.exhaust }}>Shield exhausted Mo {ext1 + 1}</Text>}
-                </View>
-              </View>
+              {neverExhausted && (
+                <Text style={{ fontSize: 7, color: '#888', fontFamily: 'Helvetica-Oblique', marginBottom: 4 }}>
+                  * Benefit not exhausted within {showRows.length} years shown. Cumulative after-tax balance remains positive.
+                </Text>
+              )}
+
+              <Text style={{ fontSize: 7, color: '#888', fontFamily: 'Helvetica-Oblique', marginTop: 4, lineHeight: 1.5 }}>
+                Bonus depreciation reflects 100% first-year deduction on cost-segregated assets at stated bracket. Straight-line depreciation continues over 27.5 years. Operating loss savings apply only when pre-tax cash flow is negative. Tax benefit &quot;exhaustion&quot; represents the point at which cumulative after-tax returns equal zero — the property then relies solely on pre-tax cash flow. Consult a licensed CPA before making tax or investment decisions.
+              </Text>
             </>
           )
         })()}
