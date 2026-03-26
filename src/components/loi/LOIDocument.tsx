@@ -32,7 +32,7 @@ function InlineV({ v }: { v: string }) {
 // ── Simple LOI (lean 2-page format) ───────────────────────────────────────
 function OriginalLOI({ data }: { data: LOIData }) {
   const d = data
-  const purchaserFull = 'Andrew Schildcrout for Chai Holdings, LLC, its managing member, and/or assigns'
+  const purchaserFull = 'Andrew Schildcrout for Chai Holdings, LLC Its Managing Member, and/or assigns'
   return (
     <Document title={`LOI - ${d.propertyName}`}>
       <Page size="LETTER" style={s.page}>
@@ -152,8 +152,8 @@ function OriginalLOI({ data }: { data: LOIData }) {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
           <View style={{ width: '48%' }}>
             <Text style={s.sigLabel}>PURCHASER:</Text>
-            <Text style={[s.sigText, { marginTop: 2 }]}>Andrew Schildcrout for Chai Holdings, LLC,</Text>
-            <Text style={s.sigText}>its managing member</Text>
+            <Text style={[s.sigText, { marginTop: 2 }]}>Andrew Schildcrout for Chai Holdings, LLC</Text>
+            <Text style={s.sigText}>Its Managing Member</Text>
             <View style={s.sigLine} />
             <Text style={s.sigText}>Date</Text>
           </View>
@@ -172,7 +172,7 @@ function OriginalLOI({ data }: { data: LOIData }) {
 // ── Buyer-Friendly LOI (numbered sections, extra protections) ─────────────
 function BuyerFriendlyLOI({ data }: { data: LOIData }) {
   const d = data
-  const purchaserFull = 'Andrew Schildcrout for Chai Holdings, LLC, its managing member, and/or assigns'
+  const purchaserFull = 'Andrew Schildcrout for Chai Holdings, LLC Its Managing Member, and/or assigns'
   return (
     <Document title={`LOI - ${d.propertyName} (Buyer-Friendly)`}>
       <Page size="LETTER" style={s.page}>
@@ -339,8 +339,8 @@ function BuyerFriendlyLOI({ data }: { data: LOIData }) {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
           <View style={{ width: '48%' }}>
             <Text style={s.sigLabel}>PURCHASER:</Text>
-            <Text style={[s.sigText, { marginTop: 2 }]}>Andrew Schildcrout for Chai Holdings, LLC,</Text>
-            <Text style={s.sigText}>its managing member</Text>
+            <Text style={[s.sigText, { marginTop: 2 }]}>Andrew Schildcrout for Chai Holdings, LLC</Text>
+            <Text style={s.sigText}>Its Managing Member</Text>
             <View style={s.sigLine} />
             <Text style={s.sigText}>Date</Text>
           </View>
