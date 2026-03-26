@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import { AppShell } from './components/layout/AppShell'
 import { LoginPage }      from './pages/LoginPage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { PropertiesPage } from './pages/PropertiesPage'
 import { PropertyPage }   from './pages/PropertyPage'
 import { ScenarioPage }   from './pages/ScenarioPage'
@@ -20,6 +21,7 @@ export default function App() {
     <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         <Route element={<AppShell />}>
           {/* Demo — no auth required */}

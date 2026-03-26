@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 
 export function LoginPage() {
-  const { signIn, signUp } = useAuth()
+  const { signIn, signUp, resetPassword } = useAuth()
   const navigate = useNavigate()
   const [mode, setMode] = useState<'login'|'signup'>('login')
   const [email, setEmail] = useState('')
@@ -11,6 +11,8 @@ export function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [signedUp, setSignedUp] = useState(false)
+  const [showReset, setShowReset] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
 
   const logoSrc = `${import.meta.env.BASE_URL}Chai_Logo.jpeg`
 
@@ -44,6 +46,43 @@ export function LoginPage() {
           <div className="bg-green-50 border border-green-200 rounded-sm p-4 text-green-700 text-sm text-center">
             Account created! Check your email for a confirmation link, then come back to log in.
           </div>
+        ) : showReset ? (
+          <>
+            <h2 className="text-xl font-light text-gray-800 mb-1">Reset your password</h2>
+            <p className="text-[11px] text-gray-400 mb-7">We&rsquo;ll send a reset link to your email</p>
+
+            {resetSent ? (
+              <div className="bg-green-50 border border-green-200 rounded-sm p-4 text-green-700 text-sm text-center">
+                Check your email for a reset link
+              </div>
+            ) : (
+              <form onSubmit={async (e) => {
+                e.preventDefault()
+                setError(''); setLoading(true)
+                const { error: err } = await resetPassword(email)
+                if (err) setError(err.message)
+                else setResetSent(true)
+                setLoading(false)
+              }} className="space-y-4">
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wide text-gray-500 mb-1.5">Email</label>
+                  <input
+                    type="email" required value={email} onChange={e => setEmail(e.target.value)}
+                    placeholder="you@company.com"
+                    className="w-full bg-white border border-gray-300 text-sm text-gray-800 px-3 py-2.5 rounded-sm focus:border-[#c9a84c] focus:ring-0 focus:outline-none transition" />
+                </div>
+                {error && <p className="text-red-500 text-xs px-1">{error}</p>}
+                <button type="submit" disabled={loading}
+                  className="w-full bg-[#1a1a2e] text-white text-sm font-medium py-3 rounded-sm hover:bg-[#c9a84c] hover:text-[#1a1a2e] disabled:opacity-60 transition mt-2">
+                  {loading ? '...' : 'Send reset link'}
+                </button>
+              </form>
+            )}
+            <button type="button" onClick={() => { setShowReset(false); setResetSent(false); setError('') }}
+              className="w-full text-xs text-gray-400 py-3 hover:text-gray-600 transition-colors text-center mt-1">
+              Back to sign in
+            </button>
+          </>
         ) : (
           <>
             <h2 className="text-xl font-light text-gray-800 mb-1">Sign in</h2>
@@ -63,6 +102,15 @@ export function LoginPage() {
                   type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)}
                   placeholder="Min 6 characters"
                   className="w-full bg-white border border-gray-300 text-sm text-gray-800 px-3 py-2.5 rounded-sm focus:border-[#c9a84c] focus:ring-0 focus:outline-none transition" />
+                <div className="text-right mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowReset(true)}
+                    className="text-[11px] text-gray-400 hover:text-[#c9a84c] transition"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
               </div>
               {error && <p className="text-red-500 text-xs px-1">{error}</p>}
               <button type="submit" disabled={loading}
