@@ -124,13 +124,15 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
     try {
       const base64s = await Promise.all(pdfFiles.map(toBase64))
       setPdfStatus('extracting')
+      const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(
         'https://mrraacrijhzlchskuzru.supabase.co/functions/v1/extract-om',
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Authorization': `Bearer ${session?.access_token ?? ''}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY ?? '',
           },
           body: JSON.stringify({ pdfs: base64s })
         }
