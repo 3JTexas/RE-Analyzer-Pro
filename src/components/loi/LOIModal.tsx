@@ -46,6 +46,7 @@ export function LOIModal({ initial, onClose }: Props) {
       a.download = `LOI_${safeName}_${safeDate}.pdf`
       a.click()
       URL.revokeObjectURL(url)
+      onClose()
     } finally {
       setGenerating(false)
     }
