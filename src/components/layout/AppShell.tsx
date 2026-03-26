@@ -15,9 +15,9 @@ export function AppShell() {
   const bldgSrc = `${import.meta.env.BASE_URL}BLDG%20Background.jpeg`
 
   return (
-    <div className="flex flex-col h-screen bg-[#f8f7f4] w-full relative overflow-hidden">
+    <div style={{ position: 'relative', height: '100vh', overflow: 'hidden', backgroundColor: '#f8f7f4' }}>
 
-      {/* Building photo watermark — contained within app column */}
+      {/* Full-bleed building backdrop — first child, paints immediately */}
       <div
         aria-hidden="true"
         style={{
@@ -29,13 +29,13 @@ export function AppShell() {
           backgroundRepeat: 'no-repeat',
           backgroundPosition: 'center center',
           backgroundSize: 'cover',
-          opacity: 0.07,
+          opacity: 0.08,
           filter: 'grayscale(100%)',
         }}
       />
 
       {/* Top nav — md+ */}
-      <header className="hidden md:flex items-center justify-between bg-white border-b border-gray-200 h-14 px-6 flex-shrink-0 relative z-10 min-w-0">
+      <header className="hidden md:flex items-center justify-between bg-white border-b border-gray-200 h-14 px-6 min-w-0" style={{ position: 'relative', zIndex: 10, flexShrink: 0 }}>
         <div className="flex items-center min-w-0">
           <Link to="/">
             <img src={logoSrc} alt="Chai Holdings" className="h-7 w-auto" />
@@ -59,7 +59,7 @@ export function AppShell() {
       </header>
 
       {/* Mobile top bar */}
-      <header className="flex md:hidden items-center justify-between bg-white border-b border-gray-200 h-12 px-4 flex-shrink-0 relative z-10 min-w-0">
+      <header className="flex md:hidden items-center justify-between bg-white border-b border-gray-200 h-12 px-4 min-w-0" style={{ position: 'relative', zIndex: 10, flexShrink: 0 }}>
         <Link to="/">
           <img src={logoSrc} alt="Chai Holdings" className="h-5 w-auto" />
         </Link>
@@ -71,13 +71,13 @@ export function AppShell() {
         )}
       </header>
 
-      {/* Page content */}
-      <main className="flex-1 overflow-hidden relative z-[1] min-w-0">
+      {/* Scrollable content area — fills remaining height */}
+      <main style={{ position: 'relative', zIndex: 1, flex: 1, overflowY: 'auto', overflowX: 'hidden', height: 'calc(100vh - 56px)' }}>
         <Outlet />
       </main>
 
       {/* Bottom nav — mobile */}
-      <nav className="flex md:hidden border-t border-gray-200 bg-white flex-shrink-0 pb-safe relative z-10">
+      <nav className="flex md:hidden border-t border-gray-200 bg-white pb-safe" style={{ position: 'relative', zIndex: 10, flexShrink: 0 }}>
         {nav.map(({ to, icon: Icon, label }) => {
           const active = loc.pathname === to || (to !== '/' && loc.pathname.startsWith(to))
           return (
