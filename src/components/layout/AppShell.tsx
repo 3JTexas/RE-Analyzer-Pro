@@ -15,7 +15,7 @@ export function AppShell() {
   const bldgSrc = `${import.meta.env.BASE_URL}BLDG%20Background.jpeg`
 
   return (
-    <div style={{ position: 'relative', height: '100vh', overflow: 'hidden', backgroundColor: '#f8f7f4' }}>
+    <div style={{ position: 'relative', height: '100vh', overflow: 'hidden', backgroundColor: '#f8f7f4', display: 'flex', flexDirection: 'column' }}>
 
       {/* Full-bleed building backdrop — first child, paints immediately */}
       <div
@@ -72,7 +72,7 @@ export function AppShell() {
       </header>
 
       {/* Scrollable content area — fills remaining height */}
-      <main style={{ position: 'relative', zIndex: 1, flex: 1, overflowY: 'auto', overflowX: 'hidden', height: 'calc(100vh - 56px)' }}>
+      <main style={{ position: 'relative', zIndex: 1, flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }}>
         <Outlet />
       </main>
 
