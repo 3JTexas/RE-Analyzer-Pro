@@ -286,7 +286,7 @@ When `is1031` toggled on (hidden on OM scenario):
 
 ---
 
-## Latest Session — March 25, 2026
+## Session — March 25, 2026 (morning)
 
 **OM Method Fix**
 - OM As-Presented scenario (is_default=true) now always forces `'om'` method regardless of `ou/tu` values
@@ -304,55 +304,123 @@ When `is1031` toggled on (hidden on OM scenario):
 - `property_image_url text` column added to `properties` table
 - Supabase Storage RLS policies: INSERT/UPDATE for authenticated, SELECT for public
 - Photos pre-fetched as base64 data URLs to bypass CORS in `@react-pdf/renderer`
-- Edge function returns `propertyImageUrl: null` (manual upload only — vision API can't extract photos)
 
 **Bidirectional Offer Calculator**
 - Two pill-toggle modes: "Target cap rate" (solve price) and "Target price" (solve cap rate)
-- Both modes show: offer price, cap rate, delta vs asking, price/unit, DCR, down payment, loan amount
-- "Apply to Inputs" button: writes implied offer price to `inputs.price`, clears `targetCapRate` and `targetOfferPrice`, shows 2-sec confirmation, requires manual Save
+- "Apply to Inputs" button: writes implied offer price to `inputs.price`, clears calculator, requires manual Save
 - New `ModelInputs` fields: `targetOfferPrice?: number`, `offerCalcMode?: 'cap' | 'price'`
 
 **Compare Tab & PDF Price Consistency**
-- Compare tab price row: always shows `inputs.price` as "Purchase Price" (blue highlight, no back-calculated offer prices)
-- PDF: removed all back-calculated offer price references; cover page and page 2 use `inputs.price` throughout
+- Compare tab price row: always shows `inputs.price` as "Purchase Price"
+- PDF: uses `inputs.price` throughout, no back-calculated offer prices
 - PDF comparison table: "Purchase Price" added as bold first row
-- PDF method label: `deriveMethodLabel()` checks scenario name for "OM As-Presented", then auto-derives from `ou/tu`
+- PDF method label: `deriveMethodLabel()` auto-derives from scenario name and `ou/tu`
 
-**Tooltips on All Input Fields**
-- Fixed Unicode escapes (`\u2013` → `-`) in Land % and Cost Seg % tooltips
-- Added info tooltips to all 20+ InputField instances in Inputs tab (Income, Financing, Expenses, Tax sections)
-- `SectionHeader` component now accepts optional `tooltip` prop
-- Tooltips on Tax Analysis, Return on Equity, Tax Benefit Runway, and Offer Calculator section headers
+**Tooltips**
+- Fixed Unicode escapes, added info tooltips to all 20+ InputField instances
+- `SectionHeader` component accepts optional `tooltip` prop
 
-**Tax Benefit Runway — Three-Scenario Chart**
-- Chart.js line chart with three color-blind-safe lines:
-  - Bonus + Cost Seg (`#0072B2` blue) — Y1 bonus dep cliff, then SL only
-  - Straight-line only (`#E69F00` amber) — no cost seg, full 27.5yr schedule
-  - No depreciation (`#CC79A7` pink, dashed) — pure pre-tax cash flow
-- Monthly vertical gridlines, heavier year boundaries, mid-year month labels
-- Bold zero line, peak/extinguish data points with labels, color-swatch legend
-- Interactive tooltip shows all three values at each month
-- Chart only renders when bracket > 0 and depreciation is active
+---
 
-**PDF Tax Benefit Runway**
-- SVG three-line chart with monthly gridlines, year separators, peak/extinguish dots
-- Legend with color swatches below chart
-- Explanation grid with 5 columns: Component, Bonus+CS Y1, Bonus+CS Y2+, SL only, No dep
-- All values computed from live inputs (pre-tax CF/mo, tax savings/mo, net monthly, peak cumulative, months to zero)
+## Latest Session — March 25, 2026 (continued)
 
-**Debug Logs (to remove)**
-- Console.logs removed from photo pipeline (PropertyPage, ScenarioPage, PdfReport)
+**LOI Generator**
+- Simple and Buyer-Friendly templates via `@react-pdf/renderer`
+- Modal on scenario tab bar, pulls from active scenario `inputs.price` and `inputs.lev`
+- LOI button hidden on OM As-Presented scenario
+- DD deliverables split: LOI-execution (rent roll, P&L, leases, utilities, tax bills, contracts, rent payment status) and PSA-execution (title, survey, COO, env reports, loss runs, litigation, estoppels)
+- Non-binding language revised: removed exclusivity clause, confidentiality binding only
+- Files: `src/types/loi.ts`, `src/components/loi/LOIDocument.tsx`, `src/components/loi/LOIModal.tsx`
+
+**OM Extraction Improvements**
+- Switched to native PDF document API with `type: 'document'` blocks
+- Improved prompt with field-by-field extraction hints and Crexi-format tips
+- Increased `max_tokens` to 4000
+- Defensive JSON extraction: strips code fences, finds `{` to `}`
+- Base64 prefix stripping for `data:application/pdf;base64,`
+- Field mapping fix: `numericKeys` set with `parseFloat` for string-typed numbers
+- `ou` defaults to `tu` when not extracted
+
+**Utility Sub-Fields**
+- Added `utilElec`, `utilWater`, `utilTrash` to `ModelInputs` with auto-sum into `util`
+- Three sub-field inputs in Inputs tab with left-border grouping
+- Total Utilities shows "auto" badge when matching sum
+- Edge function extracts individual utility line items
+
+**Sub-Metering Toggles**
+- `utilElecSubmetered` and `utilWaterSubmetered` boolean fields
+- Inline pill toggles on Electric and Water inputs
+- When sub-metered: label changes to "property only ($)", blue badge, suppressed per-unit sub-label
+- Flags tab: amber warning if sub-metered but cost seems high, info note if $0
+
+**Extraction Quality Warnings**
+- Critical field banners (price, tu, tax, ins) — red card on OM review screen
+- Expected field banners (ir, am, lev, pm) — amber card
+- Inline field highlighting with "(not found)" badges
+- Confirm button blocked until critical fields filled
+
+**Expense Labels & Sub-Labels**
+- All expense inputs standardized: annual totals labeled "(annual $)", per-unit fields labeled "$/unit/yr"
+- Monthly/per-unit sub-labels on all expense fields in Inputs tab
+- P&L expense rows: monthly primary with annual + per-unit parenthetical
+
+**County Tax Assessor PDF Import**
+- New edge function: `extract-tax-record` (Claude Sonnet 4, native PDF document API)
+- Extracts: assessed value, land/improvement split, land%, taxable value, annual tax bill, millage rate
+- `TaxRecordImport` component in Flags tab with modal flow: upload → review → apply
+- Writes `annualTaxBill → inputs.tax` and `landPct → inputs.land`
+
+**PDF Tax Page Redesign**
+- Replaced all charts/SVG with clean dynamic after-tax table
+- Narrative summary paragraph + three metric cards (Y1 benefit, annual ongoing, exhaustion year)
+- Table runs Year 1 through exhaustion (min 3yr, max 30yr)
+- Year 1 highlighted blue, exhaustion row highlighted red, dark header/totals
+- CPA disclaimer footnote
+
+**App Redesign — Light Portal**
+- Warm off-white `#f8f7f4` backgrounds, white nav/cards, gold `#c9a84c` accents, navy `#1a1a2e` text
+- `BLDG Background.jpeg` at 8% opacity grayscale as full-bleed fixed backdrop
+- App constrained to 768px column via `#root` max-width, box-shadow depth
+- AppShell: flex column layout, watermark `position: absolute` within column
+- Content area: `flex: 1, minHeight: 0, overflowY: auto` — only content scrolls
+- Page backgrounds transparent so building shows through
+- LoginPage: centered card with navy sign-in button, gold hover
+
+---
+
+## Setting Up on a New Machine
+
+**One-time setup (first time on a new Mac):**
+1. `brew install node`
+2. `npm install -g @anthropic/claude-code`
+3. `brew install supabase/tap/supabase`
+4. `git clone https://github.com/3JTexas/RE-Analyzer-Pro ~/Applications/Claude/RE-Analyzer-Pro`
+5. `cd ~/Applications/Claude/RE-Analyzer-Pro`
+6. `npm install`
+7. Create `.env.local` with Supabase keys — copy from existing machine or get from Supabase dashboard:
+   ```
+   VITE_SUPABASE_URL=https://mrraacrijhzlchskuzru.supabase.co
+   VITE_SUPABASE_ANON_KEY=eyJ...
+   ```
+
+**Every subsequent session on any machine:**
+```
+cd ~/Applications/Claude/RE-Analyzer-Pro
+git pull
+npm run dev
+```
+
+Note: `node_modules/`, `dist/`, and `ios/` are gitignored — `npm install` recreates them. The `.env.local` file is also gitignored and must be copied manually to each machine.
 
 ---
 
 ## Pending Features / Known Issues (updated)
 
 1. **Method refactor** — remove `method` field from DB/types; derive purely from inputs
-2. **Settings / User Defaults page** — gear icon; user_defaults table; seeds new scenarios with preferred defaults
+2. **Settings / User Defaults page** — gear icon; user_defaults table; preferred defaults
 3. **Per-unit rent roll** — individual unit rows replacing blended avg
-4. **Tax assessor PDF import** — upload county appraiser PDF → extract assessed value, land/improvement split
-5. **Update Node.js 20 → 24 in `deploy.yml`** — before June 2026 when Node 20 reaches EOL
-6. **Responsive layout** — proper breakpoint-aware design for desktop
+4. **Update Node.js 20 → 24 in `deploy.yml`** — before June 2026 EOL
+5. **Responsive layout** — desktop breakpoint-aware design
 
 ---
 
