@@ -80,7 +80,7 @@ export function PropertyPage() {
   if (loading) return <Spinner />
 
   return (
-    <div className="flex flex-col h-full bg-[#f8f7f4]">
+    <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 px-4 py-3 bg-white border-b border-gray-200">
         <Link to="/" className="p-1 -ml-1 text-gray-400 hover:text-[#1a1a2e] transition-colors">
           <ChevronLeft size={20} />

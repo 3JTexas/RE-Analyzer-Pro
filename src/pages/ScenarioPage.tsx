@@ -51,7 +51,7 @@ export function ScenarioPage() {
   if (loading) return <Spinner />
 
   return (
-    <div className="flex flex-col h-full bg-[#f8f7f4]">
+    <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 px-3 py-2.5 bg-white border-b border-gray-200 flex-shrink-0">
         <Link
           to={scenario ? `/property/${scenario.property_id}` : '/'}

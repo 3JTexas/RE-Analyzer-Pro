@@ -72,7 +72,7 @@ export function AppShell() {
       </header>
 
       {/* Scrollable content area — fills remaining height */}
-      <main style={{ position: 'relative', zIndex: 1, flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }}>
+      <main style={{ position: 'relative', zIndex: 1, flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0, backgroundColor: 'transparent' }}>
         <Outlet />
       </main>
 
