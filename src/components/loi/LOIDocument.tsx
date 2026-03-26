@@ -150,13 +150,14 @@ function OriginalLOI({ data }: { data: LOIData }) {
         <Text style={[s.normal, { marginTop: 12 }]}>Sincerely,</Text>
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
-          <View>
+          <View style={{ width: '48%' }}>
             <Text style={s.sigLabel}>PURCHASER:</Text>
-            <Text style={[s.sigText, { marginTop: 2 }]}>Andrew Schildcrout for Chai Holdings, LLC, its managing member</Text>
+            <Text style={[s.sigText, { marginTop: 2 }]}>Andrew Schildcrout for Chai Holdings, LLC,</Text>
+            <Text style={s.sigText}>its managing member</Text>
             <View style={s.sigLine} />
             <Text style={s.sigText}>Date</Text>
           </View>
-          <View>
+          <View style={{ width: '48%' }}>
             <Text style={s.sigLabel}>SELLER:</Text>
             <Text style={[s.sigText, { marginTop: 2 }]}>TBD</Text>
             <View style={s.sigLine} />
@@ -336,13 +337,14 @@ function BuyerFriendlyLOI({ data }: { data: LOIData }) {
         <Text style={[s.normal, { marginTop: 8 }]}>Sincerely,</Text>
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
-          <View>
+          <View style={{ width: '48%' }}>
             <Text style={s.sigLabel}>PURCHASER:</Text>
-            <Text style={[s.sigText, { marginTop: 2 }]}>Andrew Schildcrout for Chai Holdings, LLC, its managing member</Text>
+            <Text style={[s.sigText, { marginTop: 2 }]}>Andrew Schildcrout for Chai Holdings, LLC,</Text>
+            <Text style={s.sigText}>its managing member</Text>
             <View style={s.sigLine} />
             <Text style={s.sigText}>Date</Text>
           </View>
-          <View>
+          <View style={{ width: '48%' }}>
             <Text style={s.sigLabel}>SELLER:</Text>
             <Text style={[s.sigText, { marginTop: 2 }]}>TBD</Text>
             <View style={s.sigLine} />
