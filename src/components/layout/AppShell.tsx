@@ -15,13 +15,13 @@ export function AppShell() {
   const bldgSrc = `${import.meta.env.BASE_URL}BLDG%20Background.jpeg`
 
   return (
-    <div className="flex flex-col h-screen bg-[#f8f7f4] w-full max-w-3xl mx-auto relative shadow-xl overflow-x-hidden">
+    <div className="flex flex-col h-screen bg-[#f8f7f4] w-full relative overflow-hidden">
 
-      {/* Fixed building photo watermark */}
+      {/* Building photo watermark — contained within app column */}
       <div
         aria-hidden="true"
         style={{
-          position: 'fixed',
+          position: 'absolute',
           inset: 0,
           zIndex: 0,
           pointerEvents: 'none',
