@@ -1,11 +1,13 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { Download, Save, RotateCcw, FileText } from 'lucide-react'
+import { Download, Save, RotateCcw, FileText, X, Eye } from 'lucide-react'
 import { calculate, OM_DEFAULTS, fmtDollar, fmtNeg, fmtPct, fmtX, fmtDelta, fmtDeltaPct } from '../../lib/calc'
 import type { ModelInputs, Method, Scenario } from '../../types'
 import {
   InputField, SectionHeader, MetricCard, PLRow, Alert, Toggle, DCRBar, Badge
 } from '../ui'
-import { generatePDF } from '../pdf/PdfReport'
+import { generatePDF, ReportDocument, fetchImageAsBase64 } from '../pdf/PdfReport'
+import type { ScenarioCol, ReportProps } from '../pdf/PdfReport'
+import { PDFViewer, BlobProvider } from '@react-pdf/renderer'
 import { loadCompareState, saveCompareState } from '../../lib/uiState'
 import { LOIModal } from '../loi/LOIModal'
 import { TaxRecordImport } from '../TaxRecordImport'
@@ -749,6 +751,8 @@ export function ModelCalculator({
   const [applyConfirm, setApplyConfirm] = useState(false)
   const [showLOI, setShowLOI] = useState(false)
   const [loiData, setLoiData] = useState<LOIData | null>(null)
+  const [showPdfPreview, setShowPdfPreview] = useState(false)
+  const [pdfPreviewProps, setPdfPreviewProps] = useState<ReportProps | null>(null)
 
   // Compare tab: which two scenarios to diff
   const [compareA, setCompareA] = useState<string>(currentScenarioId ?? 'current')
@@ -847,26 +851,33 @@ export function ModelCalculator({
     : { type: 'green' as const, msg: `DCR OK: ${fmtX(d.dcr)} — Clears 1.20× minimum. Cushion: ${fmtDollar(d.NOI - d.ds)}/yr.` }
 
   const handleSave = async () => { if (onSave) await onSave(name, method, inputs) }
-  const handlePDF = () => {
+  const handlePDF = async () => {
     // Build cols in Compare tab order: A, B, then any extra C/D cols
     const compareOrder = [compareA, compareB, ...compareCols]
-    const cols = compareOrder
+    const cols: ScenarioCol[] = compareOrder
       .map(sid => {
         const r = resolveInputs(sid)
         return { label: r.label, inputs: r.inputs, method: r.method as Method }
       })
       .filter((col, i, arr) => arr.findIndex(c => c.label === col.label) === i) // dedupe
-    generatePDF(
+    // Pre-fetch image for preview
+    let imageData: string | undefined
+    if (propertyImageUrl) {
+      const b64 = await fetchImageAsBase64(propertyImageUrl)
+      if (b64) imageData = b64
+    }
+    setPdfPreviewProps({
       inputs,
-      effectiveMethod,
+      method: effectiveMethod,
       propertyName,
-      propertyAddress,
-      propertyUnits ?? inputs.tu,
-      propertyYearBuilt ?? 0,
-      name,
-      cols,
-      propertyImageUrl,
-    )
+      address: propertyAddress,
+      units: propertyUnits ?? inputs.tu,
+      yearBuilt: propertyYearBuilt ?? 0,
+      scenarioName: name,
+      scenarioCols: cols,
+      propertyImageUrl: imageData,
+    })
+    setShowPdfPreview(true)
   }
   const handleScenarioSwitch = (sid: string) => {
     const s = siblings.find(x => x.id === sid)
@@ -958,7 +969,7 @@ export function ModelCalculator({
         <button onClick={handlePDF}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-200
             text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
-          <Download size={12} />
+          <Eye size={12} />
           PDF
         </button>
         {!isDefaultOM && (
@@ -1672,6 +1683,42 @@ export function ModelCalculator({
       {showLOI && loiData && (
         <LOIModal initial={loiData} onClose={() => setShowLOI(false)} />
       )}
+      {showPdfPreview && pdfPreviewProps && (() => {
+        const safeProp = (pdfPreviewProps.propertyName || 'Property').replace(/[^a-zA-Z0-9]/g, '_')
+        const safeSc = (pdfPreviewProps.scenarioName || 'Scenario').replace(/[^a-zA-Z0-9]/g, '_')
+        const fileName = `${safeProp}_${safeSc}_Analysis.pdf`
+        return (
+          <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center">
+            <div className="bg-white w-full max-w-4xl mx-4 rounded-xl shadow-2xl flex flex-col" style={{ height: '90vh' }}>
+              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 flex-shrink-0">
+                <h2 className="text-sm font-semibold text-gray-800">Report Preview</h2>
+                <div className="flex items-center gap-3">
+                  <BlobProvider document={<ReportDocument {...pdfPreviewProps} />}>
+                    {({ url, loading: pdfLoading }) => (
+                      <a
+                        href={url ?? '#'}
+                        download={fileName}
+                        className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-[#1a1a2e] text-white rounded-lg hover:bg-[#c9a84c] hover:text-[#1a1a2e] transition-colors ${pdfLoading ? 'opacity-50 pointer-events-none' : ''}`}
+                      >
+                        <Download size={12} />
+                        {pdfLoading ? 'Preparing...' : 'Download PDF'}
+                      </a>
+                    )}
+                  </BlobProvider>
+                  <button onClick={() => setShowPdfPreview(false)} className="p-1 text-gray-400 hover:text-gray-600 transition-colors">
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 min-h-0">
+                <PDFViewer width="100%" height="100%" style={{ border: 'none' }}>
+                  <ReportDocument {...pdfPreviewProps} />
+                </PDFViewer>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

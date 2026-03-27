@@ -126,7 +126,7 @@ function PLRowComp({ label, value, variant = 'normal', indent = false }:
 }
 
 // ── PDF Document ──────────────────────────────────────────────────────────
-interface ScenarioCol {
+export interface ScenarioCol {
   label: string
   inputs: ModelInputs
   method: Method
@@ -152,7 +152,9 @@ function deriveMethodLabel(inputs: ModelInputs, method: Method, label?: string):
   return method === 'om' ? 'OM Method' : 'Physical Occupancy'
 }
 
-function ReportDocument({ inputs, method, propertyName, address, units, yearBuilt, scenarioName, scenarioCols = [], propertyImageUrl }: ReportProps) {
+export { type ReportProps }
+
+export function ReportDocument({ inputs, method, propertyName, address, units, yearBuilt, scenarioName, scenarioCols = [], propertyImageUrl }: ReportProps) {
   const isOM = method === 'om'
   const d    = calculate(inputs, isOM)
   const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
@@ -589,7 +591,7 @@ function ReportDocument({ inputs, method, propertyName, address, units, yearBuil
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
-async function fetchImageAsBase64(url: string): Promise<string | null> {
+export async function fetchImageAsBase64(url: string): Promise<string | null> {
   try {
     const resp = await fetch(url)
     if (!resp.ok) return null
