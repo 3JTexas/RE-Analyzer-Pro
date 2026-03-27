@@ -38,7 +38,7 @@ export function AppShell() {
       <header className="hidden md:flex items-center justify-between bg-white border-b border-gray-200 h-14 px-6 min-w-0" style={{ position: 'relative', zIndex: 10, flexShrink: 0 }}>
         <div className="flex items-center min-w-0">
           <Link to="/">
-            <img src={logoSrc} alt="Chai Holdings" className="h-7 w-auto" />
+            <img src={logoSrc} alt="Chai Holdings" className="h-14 w-auto" />
           </Link>
           <div className="w-px h-5 border-l border-gray-200 mx-4" />
           <span className="text-[11px] font-medium tracking-[0.12em] uppercase text-gray-400">RE Analyzer Pro</span>
@@ -61,7 +61,7 @@ export function AppShell() {
       {/* Mobile top bar */}
       <header className="flex md:hidden items-center justify-between bg-white border-b border-gray-200 h-12 px-4 min-w-0" style={{ position: 'relative', zIndex: 10, flexShrink: 0 }}>
         <Link to="/">
-          <img src={logoSrc} alt="Chai Holdings" className="h-5 w-auto" />
+          <img src={logoSrc} alt="Chai Holdings" className="h-10 w-auto" />
         </Link>
         <span className="text-[9px] font-medium tracking-[0.12em] uppercase text-gray-400">RE Analyzer Pro</span>
         {user && (
