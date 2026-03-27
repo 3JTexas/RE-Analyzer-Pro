@@ -1,10 +1,13 @@
+import { useState } from 'react'
 import { Link, useLocation, Outlet } from 'react-router-dom'
-import { Building2, BarChart3, LogOut, Home } from 'lucide-react'
+import { Building2, BarChart3, Home } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
+import { ProfileModal, getInitials } from '../ProfileModal'
 
 export function AppShell() {
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
   const loc = useLocation()
+  const [showProfile, setShowProfile] = useState(false)
 
   const nav = [
     { to: '/',           icon: Building2, label: 'Properties' },
@@ -48,12 +51,11 @@ export function AppShell() {
             <Home size={16} />
           </Link>
           {user && (
-            <>
-              <span className="text-[11px] text-gray-400 truncate max-w-[160px]">{user.email}</span>
-              <button onClick={signOut} className="p-1.5 text-gray-400 hover:text-red-400 transition-colors" title="Sign out">
-                <LogOut size={16} />
-              </button>
-            </>
+            <button onClick={() => setShowProfile(true)}
+              className="w-9 h-9 rounded-full bg-[#1a1a2e] flex items-center justify-center hover:bg-[#c9a84c] transition-colors"
+              title="Account">
+              <span className="text-xs font-semibold text-white">{getInitials(user.email ?? '')}</span>
+            </button>
           )}
         </div>
       </header>
@@ -65,8 +67,10 @@ export function AppShell() {
         </Link>
         <span className="text-[9px] font-medium tracking-[0.12em] uppercase text-gray-400">RE Analyzer Pro</span>
         {user && (
-          <button onClick={signOut} className="p-1.5 text-gray-400 hover:text-red-400 transition-colors">
-            <LogOut size={14} />
+          <button onClick={() => setShowProfile(true)}
+            className="w-8 h-8 rounded-full bg-[#1a1a2e] flex items-center justify-center hover:bg-[#c9a84c] transition-colors"
+            title="Account">
+            <span className="text-[10px] font-semibold text-white">{getInitials(user.email ?? '')}</span>
           </button>
         )}
       </header>
@@ -90,6 +94,8 @@ export function AppShell() {
           )
         })}
       </nav>
+
+      {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
     </div>
   )
 }
