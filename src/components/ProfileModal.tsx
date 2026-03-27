@@ -57,14 +57,6 @@ export function ProfileModal({ onClose }: Props) {
             </div>
           </div>
 
-          {/* User ID */}
-          <div className="mb-4">
-            <label className="block text-[9px] uppercase tracking-wide text-gray-400 font-medium mb-1">User ID</label>
-            <div className="text-[11px] text-gray-500 font-mono bg-gray-50 border border-gray-100 rounded px-3 py-2 truncate">
-              {user.id}
-            </div>
-          </div>
-
           {/* Password reset */}
           <div className="mb-4">
             <label className="block text-[9px] uppercase tracking-wide text-gray-400 font-medium mb-2">Password</label>
