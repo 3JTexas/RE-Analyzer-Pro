@@ -29,7 +29,7 @@ export function AppShell() {
           backgroundRepeat: 'no-repeat',
           backgroundPosition: 'center center',
           backgroundSize: 'cover',
-          opacity: 0.32,
+          opacity: 0.2,
           filter: 'grayscale(100%)',
         }}
       />
