@@ -11,15 +11,20 @@ export function AppShell() {
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  // Close menu on outside click — use click (not mousedown) so button onClick fires first
+  // Close menu on outside click
   useEffect(() => {
     if (!showMenu) return
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false)
-    }
-    document.addEventListener('click', handler)
-    return () => document.removeEventListener('click', handler)
+    // Delay listener so the opening click doesn't immediately close the menu
+    const id = setTimeout(() => {
+      const handler = (e: MouseEvent) => {
+        if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false)
+      }
+      document.addEventListener('mousedown', handler)
+      cleanupRef.current = () => document.removeEventListener('mousedown', handler)
+    }, 0)
+    return () => { clearTimeout(id); cleanupRef.current?.() }
   }, [showMenu])
+  const cleanupRef = useRef<(() => void) | null>(null)
 
   const nav = [
     { to: '/',           icon: Building2, label: 'Properties' },
