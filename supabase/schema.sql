@@ -11,9 +11,10 @@ create table if not exists properties (
   address     text,
   units       int default 8,
   year_built  int,
-  notes       text,
-  created_at  timestamptz default now(),
-  updated_at  timestamptz default now()
+  notes         text,
+  display_order int default 0,
+  created_at    timestamptz default now(),
+  updated_at    timestamptz default now()
 );
 
 -- Scenarios table — inputs stored as JSONB so schema never needs migration when fields are added

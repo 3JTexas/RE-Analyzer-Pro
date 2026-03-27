@@ -117,6 +117,7 @@ export interface Property {
   units: number | null
   year_built: number | null
   notes: string | null
+  display_order: number
   created_at: string
   updated_at: string
   scenarios?: Scenario[]

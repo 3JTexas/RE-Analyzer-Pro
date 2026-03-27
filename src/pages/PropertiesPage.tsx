@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Building2, Plus, Trash2, ChevronRight } from 'lucide-react'
+import { Building2, Plus, Trash2, ChevronRight, GripVertical } from 'lucide-react'
 import { useProperties, useScenario } from '../hooks/useScenario'
 import { Spinner } from '../components/ui'
 import { OmSetupFlow } from '../components/OMSetupFlow'
@@ -8,7 +8,9 @@ import type { ModelInputs } from '../types'
 import type { OmConfirmMeta } from '../components/OMSetupFlow'
 
 export function PropertiesPage() {
-  const { properties, loading, createProperty, deleteProperty } = useProperties()
+  const { properties, loading, createProperty, deleteProperty, reorderProperties } = useProperties()
+  const dragIdx = useRef<number | null>(null)
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
   const { createScenario } = useScenario()
   const navigate = useNavigate()
   const [showSetup, setShowSetup] = useState(false)
@@ -66,27 +68,49 @@ export function PropertiesPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {properties.map(p => (
-                <div key={p.id} className="bg-white border border-gray-200 rounded-sm hover:border-[#c9a84c] transition-colors group">
-                  <Link to={`/property/${p.id}`}
-                    className="flex items-center gap-4 px-4 py-3.5">
-                    <div className="w-12 h-12 bg-[#f8f7f4] border border-gray-200 rounded-sm flex items-center justify-center flex-shrink-0">
-                      <Building2 size={18} className="text-gray-300" />
+              {properties.map((p, i) => (
+                <div key={p.id}
+                  draggable
+                  onDragStart={() => { dragIdx.current = i }}
+                  onDragOver={e => { e.preventDefault(); setDragOverIdx(i) }}
+                  onDragEnd={() => { setDragOverIdx(null) }}
+                  onDrop={() => {
+                    if (dragIdx.current !== null && dragIdx.current !== i) {
+                      const reordered = [...properties]
+                      const [moved] = reordered.splice(dragIdx.current, 1)
+                      reordered.splice(i, 0, moved)
+                      reorderProperties(reordered)
+                    }
+                    dragIdx.current = null
+                    setDragOverIdx(null)
+                  }}
+                  className={`bg-white border rounded-sm hover:border-[#c9a84c] transition-colors group
+                    ${dragOverIdx === i ? 'border-[#c9a84c] shadow-md' : 'border-gray-200'}`}>
+                  <div className="flex items-center">
+                    <div className="flex items-center justify-center px-2 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-400"
+                      onMouseDown={e => e.stopPropagation()}>
+                      <GripVertical size={16} />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-900 truncate">{p.name}</div>
-                      {p.address && <div className="text-xs text-gray-400 mt-0.5 truncate">{p.address}</div>}
-                      <div className="text-[11px] text-gray-300 mt-0.5">
-                        {p.units ? `${p.units} units` : ''}{p.units && p.year_built ? ' · ' : ''}{p.year_built ? `Built ${p.year_built}` : ''}
+                    <Link to={`/property/${p.id}`}
+                      className="flex items-center gap-4 px-3 py-3.5 flex-1 min-w-0">
+                      <div className="w-12 h-12 bg-[#f8f7f4] border border-gray-200 rounded-sm flex items-center justify-center flex-shrink-0">
+                        <Building2 size={18} className="text-gray-300" />
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      <span className="bg-gray-50 border border-gray-200 text-gray-400 text-[10px] px-2.5 py-1 rounded-sm">
-                        {(p.scenarios?.length ?? 0)} scenario{(p.scenarios?.length ?? 0) !== 1 ? 's' : ''}
-                      </span>
-                      <ChevronRight size={14} className="text-gray-300 group-hover:text-[#c9a84c] transition-colors" />
-                    </div>
-                  </Link>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">{p.name}</div>
+                        {p.address && <div className="text-xs text-gray-400 mt-0.5 truncate">{p.address}</div>}
+                        <div className="text-[11px] text-gray-300 mt-0.5">
+                          {p.units ? `${p.units} units` : ''}{p.units && p.year_built ? ' · ' : ''}{p.year_built ? `Built ${p.year_built}` : ''}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <span className="bg-gray-50 border border-gray-200 text-gray-400 text-[10px] px-2.5 py-1 rounded-sm">
+                          {(p.scenarios?.length ?? 0)} scenario{(p.scenarios?.length ?? 0) !== 1 ? 's' : ''}
+                        </span>
+                        <ChevronRight size={14} className="text-gray-300 group-hover:text-[#c9a84c] transition-colors" />
+                      </div>
+                    </Link>
+                  </div>
                   <div className="border-t border-gray-100 flex">
                     <button onClick={() => deleteProperty(p.id)}
                       className="flex items-center gap-1 px-3 py-2 text-[10px] text-gray-400 hover:text-red-400 transition-colors">

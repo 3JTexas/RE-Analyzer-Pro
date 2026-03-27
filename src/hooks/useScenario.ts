@@ -11,6 +11,7 @@ export function useProperties() {
     const { data } = await supabase
       .from('properties')
       .select('*, scenarios(id, name, method, is_default, created_at, updated_at)')
+      .order('display_order', { ascending: true })
       .order('created_at', { ascending: false })
     setProperties((data as Property[]) ?? [])
     setLoading(false)
@@ -39,7 +40,16 @@ export function useProperties() {
     await fetch()
   }
 
-  return { properties, loading, createProperty, deleteProperty, refresh: fetch }
+  const reorderProperties = async (reordered: Property[]) => {
+    setProperties(reordered)
+    await Promise.all(
+      reordered.map((p, i) =>
+        supabase.from('properties').update({ display_order: i }).eq('id', p.id)
+      )
+    )
+  }
+
+  return { properties, loading, createProperty, deleteProperty, reorderProperties, refresh: fetch }
 }
 
 export function useScenario(scenarioId?: string) {
