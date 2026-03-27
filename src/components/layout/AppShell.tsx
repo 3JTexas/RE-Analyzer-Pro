@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Link, useLocation, Outlet } from 'react-router-dom'
-import { Building2, BarChart3, Home, User, LogOut } from 'lucide-react'
+import { Building2, BarChart3, Home, User, LogOut, Settings } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { ProfileModal, getInitials } from '../ProfileModal'
+import { SettingsModal } from '../SettingsModal'
 
-function AvatarMenu({ size, textSize, onProfile, onSignOut }: {
-  size: string; textSize: string; onProfile: () => void; onSignOut: () => void
+function AvatarMenu({ size, textSize, onProfile, onSettings, onSignOut }: {
+  size: string; textSize: string; onProfile: () => void; onSettings: () => void; onSignOut: () => void
 }) {
   const { user } = useAuth()
   const [open, setOpen] = useState(false)
@@ -25,6 +26,10 @@ function AvatarMenu({ size, textSize, onProfile, onSignOut }: {
               className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
               <User size={14} className="text-gray-400" /> Profile
             </button>
+            <button onClick={() => { setOpen(false); onSettings() }}
+              className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+              <Settings size={14} className="text-gray-400" /> Settings
+            </button>
             <div className="border-t border-gray-100 my-1" />
             <button onClick={() => { setOpen(false); onSignOut() }}
               className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs text-red-500 hover:bg-red-50 transition-colors">
@@ -41,6 +46,7 @@ export function AppShell() {
   const { user, signOut } = useAuth()
   const loc = useLocation()
   const [showProfile, setShowProfile] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   const nav = [
     { to: '/',           icon: Building2, label: 'Properties' },
@@ -84,7 +90,7 @@ export function AppShell() {
             <Home size={16} />
           </Link>
           {user && (
-            <AvatarMenu size="w-9 h-9" textSize="text-xs" onProfile={() => setShowProfile(true)} onSignOut={signOut} />
+            <AvatarMenu size="w-9 h-9" textSize="text-xs" onProfile={() => setShowProfile(true)} onSettings={() => setShowSettings(true)} onSignOut={signOut} />
           )}
         </div>
       </header>
@@ -96,7 +102,7 @@ export function AppShell() {
         </Link>
         <span className="text-[9px] font-medium tracking-[0.12em] uppercase text-gray-400">RE Analyzer Pro</span>
         {user && (
-          <AvatarMenu size="w-8 h-8" textSize="text-[10px]" onProfile={() => setShowProfile(true)} onSignOut={signOut} />
+          <AvatarMenu size="w-8 h-8" textSize="text-[10px]" onProfile={() => setShowProfile(true)} onSettings={() => setShowSettings(true)} onSignOut={signOut} />
         )}
       </header>
 
@@ -121,6 +127,7 @@ export function AppShell() {
       </nav>
 
       {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </div>
   )
 }

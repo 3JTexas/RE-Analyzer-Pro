@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Upload, FileText, X, Loader2, CheckCircle, AlertCircle, Camera } from 'lucide-react'
 import { OM_DEFAULTS } from '../lib/calc'
 import { supabase } from '../lib/supabase'
+import { useUserDefaults } from '../hooks/useUserDefaults'
 import type { ModelInputs } from '../types'
 
 const FIELDS: { key: keyof ModelInputs; label: string; step: number; prefix?: string; suffix?: string }[] = [
@@ -64,6 +65,16 @@ interface Props {
 export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, defaultScenarioName = 'OM As-Presented' }: Props) {
   const [mode, setMode] = useState<Mode>('choose')
   const [inputs, setInputs] = useState<ModelInputs>({ ...OM_DEFAULTS })
+  const { loadDefaults } = useUserDefaults()
+
+  // Merge user defaults into initial inputs on mount
+  useEffect(() => {
+    loadDefaults().then(d => {
+      if (Object.keys(d).length > 0) {
+        setInputs(prev => ({ ...prev, ...d }))
+      }
+    })
+  }, [])
   const [pdfStatus, setPdfStatus] = useState<PdfStatus>('idle')
   const [pdfError, setPdfError] = useState('')
   const [pdfFiles, setPdfFiles] = useState<File[]>([])

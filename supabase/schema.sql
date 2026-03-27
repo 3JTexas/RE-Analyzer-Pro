@@ -59,6 +59,25 @@ create policy "Users manage own scenarios"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+-- User defaults — stores underwriting defaults as JSONB
+create table if not exists user_defaults (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid references auth.users(id) on delete cascade not null unique,
+  defaults    jsonb not null default '{}',
+  created_at  timestamptz default now(),
+  updated_at  timestamptz default now()
+);
+
+alter table user_defaults enable row level security;
+
+create policy "Users manage own defaults"
+  on user_defaults for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create trigger user_defaults_updated_at before update on user_defaults
+  for each row execute function update_updated_at();
+
 -- Indexes
 create index if not exists properties_user_id_idx on properties(user_id);
 create index if not exists scenarios_property_id_idx on scenarios(property_id);
