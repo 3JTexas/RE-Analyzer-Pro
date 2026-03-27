@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ChevronLeft, Plus, BarChart3, Trash2, Copy, Camera, Loader2 } from 'lucide-react'
+import { ChevronLeft, Plus, BarChart3, Trash2, Copy, Camera, Loader2, ExternalLink, Pencil, Check, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getScenariosForProperty, useScenario } from '../hooks/useScenario'
 import type { Property, Scenario, ModelInputs } from '../types'
@@ -19,6 +19,8 @@ export function PropertyPage() {
   const [duplicating, setDuplicating] = useState<Scenario | null>(null)
   const [dupName, setDupName] = useState('')
   const [photoUploading, setPhotoUploading] = useState(false)
+  const [editingCrexi, setEditingCrexi] = useState(false)
+  const [crexiDraft, setCrexiDraft] = useState('')
   const photoRef = useRef<HTMLInputElement>(null)
 
   const loadData = async () => {
@@ -77,6 +79,14 @@ export function PropertyPage() {
     setPhotoUploading(false)
   }
 
+  const saveCrexiUrl = async (url: string) => {
+    if (!id) return
+    const trimmed = url.trim() || null
+    await supabase.from('properties').update({ crexi_url: trimmed }).eq('id', id)
+    setProperty(prev => prev ? { ...prev, crexi_url: trimmed } as Property : prev)
+    setEditingCrexi(false)
+  }
+
   if (loading) return <Spinner />
 
   return (
@@ -88,6 +98,42 @@ export function PropertyPage() {
         <div className="flex-1 min-w-0">
           <h1 className="text-base font-semibold text-gray-900 truncate">{property?.name}</h1>
           {property?.address && <p className="text-xs text-gray-400 truncate">{property.address}</p>}
+          <div className="flex items-center gap-2 mt-1">
+            {editingCrexi ? (
+              <div className="flex items-center gap-1">
+                <input
+                  value={crexiDraft}
+                  onChange={e => setCrexiDraft(e.target.value)}
+                  placeholder="https://www.crexi.com/properties/..."
+                  className="text-[11px] border border-gray-300 rounded px-2 py-1 w-56 focus:outline-none focus:border-[#c9a84c] bg-white text-gray-700"
+                  autoFocus
+                  onKeyDown={e => { if (e.key === 'Enter') saveCrexiUrl(crexiDraft) }}
+                />
+                <button onClick={() => saveCrexiUrl(crexiDraft)} className="p-0.5 text-green-500 hover:text-green-700">
+                  <Check size={13} />
+                </button>
+                <button onClick={() => setEditingCrexi(false)} className="p-0.5 text-gray-400 hover:text-gray-600">
+                  <X size={13} />
+                </button>
+              </div>
+            ) : property?.crexi_url ? (
+              <div className="flex items-center gap-1.5">
+                <a href={property?.crexi_url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-[10px] font-medium text-[#c9a84c] border border-[#c9a84c] rounded px-2 py-0.5 hover:bg-[#c9a84c] hover:text-white transition-colors">
+                  <ExternalLink size={10} /> View on Crexi
+                </a>
+                <button onClick={() => { setCrexiDraft(property?.crexi_url ?? ''); setEditingCrexi(true) }}
+                  className="p-0.5 text-gray-300 hover:text-gray-500">
+                  <Pencil size={10} />
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => { setCrexiDraft(''); setEditingCrexi(true) }}
+                className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-[#c9a84c] transition-colors">
+                <Pencil size={10} /> Add Crexi link
+              </button>
+            )}
+          </div>
         </div>
         <input ref={photoRef} type="file" accept="image/*" className="hidden"
           onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f) }} />

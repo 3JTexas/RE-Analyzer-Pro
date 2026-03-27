@@ -118,6 +118,7 @@ export interface Property {
   year_built: number | null
   notes: string | null
   display_order: number
+  crexi_url: string | null
   created_at: string
   updated_at: string
   scenarios?: Scenario[]

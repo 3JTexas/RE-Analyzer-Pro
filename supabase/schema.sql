@@ -13,6 +13,7 @@ create table if not exists properties (
   year_built  int,
   notes         text,
   display_order int default 0,
+  crexi_url     text,
   created_at    timestamptz default now(),
   updated_at    timestamptz default now()
 );
