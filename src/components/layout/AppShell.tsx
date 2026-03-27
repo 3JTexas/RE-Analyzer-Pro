@@ -35,7 +35,7 @@ export function AppShell() {
       />
 
       {/* Top nav — md+ */}
-      <header className="hidden md:flex items-center justify-between bg-white border-b border-gray-200 h-14 px-6 min-w-0" style={{ position: 'relative', zIndex: 10, flexShrink: 0 }}>
+      <header className="hidden md:flex items-center justify-between bg-white border-b border-gray-200 h-20 px-6 min-w-0" style={{ position: 'relative', zIndex: 10, flexShrink: 0 }}>
         <div className="flex items-center min-w-0">
           <Link to="/">
             <img src={logoSrc} alt="Chai Holdings" className="h-14 w-auto" />
@@ -59,7 +59,7 @@ export function AppShell() {
       </header>
 
       {/* Mobile top bar */}
-      <header className="flex md:hidden items-center justify-between bg-white border-b border-gray-200 h-12 px-4 min-w-0" style={{ position: 'relative', zIndex: 10, flexShrink: 0 }}>
+      <header className="flex md:hidden items-center justify-between bg-white border-b border-gray-200 h-14 px-4 min-w-0" style={{ position: 'relative', zIndex: 10, flexShrink: 0 }}>
         <Link to="/">
           <img src={logoSrc} alt="Chai Holdings" className="h-10 w-auto" />
         </Link>
