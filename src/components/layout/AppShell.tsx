@@ -26,24 +26,21 @@ function AvatarMenu({ size, textSize, onProfile, onSettings, onSignOut }: {
         <span className={`${textSize} font-semibold text-white`}>{getInitials(user.email ?? '')}</span>
       </button>
       {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
-            <button onClick={() => { setOpen(false); onProfile() }}
-              className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
-              <User size={14} className="text-gray-400" /> Profile
-            </button>
-            <button onClick={() => { setOpen(false); onSettings() }}
-              className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
-              <Settings size={14} className="text-gray-400" /> Settings
-            </button>
-            <div className="border-t border-gray-100 my-1" />
-            <button onClick={() => { setOpen(false); onSignOut() }}
-              className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs text-red-500 hover:bg-red-50 transition-colors">
-              <LogOut size={14} /> Sign out
-            </button>
-          </div>
-        </>
+        <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
+          <button onClick={() => { setOpen(false); onProfile() }}
+            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+            <User size={14} className="text-gray-400" /> Profile
+          </button>
+          <button onClick={() => { setOpen(false); onSettings() }}
+            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+            <Settings size={14} className="text-gray-400" /> Settings
+          </button>
+          <div className="border-t border-gray-100 my-1" />
+          <button onClick={() => { setOpen(false); onSignOut() }}
+            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs text-red-500 hover:bg-red-50 transition-colors">
+            <LogOut size={14} /> Sign out
+          </button>
+        </div>
       )}
     </div>
   )
