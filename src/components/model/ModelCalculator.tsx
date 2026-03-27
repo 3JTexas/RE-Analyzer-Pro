@@ -1688,8 +1688,8 @@ export function ModelCalculator({
         const safeSc = (pdfPreviewProps.scenarioName || 'Scenario').replace(/[^a-zA-Z0-9]/g, '_')
         const fileName = `${safeProp}_${safeSc}_Analysis.pdf`
         return (
-          <div className="fixed inset-0 z-50 bg-black/70 flex items-start justify-center pt-20">
-            <div className="bg-white w-full max-w-4xl mx-4 rounded-xl shadow-2xl flex flex-col" style={{ height: 'calc(90vh - 5rem)' }}>
+          <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center">
+            <div className="bg-white w-full max-w-4xl mx-4 rounded-xl shadow-2xl flex flex-col" style={{ height: '90vh' }}>
               <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 flex-shrink-0">
                 <h2 className="text-sm font-semibold text-gray-800">Report Preview</h2>
                 <div className="flex items-center gap-3">
