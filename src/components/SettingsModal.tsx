@@ -69,7 +69,7 @@ export function SettingsModal({ onClose }: Props) {
     if (err) setError(err)
     else {
       setSaved(true)
-      setTimeout(() => onClose(), 2000)
+      setTimeout(() => onClose(), 1000)
     }
     setSaving(false)
   }

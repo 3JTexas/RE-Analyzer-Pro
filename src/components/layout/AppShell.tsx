@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { Link, useLocation, Outlet } from 'react-router-dom'
 import { Building2, BarChart3, Home, User, LogOut, Settings } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
@@ -10,9 +10,16 @@ function AvatarMenu({ size, textSize, onProfile, onSettings, onSignOut }: {
 }) {
   const { user } = useAuth()
   const [open, setOpen] = useState(false)
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const startClose = useCallback(() => {
+    closeTimer.current = setTimeout(() => setOpen(false), 1000)
+  }, [])
+  const cancelClose = useCallback(() => {
+    if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null }
+  }, [])
   if (!user) return null
   return (
-    <div className="relative">
+    <div className="relative" onMouseLeave={startClose} onMouseEnter={cancelClose}>
       <button onClick={() => setOpen(v => !v)}
         className={`${size} rounded-full bg-[#1a1a2e] flex items-center justify-center hover:bg-[#c9a84c] transition-colors`}
         title="Account">
