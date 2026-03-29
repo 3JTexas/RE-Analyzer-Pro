@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import React, { useState, useCallback, useEffect, useMemo } from 'react'
+import ReactDOM from 'react-dom'
 import { Download, Save, RotateCcw, FileText, X, Eye } from 'lucide-react'
 import { calculate, OM_DEFAULTS, fmtDollar, fmtNeg, fmtPct, fmtX, fmtDelta, fmtDeltaPct } from '../../lib/calc'
 import type { ModelInputs, Method, Scenario } from '../../types'
@@ -26,10 +27,33 @@ function fmtCell(v: number): string {
   return v < 0 ? `($${Math.abs(v).toLocaleString('en-US',{maximumFractionDigits:0})})` : `$${v.toLocaleString('en-US',{maximumFractionDigits:0})}`
 }
 function ColTip({ text }: { text: string }) {
+  const ref = React.useRef<HTMLSpanElement>(null)
+  const [show, setShow] = React.useState(false)
+  const [pos, setPos] = React.useState<{ top: number; left: number } | null>(null)
+  const handleEnter = () => {
+    if (ref.current) {
+      const r = ref.current.getBoundingClientRect()
+      setPos({ top: r.top, left: r.left + r.width / 2 })
+    }
+    setShow(true)
+  }
   return (
-    <span className="relative group ml-0.5">
-      <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-gray-300 text-[7px] text-gray-600 cursor-help font-semibold leading-none">i</span>
-      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-48 px-2 py-1.5 text-[9px] leading-snug text-white bg-gray-800 rounded-lg shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50 normal-case tracking-normal font-normal">{text}</span>
+    <span
+      ref={ref}
+      className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-gray-300 text-[7px] text-gray-600 cursor-help font-semibold leading-none ml-0.5"
+      onMouseEnter={handleEnter}
+      onMouseLeave={() => setShow(false)}
+    >
+      i
+      {show && pos && ReactDOM.createPortal(
+        <span
+          style={{ position: 'fixed', top: pos.top, left: pos.left, transform: 'translate(-50%, -100%)', marginTop: -4 }}
+          className="w-48 px-2 py-1.5 text-[9px] leading-snug text-white bg-gray-800 rounded-lg shadow-lg z-[9999] pointer-events-none normal-case tracking-normal font-normal"
+        >
+          {text}
+        </span>,
+        document.body,
+      )}
     </span>
   )
 }

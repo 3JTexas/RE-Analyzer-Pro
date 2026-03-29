@@ -1,4 +1,41 @@
 import React from 'react'
+import ReactDOM from 'react-dom'
+
+// ── Tooltip that escapes overflow:hidden via fixed positioning + portal ───
+function InfoTooltip({ text, className }: { text: string; className?: string }) {
+  const triggerRef = React.useRef<HTMLSpanElement>(null)
+  const [show, setShow] = React.useState(false)
+  const [pos, setPos] = React.useState<{ top: number; left: number } | null>(null)
+
+  const handleEnter = () => {
+    if (triggerRef.current) {
+      const r = triggerRef.current.getBoundingClientRect()
+      setPos({ top: r.top, left: r.left + r.width / 2 })
+    }
+    setShow(true)
+  }
+  const handleLeave = () => setShow(false)
+
+  return (
+    <span
+      ref={triggerRef}
+      className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-200 text-[9px] text-gray-500 cursor-help font-semibold leading-none"
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
+    >
+      i
+      {show && pos && ReactDOM.createPortal(
+        <span
+          style={{ position: 'fixed', top: pos.top, left: pos.left, transform: 'translate(-50%, -100%)', marginTop: -6 }}
+          className={`w-56 px-2.5 py-2 text-[10px] leading-snug text-white bg-gray-800 rounded-lg shadow-lg z-[9999] pointer-events-none ${className ?? ''}`}
+        >
+          {text}
+        </span>,
+        document.body,
+      )}
+    </span>
+  )
+}
 
 // ── Input field ───────────────────────────────────────────────────────────
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -39,14 +76,7 @@ export function InputField({ label, badge, badgeColor = 'blue', tooltip, dollar,
       )}
       <label className="text-xs text-gray-500 mb-1 flex items-center gap-1">
         {label}
-        {tooltip && (
-          <span className="relative group">
-            <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-200 text-[9px] text-gray-500 cursor-help font-semibold leading-none">i</span>
-            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 px-2.5 py-2 text-[10px] leading-snug text-white bg-gray-800 rounded-lg shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50">
-              {tooltip}
-            </span>
-          </span>
-        )}
+        {tooltip && <InfoTooltip text={tooltip} />}
       </label>
       <input
         {...props}
@@ -110,14 +140,7 @@ export function SectionHeader({ title, tooltip, children }: { title: string; too
     <div className="flex items-center justify-between mt-4 mb-2 pb-1 border-b border-gray-200">
       <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">
         {title}
-        {tooltip && (
-          <span className="relative group">
-            <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-200 text-[9px] text-gray-500 cursor-help font-semibold leading-none">i</span>
-            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 px-2.5 py-2 text-[10px] leading-snug text-white bg-gray-800 rounded-lg shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50 normal-case tracking-normal font-normal">
-              {tooltip}
-            </span>
-          </span>
-        )}
+        {tooltip && <InfoTooltip text={tooltip} className="normal-case tracking-normal font-normal" />}
       </span>
       {children}
     </div>
