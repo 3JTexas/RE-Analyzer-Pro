@@ -40,6 +40,10 @@ export interface ModelInputs {
   targetCapRate?: number // offer calculator target cap rate %
   targetOfferPrice?: number // offer calculator target price $
   offerCalcMode?: 'cap' | 'price' // which offer calculator mode is active
+  // 1031 exchange analysis
+  priorSalePrice?: number   // what the relinquished property sold for
+  priorBasis?: number       // original purchase price of relinquished property
+  cgRate?: number           // long-term cap gains rate (default 20)
 }
 
 // ── Computed outputs ──────────────────────────────────────────────────────

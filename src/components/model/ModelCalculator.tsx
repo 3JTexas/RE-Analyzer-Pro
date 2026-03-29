@@ -12,10 +12,10 @@ import { loadCompareState, saveCompareState } from '../../lib/uiState'
 import { LOIModal } from '../loi/LOIModal'
 import { TaxRecordImport } from '../TaxRecordImport'
 import type { LOIData } from '../../types/loi'
-import { Line } from 'react-chartjs-2'
-import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
+import { Line, Bar } from 'react-chartjs-2'
+import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip, BarElement, Legend } from 'chart.js'
 
-ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
+ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip, BarElement, Legend)
 
 // ── Tax Benefit Bank — table + chart ─────────────────────────────────────
 const LC = { bonus: '#0072B2', sl: '#E69F00', none: '#CC79A7', exhaust: '#D85A30' }
@@ -1505,6 +1505,141 @@ export function ModelCalculator({
         {/* ── TAX TAB ───────────────────────────────────────────────────── */}
         {activeTab === 'tax' && (
           <div>
+            {/* ── Section A: 1031 Exchange Analysis ── */}
+            {inputs.is1031 && (() => {
+              const priorSale = inputs.priorSalePrice ?? 0
+              const priorBasisVal = inputs.priorBasis ?? 0
+              const cgRateVal = inputs.cgRate ?? 20
+              const capGain = priorSale - priorBasisVal
+              const taxDeferred = capGain * (cgRateVal / 100)
+              const afterTaxSale = priorSale - taxDeferred
+              return (
+                <>
+                  <SectionHeader title="1031 Exchange Analysis" tooltip="Compare tax-deferred 1031 exchange vs. selling and paying capital gains tax on the relinquished property." />
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    <InputField label="Prior sale price" type="number" dollar value={priorSale}
+                      onChange={e => set('priorSalePrice' as keyof ModelInputs, +e.target.value)} />
+                    <InputField label="Original basis" type="number" dollar value={priorBasisVal}
+                      onChange={e => set('priorBasis' as keyof ModelInputs, +e.target.value)} />
+                    <InputField label="Cap gains rate %" type="number" value={cgRateVal} step={1}
+                      onChange={e => set('cgRate' as keyof ModelInputs, +e.target.value)} />
+                  </div>
+                  {priorSale > 0 && priorBasisVal > 0 && (
+                    <>
+                      <div className="border border-gray-100 rounded-lg p-3 mb-3">
+                        <PLRow label="Capital gain" value={fmtDollar(capGain)} variant="total" />
+                        <PLRow label={`Tax deferred (avoided @ ${cgRateVal}%)`} value={fmtDollar(taxDeferred)} variant="pos" indent />
+                        <PLRow label="Capital deployed via 1031" value={fmtDollar(priorSale)} variant="noi" />
+                      </div>
+                      <div className="mb-4" style={{ height: 220 }}>
+                        <Bar
+                          data={{
+                            labels: ['Sell & pay tax', '1031 Exchange'],
+                            datasets: [{
+                              label: 'Capital deployed',
+                              data: [afterTaxSale, priorSale],
+                              backgroundColor: ['#E24B4A', '#1D9E75'],
+                              borderRadius: 4,
+                            }],
+                          }}
+                          options={{
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmtDollar(ctx.raw as number) } } },
+                            scales: { y: { beginAtZero: true, ticks: { callback: v => `$${(+v / 1000).toFixed(0)}k` } } },
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
+                </>
+              )
+            })()}
+
+            {/* ── Section B: Bonus Depreciation ── */}
+            {inputs.price > 0 && d.brk > 0 && (() => {
+              const bracket = d.brk / 100
+              const depBasis = inputs.price * (1 - inputs.land / 100)
+              const bonusDed = depBasis * (inputs.costSeg / 100)
+              const slAnnual = (depBasis * (1 - inputs.costSeg / 100)) / 27.5
+              const y1PaperLoss = d.NOI - bonusDed - slAnnual
+              const y1TaxBenefit = Math.max(0, -y1PaperLoss) * bracket
+              const years = Array.from({ length: 10 }, (_, i) => i + 1)
+              const noiArr = years.map(() => d.NOI)
+              const taxableArr = years.map(y => y === 1 ? d.NOI - bonusDed - slAnnual : d.NOI - slAnnual)
+              return (
+                <>
+                  <SectionHeader title="Bonus Depreciation" tooltip="Year 1 bonus depreciation on cost-segregated components (5/7/15-year property). Assumes 100% bonus depreciation and Real Estate Professional status." />
+                  <div className="border border-gray-100 rounded-lg p-3 mb-3">
+                    <PLRow label="Year 1 bonus deduction" value={fmtDollar(bonusDed)} variant="pos" />
+                    <PLRow label="Year 1 paper loss" value={y1PaperLoss < 0 ? `(${fmtDollar(Math.abs(y1PaperLoss))})` : fmtDollar(y1PaperLoss)} variant={y1PaperLoss < 0 ? 'pos' : 'neg'} indent />
+                    <PLRow label={`Year 1 tax benefit @ ${d.brk}%`} value={fmtDollar(y1TaxBenefit)} variant="total" />
+                  </div>
+                  <div className="mb-4" style={{ height: 240 }}>
+                    <Bar
+                      data={{
+                        labels: years.map(y => `Y${y}`),
+                        datasets: [
+                          { label: 'NOI', data: noiArr, backgroundColor: '#3B82F6', borderRadius: 3 },
+                          { label: 'Taxable income', data: taxableArr.map(v => v), backgroundColor: taxableArr.map(v => v < 0 ? '#E24B4A' : '#1D9E75'), borderRadius: 3 },
+                        ],
+                      }}
+                      options={{
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                          legend: { display: true, position: 'top', labels: { boxWidth: 10, font: { size: 10 } } },
+                          tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmtDollar(ctx.raw as number)}` } },
+                        },
+                        scales: { y: { ticks: { callback: v => `$${(+v / 1000).toFixed(0)}k` } } },
+                      }}
+                    />
+                  </div>
+                </>
+              )
+            })()}
+
+            {/* ── Section C: 27.5-Year Depreciation Schedule ── */}
+            {inputs.price > 0 && d.brk > 0 && (() => {
+              const depBasis = inputs.price * (1 - inputs.land / 100) * (1 - inputs.costSeg / 100)
+              const annualDed = depBasis / 27.5
+              const bracket = d.brk / 100
+              const annualShield = annualDed * bracket
+              const years28 = Array.from({ length: 28 }, (_, i) => i + 1)
+              const shieldArr = years28.map((_, i) => i < 27 ? annualShield : annualShield * 0.5)
+              const cumulArr = years28.map((_, i) => shieldArr.slice(0, i + 1).reduce((a, b) => a + b, 0))
+              return (
+                <>
+                  <SectionHeader title="27.5-Year Depreciation Schedule" tooltip="Straight-line depreciation on the building value not allocated to cost segregation. Provides an annual tax shield for the full 27.5-year recovery period." />
+                  <div className="border border-gray-100 rounded-lg p-3 mb-3">
+                    <PLRow label="Depreciable basis (after cost seg)" value={fmtDollar(depBasis)} />
+                    <PLRow label="Annual deduction" value={fmtDollar(annualDed)} variant="pos" indent />
+                    <PLRow label={`Annual tax shield @ ${d.brk}%`} value={fmtDollar(annualShield)} variant="total" />
+                  </div>
+                  <div className="mb-4" style={{ height: 200 }}>
+                    <Bar
+                      data={{
+                        labels: years28.map(y => y % 5 === 0 || y === 1 || y === 28 ? `Y${y}` : ''),
+                        datasets: [
+                          { label: 'Annual shield', data: shieldArr, backgroundColor: '#14B8A6', borderRadius: 2, yAxisID: 'y' },
+                          { label: 'Cumulative saved', data: cumulArr, type: 'line' as const, borderColor: '#3B82F6', borderWidth: 2, pointRadius: 0, yAxisID: 'y1' } as any,
+                        ],
+                      }}
+                      options={{
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                          legend: { display: true, position: 'top', labels: { boxWidth: 10, font: { size: 10 } } },
+                          tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmtDollar(ctx.raw as number)}` } },
+                        },
+                        scales: {
+                          y: { position: 'left', ticks: { callback: v => `$${(+v / 1000).toFixed(0)}k` }, title: { display: true, text: 'Annual', font: { size: 9 } } },
+                          y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { callback: v => `$${(+v / 1000).toFixed(0)}k` }, title: { display: true, text: 'Cumulative', font: { size: 9 } } },
+                        },
+                      }}
+                    />
+                  </div>
+                </>
+              )
+            })()}
+
             <SectionHeader title="Tax analysis — REP · 100% bonus dep · 1031" tooltip="Year 1 tax impact assuming Real Estate Professional status, 100% bonus depreciation on cost-segregated components, and straight-line on the remainder." />
             <div className="border border-gray-100 rounded-lg p-3 mb-3">
               <PLRow label="NOI" value={fmtDollar(d.NOI)} variant="noi" />
