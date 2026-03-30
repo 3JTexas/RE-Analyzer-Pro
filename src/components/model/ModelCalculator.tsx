@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import ReactDOM from 'react-dom'
 import { Download, Save, RotateCcw, FileText, X, Eye, Trash2 } from 'lucide-react'
-import { calculate, OM_DEFAULTS, fmtDollar, fmtNeg, fmtPct, fmtX, fmtDelta, fmtDeltaPct } from '../../lib/calc'
+import { calculate, calc1031, pmtCalcExport, OM_DEFAULTS, fmtDollar, fmtNeg, fmtPct, fmtX, fmtDelta, fmtDeltaPct } from '../../lib/calc'
 import type { ModelInputs, Method, Scenario, RentRollUnit } from '../../types'
 import {
   InputField, SectionHeader, MetricCard, PLRow, Alert, Toggle, DCRBar, Badge
@@ -1426,9 +1426,20 @@ export function ModelCalculator({
             )}
             {omScenario?.id !== currentScenarioId && inputs.is1031 && (
               <div className="mt-2 space-y-2">
-                <InputField label="1031 equity rolling in ($)" type="number" dollar value={inputs.equity1031} step={10000}
-                  tooltip="Net proceeds from your relinquished property rolling into this purchase. Reduces cash required at closing"
-                  badgeColor="amber" badge="from relinquished sale" onChange={e => set('equity1031', +e.target.value)} />
+                {(inputs.priorSalePrice ?? 0) > 0 ? (
+                  <div className="bg-gray-50 rounded-lg p-2.5">
+                    <label className="text-xs text-gray-500 mb-1 block">1031 equity rolling in ($)</label>
+                    <div className="text-sm font-medium text-gray-900">${Math.round(inputs.equity1031).toLocaleString()}</div>
+                    <button onClick={() => setActiveTab('tax')}
+                      className="text-[10px] text-blue-500 hover:text-blue-700 font-medium mt-1">
+                      Auto-calculated from 1031 analysis — Edit in Tax tab →
+                    </button>
+                  </div>
+                ) : (
+                  <InputField label="1031 equity rolling in ($)" type="number" dollar value={inputs.equity1031} step={10000}
+                    tooltip="Net proceeds from your relinquished property rolling into this purchase. Reduces cash required at closing"
+                    badgeColor="amber" badge="from relinquished sale" onChange={e => set('equity1031', +e.target.value)} />
+                )}
                 <InputField label="Est. carryover adjusted basis ($)" type="number" dollar value={inputs.basis1031} step={10000} min={0}
                   tooltip="In a 1031 exchange, your depreciation basis carries over from the relinquished property. Enter the remaining adjusted basis of the property you sold"
                   badgeColor="amber" badge="verify w/ CPA" onChange={e => set('basis1031', Math.max(0, +e.target.value))} />
@@ -1669,37 +1680,113 @@ export function ModelCalculator({
           <div>
             {/* ── Section A: 1031 Exchange Analysis ── */}
             {inputs.is1031 && (() => {
+              const ex = calc1031(inputs)
               const priorSale = inputs.priorSalePrice ?? 0
-              const priorBasisVal = inputs.priorBasis ?? 0
               const cgRateVal = inputs.cgRate ?? 20
-              const capGain = priorSale - priorBasisVal
-              const taxDeferred = capGain * (cgRateVal / 100)
-              const afterTaxSale = priorSale - taxDeferred
+              const reclaimRateVal = inputs.reclaimRate ?? 25
+              // For chart: after-tax proceeds if they sold without 1031
+              const afterTaxProceeds = ex ? ex.netProceeds - ex.totalTaxDeferred : 0
               return (
                 <>
                   <SectionHeader title="1031 Exchange Analysis" tooltip="A 1031 exchange lets you sell a property and defer all capital gains taxes by rolling the proceeds into a new like-kind property. The deferred tax stays invested — effectively an interest-free loan from the IRS that compounds over your hold period." />
-                  <div className="grid grid-cols-3 gap-2 mb-3">
+                  {/* Input fields */}
+                  <div className="grid grid-cols-2 gap-2 mb-1">
                     <InputField label="Prior sale price" type="number" dollar value={priorSale}
-                      onChange={e => set('priorSalePrice' as keyof ModelInputs, +e.target.value)} />
-                    <InputField label="Original basis" type="number" dollar value={priorBasisVal}
-                      onChange={e => set('priorBasis' as keyof ModelInputs, +e.target.value)} />
+                      onChange={e => {
+                        const v = +e.target.value
+                        setInputs(prev => {
+                          const next = { ...prev, priorSalePrice: v }
+                          // Auto-set equity1031 from net proceeds
+                          const ex2 = calc1031(next)
+                          if (ex2 && ex2.netProceeds > 0) next.equity1031 = Math.round(ex2.netProceeds)
+                          return next
+                        })
+                      }} />
+                    <InputField label="Selling costs %" type="number" value={inputs.priorSellingCostsPct ?? 5} step={0.5}
+                      onChange={e => set('priorSellingCostsPct' as keyof ModelInputs, +e.target.value)} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mb-1">
+                    <InputField label="Mortgage payoff" type="number" dollar value={inputs.priorMortgagePayoff ?? 0}
+                      onChange={e => {
+                        const v = +e.target.value
+                        setInputs(prev => {
+                          const next = { ...prev, priorMortgagePayoff: v }
+                          const ex2 = calc1031(next)
+                          if (ex2 && ex2.netProceeds > 0) next.equity1031 = Math.round(ex2.netProceeds)
+                          return next
+                        })
+                      }} />
                     <InputField label="Cap gains rate %" type="number" value={cgRateVal} step={1}
                       onChange={e => set('cgRate' as keyof ModelInputs, +e.target.value)} />
                   </div>
-                  {priorSale > 0 && priorBasisVal > 0 && (
+                  <div className="grid grid-cols-2 gap-2 mb-1">
+                    <InputField label="Original purchase price" type="number" dollar value={inputs.priorPurchasePrice ?? 0}
+                      onChange={e => set('priorPurchasePrice' as keyof ModelInputs, +e.target.value)} />
+                    <InputField label="Capital improvements" type="number" dollar value={inputs.priorImprovements ?? 0}
+                      onChange={e => set('priorImprovements' as keyof ModelInputs, +e.target.value)} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <InputField label="Depreciation taken" type="number" dollar value={inputs.priorDepreciation ?? 0}
+                      onChange={e => set('priorDepreciation' as keyof ModelInputs, +e.target.value)} />
+                    <InputField label="Recapture rate %" type="number" value={reclaimRateVal} step={1}
+                      onChange={e => set('reclaimRate' as keyof ModelInputs, +e.target.value)} />
+                  </div>
+
+                  {/* Calculated results */}
+                  {ex && priorSale > 0 && (
                     <>
                       <div className="border border-gray-100 rounded-lg p-3 mb-3">
-                        <PLRow label="Capital gain" value={fmtDollar(capGain)} variant="total" />
-                        <PLRow label={`Tax deferred (avoided @ ${cgRateVal}%)`} value={fmtDollar(taxDeferred)} variant="pos" indent />
-                        <PLRow label="Capital deployed via 1031" value={fmtDollar(priorSale)} variant="noi" />
+                        <PLRow label="Adjusted basis" value={fmtDollar(ex.adjustedBasis)} />
+                        <PLRow label="Capital gain" value={fmtDollar(ex.capitalGain)} variant="total" />
+                        <PLRow label={`Tax deferred — cap gains @ ${cgRateVal}%`} value={fmtDollar(ex.capGainsTax)} variant="pos" indent />
+                        <PLRow label={`Tax deferred — recapture @ ${reclaimRateVal}%`} value={fmtDollar(ex.recaptureTax)} variant="pos" indent />
+                        <div className="mt-1 pt-1 border-t border-green-200 bg-green-50 rounded px-2 py-1">
+                          <PLRow label="Total tax deferred" value={fmtDollar(ex.totalTaxDeferred)} variant="pos" />
+                        </div>
                       </div>
+
+                      {/* 1031 Proceeds */}
+                      <div className="border border-gray-100 rounded-lg p-3 mb-3">
+                        <PLRow label="Net proceeds available" value={fmtDollar(ex.netProceeds)} variant="noi" />
+                        <PLRow label={`Required down payment (${inputs.lev}% LTV)`} value={fmtDollar(ex.requiredDown)} indent />
+                        <PLRow label="Excess capital" value={ex.excessCapital > 0 ? fmtDollar(ex.excessCapital) : '$0'}
+                          variant={ex.excessCapital > 0 ? 'pos' : 'normal'} />
+                      </div>
+
+                      {/* Apply excess to down payment checkbox */}
+                      {ex.excessCapital > 0 && (() => {
+                        const checked = !!inputs.applyExcessToDown
+                        const newLoan = Math.max(0, inputs.price - ex.netProceeds)
+                        const newMp = pmtCalcExport(newLoan, inputs.ir, inputs.am)
+                        const newDs = newMp * 12
+                        const newDcr = newDs > 0 ? d.NOI / newDs : 0
+                        return (
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 mb-3">
+                            <label className="flex items-start gap-2 cursor-pointer">
+                              <input type="checkbox" checked={checked}
+                                onChange={e => set('applyExcessToDown' as keyof ModelInputs, e.target.checked as any)}
+                                className="mt-0.5 w-3.5 h-3.5 rounded border-blue-300" />
+                              <div>
+                                <p className="text-[11px] font-semibold text-blue-800">
+                                  Apply excess {fmtDollar(ex.excessCapital)} to additional down payment
+                                </p>
+                                <p className="text-[10px] text-blue-600 mt-0.5">
+                                  Reduces loan to {fmtDollar(newLoan)} · Payment {fmtDollar(newMp)}/mo · DCR {fmtX(newDcr)}
+                                </p>
+                              </div>
+                            </label>
+                          </div>
+                        )
+                      })()}
+
+                      {/* Bar chart */}
                       <div className="mb-4" style={{ height: 220 }}>
                         <Bar
                           data={{
                             labels: ['Sell & pay tax', '1031 Exchange'],
                             datasets: [{
-                              label: 'Capital deployed',
-                              data: [afterTaxSale, priorSale],
+                              label: 'Net proceeds',
+                              data: [Math.max(0, afterTaxProceeds), ex.netProceeds],
                               backgroundColor: ['#E24B4A', '#1D9E75'],
                               borderRadius: 4,
                             }],

@@ -55,9 +55,15 @@ export interface ModelInputs {
   rentRoll?: RentRollUnit[]
   useRentRoll?: boolean   // toggle: true = use rent roll, false = use blended avg rent
   // 1031 exchange analysis
-  priorSalePrice?: number   // what the relinquished property sold for
-  priorBasis?: number       // original purchase price of relinquished property
-  cgRate?: number           // long-term cap gains rate (default 20)
+  priorSalePrice?: number        // sale price of relinquished property
+  priorSellingCostsPct?: number  // selling costs % (default 5)
+  priorMortgagePayoff?: number   // remaining loan balance on prior property
+  priorPurchasePrice?: number    // original purchase price of prior property
+  priorImprovements?: number     // capital improvements made
+  priorDepreciation?: number     // total depreciation taken on prior property
+  cgRate?: number                // long-term cap gains rate % (default 20)
+  reclaimRate?: number           // depreciation recapture rate % (default 25)
+  applyExcessToDown?: boolean    // apply excess 1031 proceeds to additional down payment
 }
 
 // ── Computed outputs ──────────────────────────────────────────────────────

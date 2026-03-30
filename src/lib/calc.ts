@@ -32,6 +32,10 @@ export function fmtDeltaPct(v: number): string {
 }
 
 // ── Core math ─────────────────────────────────────────────────────────────
+export function pmtCalcExport(P: number, annRate: number, years: number): number {
+  return pmtCalc(P, annRate, years)
+}
+
 function pmtCalc(P: number, annRate: number, years: number): number {
   const r = annRate / 100 / 12
   const n = years * 12
@@ -50,6 +54,43 @@ function y1Interest(P: number, annRate: number, years: number): number {
     bal -= m - ip
   }
   return tot
+}
+
+// ── 1031 Exchange calculation ─────────────────────────────────────────────
+export interface Exchange1031 {
+  sellingCosts: number
+  adjustedBasis: number
+  capitalGain: number
+  recaptureTax: number
+  capGainsTax: number
+  totalTaxDeferred: number
+  netProceeds: number
+  requiredDown: number
+  excessCapital: number
+}
+
+export function calc1031(inputs: ModelInputs): Exchange1031 | null {
+  const sale = inputs.priorSalePrice ?? 0
+  if (sale <= 0) return null
+  const sellingCostsPct = inputs.priorSellingCostsPct ?? 5
+  const mortgage = inputs.priorMortgagePayoff ?? 0
+  const purchase = inputs.priorPurchasePrice ?? 0
+  const improvements = inputs.priorImprovements ?? 0
+  const depreciation = inputs.priorDepreciation ?? 0
+  const cgRate = (inputs.cgRate ?? 20) / 100
+  const reclaimRate = (inputs.reclaimRate ?? 25) / 100
+
+  const sellingCosts = sale * sellingCostsPct / 100
+  const adjustedBasis = purchase + improvements - depreciation
+  const capitalGain = Math.max(0, sale - sellingCosts - adjustedBasis)
+  const recaptureTax = depreciation * reclaimRate
+  const capGainsTax = capitalGain * cgRate
+  const totalTaxDeferred = capGainsTax + recaptureTax
+  const netProceeds = sale - sellingCosts - mortgage
+  const requiredDown = inputs.price * (1 - inputs.lev / 100)
+  const excessCapital = Math.max(0, netProceeds - requiredDown)
+
+  return { sellingCosts, adjustedBasis, capitalGain, recaptureTax, capGainsTax, totalTaxDeferred, netProceeds, requiredDown, excessCapital }
 }
 
 // ── Main calculation ──────────────────────────────────────────────────────
@@ -80,8 +121,13 @@ export function calculate(inputs: ModelInputs, useOM: boolean): ModelOutputs {
   const otherIncomeTotal = otherIncome.reduce((s, x) => s + (x.amount || 0), 0)
   const EGI = col + otherIncomeTotal
 
-  // Debt
-  const loan = price * lev / 100
+  // Debt — 1031 applyExcessToDown override
+  const ex1031 = is1031 ? calc1031(inputs) : null
+  const useExcess = is1031 && inputs.applyExcessToDown && ex1031 && ex1031.netProceeds > 0
+  const effectiveLoan = useExcess
+    ? Math.max(0, price - ex1031!.netProceeds)
+    : price * lev / 100
+  const loan = useExcess ? effectiveLoan : price * lev / 100
   const down = price - loan
   const lfee = loan * lf / 100
   const ccAmt = price * cc / 100
