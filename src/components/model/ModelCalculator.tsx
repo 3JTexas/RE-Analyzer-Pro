@@ -1692,6 +1692,7 @@ export function ModelCalculator({
                   {/* Input fields */}
                   <div className="grid grid-cols-2 gap-2 mb-1">
                     <InputField label="Prior sale price" type="number" dollar value={priorSale}
+                      tooltip="The gross sale price of the property you are selling (the relinquished property) to fund this 1031 exchange. This is the contract price before any deductions for commissions or closing costs."
                       onChange={e => {
                         const v = +e.target.value
                         setInputs(prev => {
@@ -1703,10 +1704,12 @@ export function ModelCalculator({
                         })
                       }} />
                     <InputField label="Selling costs %" type="number" value={inputs.priorSellingCostsPct ?? 5} step={0.5}
+                      tooltip="Total transaction costs on the sale — typically broker commission (3-6%) plus closing costs (1-2%). Applied to the prior sale price to determine net proceeds. Default 5%."
                       onChange={e => set('priorSellingCostsPct' as keyof ModelInputs, +e.target.value)} />
                   </div>
                   <div className="grid grid-cols-2 gap-2 mb-1">
                     <InputField label="Mortgage payoff" type="number" dollar value={inputs.priorMortgagePayoff ?? 0}
+                      tooltip="The outstanding loan balance you must pay off at closing on the relinquished property. Net 1031 proceeds = sale price minus selling costs minus this payoff amount."
                       onChange={e => {
                         const v = +e.target.value
                         setInputs(prev => {
@@ -1717,18 +1720,23 @@ export function ModelCalculator({
                         })
                       }} />
                     <InputField label="Cap gains rate %" type="number" value={cgRateVal} step={1}
+                      tooltip="Your federal long-term capital gains tax rate. Applies to gains on property held more than one year. Most investors pay 15% or 20% depending on income. The 1031 exchange defers this tax entirely."
                       onChange={e => set('cgRate' as keyof ModelInputs, +e.target.value)} />
                   </div>
                   <div className="grid grid-cols-2 gap-2 mb-1">
                     <InputField label="Original purchase price" type="number" dollar value={inputs.priorPurchasePrice ?? 0}
+                      tooltip="What you originally paid for the relinquished property. Combined with capital improvements and reduced by depreciation taken, this determines your adjusted basis and the size of your capital gain."
                       onChange={e => set('priorPurchasePrice' as keyof ModelInputs, +e.target.value)} />
                     <InputField label="Capital improvements" type="number" dollar value={inputs.priorImprovements ?? 0}
+                      tooltip="Money spent on permanent improvements to the relinquished property during your ownership (renovations, additions, major repairs). These add to your basis and reduce your taxable gain."
                       onChange={e => set('priorImprovements' as keyof ModelInputs, +e.target.value)} />
                   </div>
                   <div className="grid grid-cols-2 gap-2 mb-3">
                     <InputField label="Depreciation taken" type="number" dollar value={inputs.priorDepreciation ?? 0}
+                      tooltip="Total cumulative depreciation deductions claimed on the relinquished property across all years of ownership. This reduces your adjusted basis and is subject to 25% depreciation recapture tax upon sale — separate from capital gains tax."
                       onChange={e => set('priorDepreciation' as keyof ModelInputs, +e.target.value)} />
                     <InputField label="Recapture rate %" type="number" value={reclaimRateVal} step={1}
+                      tooltip="The IRS taxes depreciation recapture (the depreciation you previously deducted) at a maximum rate of 25% — separate from and in addition to capital gains tax. Default 25%."
                       onChange={e => set('reclaimRate' as keyof ModelInputs, +e.target.value)} />
                   </div>
 
