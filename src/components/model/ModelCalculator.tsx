@@ -1395,59 +1395,6 @@ export function ModelCalculator({
               </button>
             </div>
 
-            <SectionHeader title="Tax" />
-            <div className="grid grid-cols-2 gap-2">
-              <InputField label="Tax bracket (%)" type="number" value={inputs.brk} step={1}
-                tooltip="Your marginal federal income tax rate. Used to calculate tax savings from depreciation deductions"
-                badgeColor="amber" badge="yours" onChange={e => set('brk', +e.target.value)} />
-              <InputField label="Land % (non-depreciable)" type="number" value={inputs.land} step={1}
-                tooltip="Estimated % of purchase price allocated to land. Land is not depreciable. Typically 15-25% in Florida."
-                badgeColor="amber" badge="estimated" onChange={e => set('land', +e.target.value)} />
-              <InputField label="Cost seg % (5/7/15yr)" type="number" value={inputs.costSeg} step={1}
-                tooltip="% of depreciable building value reclassified to 5/7/15-year property via cost segregation study. Qualifies for 100% bonus depreciation. Typically 20-30% of building value."
-                badgeColor="amber" badge="estimated" onChange={e => set('costSeg', +e.target.value)} />
-            </div>
-            {omScenario?.id !== currentScenarioId && (
-            <div className="mt-3 flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-100">
-              <div>
-                <p className="text-xs font-medium text-gray-700">1031 Exchange — buyer tax structuring</p>
-                <p className="text-[10px] text-gray-400">Use carryover basis for depreciation</p>
-              </div>
-              <button
-                onClick={() => set('is1031', !inputs.is1031)}
-                className="flex items-center gap-1">
-                <div className={`w-8 h-4 rounded-full transition-colors flex items-center px-0.5
-                  ${inputs.is1031 ? 'bg-amber-400' : 'bg-gray-300'}`}>
-                  <div className={`w-3 h-3 bg-white rounded-full shadow transition-transform
-                    ${inputs.is1031 ? 'translate-x-4' : 'translate-x-0'}`} />
-                </div>
-              </button>
-            </div>
-            )}
-            {omScenario?.id !== currentScenarioId && inputs.is1031 && (
-              <div className="mt-2 space-y-2">
-                {(inputs.priorSalePrice ?? 0) > 0 ? (
-                  <div className="bg-gray-50 rounded-lg p-2.5">
-                    <label className="text-xs text-gray-500 mb-1 block">1031 equity rolling in ($)</label>
-                    <div className="text-sm font-medium text-gray-900">${Math.round(inputs.equity1031).toLocaleString()}</div>
-                    <button onClick={() => setActiveTab('tax')}
-                      className="text-[10px] text-blue-500 hover:text-blue-700 font-medium mt-1">
-                      Auto-calculated from 1031 analysis — Edit in Tax tab →
-                    </button>
-                  </div>
-                ) : (
-                  <InputField label="1031 equity rolling in ($)" type="number" dollar value={inputs.equity1031} step={10000}
-                    tooltip="Net proceeds from your relinquished property rolling into this purchase. Reduces cash required at closing"
-                    badgeColor="amber" badge="from relinquished sale" onChange={e => set('equity1031', +e.target.value)} />
-                )}
-                <InputField label="Est. carryover adjusted basis ($)" type="number" dollar value={inputs.basis1031} step={10000} min={0}
-                  tooltip="In a 1031 exchange, your depreciation basis carries over from the relinquished property. Enter the remaining adjusted basis of the property you sold"
-                  badgeColor="amber" badge="verify w/ CPA" onChange={e => set('basis1031', Math.max(0, +e.target.value))} />
-                <p className="text-[10px] text-amber-700 px-1">
-                  ⚠ Carryover basis determines bonus dep — NOT purchase price. Equity rolling in reduces cash to close. Verify both with CPA.
-                </p>
-              </div>
-            )}
           </div>
         )}
 
@@ -1476,6 +1423,12 @@ export function ModelCalculator({
               <MetricCard label="Equity required" value={fmtDollar(d.eq)} sub="down + lender fee" />
               <MetricCard label="Cash to close" value={fmtDollar(Math.max(0, d.eq + d.ccAmt - (inputs.equity1031 ?? 0)))} sub={inputs.is1031 && inputs.equity1031 > 0 ? `after $${Math.round(inputs.equity1031).toLocaleString()} 1031 equity` : inputs.cc > 0 ? `incl. ${inputs.cc}% closing costs` : "closing costs not set"} valueColor={inputs.equity1031 > d.eq + d.ccAmt ? "text-amber-600" : undefined} />
             </div>
+            {inputs.is1031 && inputs.equity1031 > 0 && (
+              <div className="flex justify-between items-center text-xs px-1 mb-3 text-amber-700 bg-amber-50 border border-amber-200 rounded-lg py-2 px-3">
+                <span className="font-medium">1031 equity applied</span>
+                <span className="font-semibold">{fmtDollar(inputs.equity1031)}</span>
+              </div>
+            )}
             <SectionHeader title="Income & expense statement" />
             <div className="border border-gray-100 rounded-lg p-3 mb-3">
               <PLRow label={method === 'om' ? 'Gross scheduled rent (GSR)' : 'Gross potential rent (GPR)'}
@@ -1678,6 +1631,58 @@ export function ModelCalculator({
         {/* ── TAX TAB ───────────────────────────────────────────────────── */}
         {activeTab === 'tax' && (
           <div>
+            {/* ── Tax Strategy Inputs ── */}
+            <SectionHeader title="Tax Strategy" />
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <div className="space-y-2">
+                <InputField label="Tax bracket (%)" type="number" value={inputs.brk} step={1}
+                  tooltip="Your marginal federal income tax rate. Used to calculate the value of depreciation deductions and paper losses against your ordinary income."
+                  badgeColor="amber" badge="yours" onChange={e => set('brk', +e.target.value)} />
+                <InputField label="Land % (non-depreciable)" type="number" value={inputs.land} step={1}
+                  tooltip="Estimated percentage of purchase price allocated to land, which is not depreciable. Typically 15-30% for urban multifamily. Higher land % = smaller depreciable basis."
+                  badgeColor="amber" badge="estimated" onChange={e => set('land', +e.target.value)} />
+                <InputField label="Cost seg % (5/7/15yr)" type="number" value={inputs.costSeg} step={1}
+                  tooltip="Percentage of the depreciable building value that qualifies for accelerated 5/7/15-year depreciation via cost segregation study. These assets receive 100% bonus depreciation in Year 1."
+                  badgeColor="amber" badge="estimated" onChange={e => set('costSeg', +e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                {/* 1031 toggle */}
+                <div className="bg-gray-50 rounded-lg p-2.5">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-gray-500 flex items-center gap-1">1031 Exchange</label>
+                    <button
+                      onClick={() => set('is1031', !inputs.is1031)}
+                      className="flex items-center gap-1">
+                      <div className={`w-8 h-4 rounded-full transition-colors flex items-center px-0.5
+                        ${inputs.is1031 ? 'bg-amber-400' : 'bg-gray-300'}`}>
+                        <div className={`w-3 h-3 bg-white rounded-full shadow transition-transform
+                          ${inputs.is1031 ? 'translate-x-4' : 'translate-x-0'}`} />
+                      </div>
+                    </button>
+                  </div>
+                  <p className="text-[9px] text-gray-400">Use carryover basis for depreciation</p>
+                </div>
+                {inputs.is1031 && (
+                  <>
+                    <InputField label="Carryover basis ($)" type="number" dollar value={inputs.basis1031} step={10000} min={0}
+                      tooltip="Your adjusted tax basis in the relinquished property being carried over. This replaces the normal depreciation basis on the new property — lower carryover basis = smaller depreciation deductions going forward."
+                      badgeColor="amber" badge="verify w/ CPA" onChange={e => set('basis1031', Math.max(0, +e.target.value))} />
+                    {(inputs.priorSalePrice ?? 0) > 0 ? (
+                      <div className="bg-gray-50 rounded-lg p-2.5">
+                        <label className="text-xs text-gray-500 mb-1 block">1031 equity applied</label>
+                        <div className="text-sm font-medium text-gray-900">${Math.round(inputs.equity1031).toLocaleString()}</div>
+                        <p className="text-[9px] text-gray-400 mt-0.5">Auto-calculated from 1031 analysis below</p>
+                      </div>
+                    ) : (
+                      <InputField label="1031 equity applied ($)" type="number" dollar value={inputs.equity1031} step={10000}
+                        tooltip="Net proceeds from your prior sale rolling into this deal. Reduces your required cash to close. Auto-calculated from the 1031 analysis below when prior sale price is entered."
+                        badgeColor="amber" badge="from relinquished sale" onChange={e => set('equity1031', +e.target.value)} />
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
             {/* ── Section A: 1031 Exchange Analysis ── */}
             {inputs.is1031 && (() => {
               const ex = calc1031(inputs)
