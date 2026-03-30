@@ -190,6 +190,13 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
   const showRentRoll = exportTab === 'full'
   const showCompare  = exportTab === 'full'
 
+  // Watermark component — property photo centered at 30% opacity on every non-cover page
+  const Watermark = () => propertyImageUrl ? (
+    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center' }} fixed>
+      <Image src={propertyImageUrl} style={{ width: 350, height: 350, objectFit: 'contain', opacity: 0.08 }} />
+    </View>
+  ) : null
+
   // Flags computation (for flags page)
   const computeFlagsForPdf = () => {
     interface PdfFlag { severity: 'red' | 'amber' | 'info'; title: string; detail: string; omVal: string; benchmark: string; noImpact?: string }
@@ -316,6 +323,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
 
       {/* ── P&L + Tax ──────────────────────────────────────────────────── */}
       {(showPL || showTax) && <Page size="LETTER" style={s.page}>
+        <Watermark />
         <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} logoSrc={logoSrc} tabLabel={exportTab === 'pl' ? 'P&L' : exportTab === 'tax' ? 'Tax' : 'P&L + Tax'} />
 
         {showPL && <><SectionHdr title="Key metrics" />
@@ -573,6 +581,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
       {/* ── Rent roll page ──────────────────────────────────────────────── */}
       {showRentRoll && inputs.useRentRoll && (inputs.rentRoll ?? []).length > 0 && (
         <Page size="LETTER" style={s.page}>
+          <Watermark />
           <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} logoSrc={logoSrc} tabLabel="Rent Roll" />
           <SectionHdr title="Rent roll" />
           <View style={s.table}>
@@ -613,6 +622,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
       {/* ── Side by side: actual scenarios ──────────────────────────────── */}
       {showCompare && allCols.length > 1 && (
       <Page size="LETTER" style={s.page}>
+        <Watermark />
         <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} logoSrc={logoSrc} tabLabel="Scenario Comparison" />
         <SectionHdr title="Side-by-side: scenario comparison" />
         <View style={s.table}>
@@ -705,6 +715,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
         const { flags, stressed } = computeFlagsForPdf()
         return (
           <Page size="LETTER" style={s.page}>
+            <Watermark />
             <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} logoSrc={logoSrc} tabLabel="Flags" />
             <SectionHdr title="Underwriting flags" />
             {flags.length === 0 ? (
@@ -765,6 +776,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
       {/* ── OM As-Presented page ────────────────────────────────────── */}
       {showOM && (
         <Page size="LETTER" style={s.page}>
+          <Watermark />
           <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} logoSrc={logoSrc} tabLabel="OM As-Presented" />
           <SectionHdr title="OM As-Presented — broker figures" />
           <View style={s.table}>
@@ -816,6 +828,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
       {/* ── Inputs summary page ────────────────────────────────────── */}
       {showInputs && (
         <Page size="LETTER" style={s.page}>
+          <Watermark />
           <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} logoSrc={logoSrc} tabLabel="Inputs" />
           <View style={s.twoCol}>
             <View style={s.col}>

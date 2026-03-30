@@ -1,19 +1,39 @@
 import { useState, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Building2, Plus, Trash2, ChevronRight, GripVertical } from 'lucide-react'
+import { Building2, Plus, Trash2, ChevronRight, GripVertical, Camera, Loader2 } from 'lucide-react'
 import { useProperties, useScenario } from '../hooks/useScenario'
+import { supabase } from '../lib/supabase'
 import { Spinner } from '../components/ui'
 import { OmSetupFlow } from '../components/OMSetupFlow'
 import type { ModelInputs } from '../types'
 import type { OmConfirmMeta } from '../components/OMSetupFlow'
 
 export function PropertiesPage() {
-  const { properties, loading, createProperty, deleteProperty, reorderProperties } = useProperties()
+  const { properties, loading, createProperty, deleteProperty, reorderProperties, refresh } = useProperties()
   const dragIdx = useRef<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
   const { createScenario } = useScenario()
   const navigate = useNavigate()
   const [showSetup, setShowSetup] = useState(false)
+  const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
+  const photoTargetId = useRef<string | null>(null)
+
+  const handlePhotoUpload = async (file: File, propertyId: string) => {
+    setUploadingPhotoId(propertyId)
+    try {
+      const ext = file.name.split('.').pop() ?? 'jpg'
+      const path = `${propertyId}.${ext}`
+      const { error } = await supabase.storage.from('property-images').upload(path, file, { upsert: true })
+      if (error) throw error
+      const { data } = supabase.storage.from('property-images').getPublicUrl(path)
+      await supabase.from('properties').update({ property_image_url: data.publicUrl }).eq('id', propertyId)
+      refresh()
+    } catch (e: any) {
+      console.error('Photo upload failed:', e.message)
+    }
+    setUploadingPhotoId(null)
+  }
 
   const handleConfirm = async (inputs: ModelInputs, meta: OmConfirmMeta) => {
     setShowSetup(false)
@@ -54,6 +74,9 @@ export function PropertiesPage() {
         </div>
       )}
 
+      <input ref={photoInputRef} type="file" accept="image/*" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f && photoTargetId.current) handlePhotoUpload(f, photoTargetId.current); e.target.value = '' }} />
+
       {!showSetup && (
         <div className="flex-1 overflow-y-auto px-4 pt-5 pb-6 max-w-3xl mx-auto w-full">
           {properties.length === 0 ? (
@@ -93,9 +116,23 @@ export function PropertiesPage() {
                     </div>
                     <Link to={`/property/${p.id}`}
                       className="flex items-center gap-4 px-3 py-3.5 flex-1 min-w-0">
-                      <div className="w-12 h-12 bg-[#f8f7f4] border border-gray-200 rounded-sm flex items-center justify-center flex-shrink-0">
-                        <Building2 size={18} className="text-gray-300" />
-                      </div>
+                      <button
+                        onClick={e => { e.preventDefault(); e.stopPropagation(); photoTargetId.current = p.id; photoInputRef.current?.click() }}
+                        className="w-12 h-12 bg-[#f8f7f4] border border-gray-200 rounded-sm flex items-center justify-center flex-shrink-0 overflow-hidden hover:border-[#c9a84c] transition-colors group/photo relative"
+                        title="Click to add/change photo">
+                        {uploadingPhotoId === p.id ? (
+                          <Loader2 size={16} className="animate-spin text-gray-400" />
+                        ) : p.property_image_url ? (
+                          <>
+                            <img src={p.property_image_url} alt="" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/0 group-hover/photo:bg-black/30 transition-colors flex items-center justify-center">
+                              <Camera size={14} className="text-white opacity-0 group-hover/photo:opacity-100 transition-opacity" />
+                            </div>
+                          </>
+                        ) : (
+                          <Camera size={16} className="text-gray-300 group-hover/photo:text-[#c9a84c] transition-colors" />
+                        )}
+                      </button>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-gray-900 truncate">{p.name}</div>
                         {p.address && <div className="text-xs text-gray-400 mt-0.5 truncate">{p.address}</div>}

@@ -143,6 +143,7 @@ export interface Property {
   notes: string | null
   display_order: number
   crexi_url: string | null
+  property_image_url: string | null
   created_at: string
   updated_at: string
   scenarios?: Scenario[]

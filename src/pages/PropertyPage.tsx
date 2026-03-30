@@ -82,7 +82,7 @@ export function PropertyPage() {
       if (uploadErr) throw uploadErr
       const { data } = supabase.storage.from('property-images').getPublicUrl(path)
       await supabase.from('properties').update({ property_image_url: data.publicUrl }).eq('id', id)
-      setProperty(prev => prev ? { ...prev, property_image_url: data.publicUrl } as any : prev)
+      setProperty(prev => prev ? { ...prev, property_image_url: data.publicUrl } : prev)
     } catch (e: any) {
       console.error('Photo upload failed:', e.message)
     }
@@ -102,8 +102,9 @@ export function PropertyPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 px-4 py-3 bg-white border-b border-gray-200">
-        <Link to="/" className="p-1 -ml-1 text-gray-400 hover:text-[#1a1a2e] transition-colors">
+        <Link to="/" className="flex items-center gap-0.5 -ml-1 text-gray-400 hover:text-[#1a1a2e] transition-colors">
           <ChevronLeft size={20} />
+          <span className="text-xs">Properties</span>
         </Link>
         <div className="flex-1 min-w-0">
           <h1 className="text-base font-semibold text-gray-900 truncate">{property?.name}</h1>

@@ -55,12 +55,10 @@ export function ScenarioPage() {
       <div className="flex items-center gap-2 px-3 py-2.5 bg-white border-b border-gray-200 flex-shrink-0">
         <Link
           to={scenario ? `/property/${scenario.property_id}` : '/'}
-          className="p-1 -ml-1 text-gray-400 hover:text-[#1a1a2e] transition-colors">
+          className="flex items-center gap-0.5 -ml-1 text-gray-400 hover:text-[#1a1a2e] transition-colors">
           <ChevronLeft size={20} />
+          <span className="text-xs">Scenarios</span>
         </Link>
-        <span className="text-xs text-gray-400">
-          {scenario ? 'Edit scenario' : 'Scenario not found'}
-        </span>
       </div>
 
       {scenario && (
