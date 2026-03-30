@@ -21,7 +21,7 @@ const C = {
 
 // ── Styles ────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  page: { fontFamily: 'Helvetica', fontSize: 9, color: C.text, padding: '0.5in' },
+  page: { fontFamily: 'Helvetica', fontSize: 9, color: C.text, paddingTop: '0.6in', paddingBottom: '0.5in', paddingHorizontal: '0.5in' },
   coverPage: { fontFamily: 'Helvetica', fontSize: 9, backgroundColor: '#FFFFFF', padding: '0.6in' },
 
   coverLogo: { width: 180, marginBottom: 16 },
@@ -39,7 +39,7 @@ const s = StyleSheet.create({
   coverFooter: { fontSize: 8.5, color: C.textLight, marginTop: 12 },
   coverConfidential: { fontSize: 7.5, color: C.textMuted, marginTop: 6 },
 
-  pageHeader: { borderBottomWidth: 1.5, borderBottomColor: C.accent, marginBottom: 14, paddingBottom: 6,
+  pageHeader: { borderBottomWidth: 1.5, borderBottomColor: C.accent, paddingBottom: 6,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   pageHeaderLeft:  { fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: C.navy },
   pageHeaderRight: { fontSize: 7.5, color: C.textLight },
@@ -100,15 +100,17 @@ interface HdrProps {
 
 function PageHdr({ propertyName, address, scenarioName, method, date, logoSrc, tabLabel }: HdrProps) {
   return (
-    <View style={s.pageHeader} fixed>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
-        {logoSrc && <Image src={logoSrc} style={{ width: 80, marginBottom: -2 }} />}
-        <View>
-          <Text style={s.pageHeaderLeft}>{propertyName.toUpperCase()}  ·  {address}</Text>
-          {tabLabel && <Text style={{ fontSize: 7, color: C.accent, fontFamily: 'Helvetica-Bold', marginTop: 1 }}>{tabLabel}</Text>}
+    <View style={{ marginBottom: 14 }} fixed>
+      {logoSrc && (
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <Image src={logoSrc} style={{ width: 100 }} />
+          {tabLabel && <Text style={{ fontSize: 10, color: C.accent, fontFamily: 'Helvetica-Bold' }}>{tabLabel}</Text>}
         </View>
+      )}
+      <View style={s.pageHeader}>
+        <Text style={s.pageHeaderLeft}>{propertyName.toUpperCase()}  ·  {address}</Text>
+        <Text style={s.pageHeaderRight}>{scenarioName} · {method} · {date}</Text>
       </View>
-      <Text style={s.pageHeaderRight}>{scenarioName} · {method} · {date}</Text>
     </View>
   )
 }
