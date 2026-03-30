@@ -1,13 +1,13 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react'
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import ReactDOM from 'react-dom'
-import { Download, Save, RotateCcw, FileText, X, Eye, Trash2 } from 'lucide-react'
+import { Download, Save, RotateCcw, FileText, X, Eye, Trash2, ChevronDown } from 'lucide-react'
 import { calculate, calc1031, pmtCalcExport, OM_DEFAULTS, fmtDollar, fmtNeg, fmtPct, fmtX, fmtDelta, fmtDeltaPct } from '../../lib/calc'
 import type { ModelInputs, Method, Scenario, RentRollUnit } from '../../types'
 import {
   InputField, SectionHeader, MetricCard, PLRow, Alert, Toggle, DCRBar, Badge
 } from '../ui'
 import { generatePDF, ReportDocument, fetchImageAsBase64 } from '../pdf/PdfReport'
-import type { ScenarioCol, ReportProps } from '../pdf/PdfReport'
+import type { ScenarioCol, ReportProps, ExportTab } from '../pdf/PdfReport'
 import { PDFViewer, BlobProvider } from '@react-pdf/renderer'
 import { loadCompareState, saveCompareState } from '../../lib/uiState'
 import { LOIModal } from '../loi/LOIModal'
@@ -777,6 +777,9 @@ export function ModelCalculator({
   const [loiData, setLoiData] = useState<LOIData | null>(null)
   const [showPdfPreview, setShowPdfPreview] = useState(false)
   const [pdfPreviewProps, setPdfPreviewProps] = useState<ReportProps | null>(null)
+  const [showPdfMenu, setShowPdfMenu] = useState(false)
+  const [exportTab, setExportTab] = useState<ExportTab>('full')
+  const pdfMenuRef = useRef<HTMLDivElement>(null)
 
   // Compare tab: which two scenarios to diff
   const [compareA, setCompareA] = useState<string>(currentScenarioId ?? 'current')
@@ -798,6 +801,16 @@ export function ModelCalculator({
       if (extra.length) setCompareCols(extra)
     })
   }, [propertyId])
+
+  // Close PDF menu on outside click
+  useEffect(() => {
+    if (!showPdfMenu) return
+    const handler = (e: MouseEvent) => {
+      if (pdfMenuRef.current && !pdfMenuRef.current.contains(e.target as Node)) setShowPdfMenu(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showPdfMenu])
 
   const set = useCallback((key: keyof ModelInputs, val: number | boolean) => {
     setInputs(prev => ({ ...prev, [key]: val }))
@@ -901,7 +914,7 @@ export function ModelCalculator({
     : { type: 'green' as const, msg: `DCR OK: ${fmtX(d.dcr)} — Clears 1.20× minimum. Cushion: ${fmtDollar(d.NOI - d.ds)}/yr.` }
 
   const handleSave = async () => { if (onSave) await onSave(name, method, inputs) }
-  const handlePDF = async () => {
+  const handlePDF = async (tab: ExportTab = 'full') => {
     // Build cols in Compare tab order: A, B, then any extra C/D cols
     const compareOrder = [compareA, compareB, ...compareCols]
     const cols: ScenarioCol[] = compareOrder
@@ -916,6 +929,7 @@ export function ModelCalculator({
       const b64 = await fetchImageAsBase64(propertyImageUrl)
       if (b64) imageData = b64
     }
+    setExportTab(tab)
     setPdfPreviewProps({
       inputs,
       method: effectiveMethod,
@@ -926,6 +940,7 @@ export function ModelCalculator({
       scenarioName: name,
       scenarioCols: cols,
       propertyImageUrl: imageData,
+      exportTab: tab,
     })
     setShowPdfPreview(true)
   }
@@ -1016,12 +1031,32 @@ export function ModelCalculator({
             {saving ? 'Saving…' : 'Save'}
           </button>
         )}
-        <button onClick={handlePDF}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-200
-            text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
-          <Eye size={12} />
-          PDF
-        </button>
+        <div className="relative" ref={pdfMenuRef}>
+          <button onClick={() => setShowPdfMenu(prev => !prev)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-200
+              text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
+            <Eye size={12} />
+            PDF
+            <ChevronDown size={10} />
+          </button>
+          {showPdfMenu && (
+            <div className="absolute top-full left-0 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1 overflow-hidden">
+              {([
+                ['full', 'Full Report'],
+                ['pl', 'P&L'],
+                ['tax', 'Tax'],
+                ['flags', 'Flags'],
+                ['om', 'OM As-Presented'],
+                ['inputs', 'Inputs'],
+              ] as [ExportTab, string][]).map(([tab, label]) => (
+                <button key={tab} onClick={() => { setShowPdfMenu(false); handlePDF(tab) }}
+                  className="w-full text-left px-3 py-1.5 text-xs text-[#1a1a2e] hover:bg-[#c9a84c]/15 hover:text-[#1a1a2e] transition-colors">
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {!isDefaultOM && (
           <button onClick={openLOI}
             className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-500 border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-500 whitespace-nowrap">
@@ -2082,8 +2117,8 @@ export function ModelCalculator({
       )}
       {showPdfPreview && pdfPreviewProps && (() => {
         const safeProp = (pdfPreviewProps.propertyName || 'Property').replace(/[^a-zA-Z0-9]/g, '_')
-        const safeSc = (pdfPreviewProps.scenarioName || 'Scenario').replace(/[^a-zA-Z0-9]/g, '_')
-        const fileName = `${safeProp}_${safeSc}_Analysis.pdf`
+        const tabSuffix: Record<ExportTab, string> = { full: 'Full_Report', pl: 'PL', tax: 'Tax', flags: 'Flags', om: 'OM', inputs: 'Inputs' }
+        const fileName = `${safeProp}_${tabSuffix[exportTab]}.pdf`
         return (
           <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center">
             <div className="bg-white w-full max-w-4xl mx-4 rounded-xl shadow-2xl flex flex-col" style={{ height: '90vh' }}>

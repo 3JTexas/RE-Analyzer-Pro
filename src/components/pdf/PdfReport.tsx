@@ -132,6 +132,8 @@ export interface ScenarioCol {
   method: Method
 }
 
+export type ExportTab = 'full' | 'pl' | 'tax' | 'flags' | 'om' | 'inputs'
+
 interface ReportProps {
   inputs: ModelInputs
   method: Method
@@ -142,6 +144,7 @@ interface ReportProps {
   scenarioName: string
   scenarioCols?: ScenarioCol[]
   propertyImageUrl?: string
+  exportTab?: ExportTab
 }
 
 function deriveMethodLabel(inputs: ModelInputs, method: Method, label?: string): string {
@@ -154,7 +157,7 @@ function deriveMethodLabel(inputs: ModelInputs, method: Method, label?: string):
 
 export { type ReportProps }
 
-export function ReportDocument({ inputs, method, propertyName, address, units, yearBuilt, scenarioName, scenarioCols = [], propertyImageUrl }: ReportProps) {
+export function ReportDocument({ inputs, method, propertyName, address, units, yearBuilt, scenarioName, scenarioCols = [], propertyImageUrl, exportTab = 'full' }: ReportProps) {
   const isOM = method === 'om'
   const d    = calculate(inputs, isOM)
   const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
@@ -168,11 +171,72 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
   // Resolve logo path — works for both dev and production builds
   const logoSrc = `${import.meta.env.BASE_URL}Chai_Logo.jpeg`
 
+  const showCover = exportTab === 'full'
+  const showPL    = exportTab === 'full' || exportTab === 'pl'
+  const showTax   = exportTab === 'full' || exportTab === 'tax'
+  const showFlags = exportTab === 'full' || exportTab === 'flags'
+  const showOM    = exportTab === 'full' || exportTab === 'om'
+  const showInputs = exportTab === 'full' || exportTab === 'inputs'
+  const showRentRoll = exportTab === 'full'
+  const showCompare  = exportTab === 'full'
+
+  // Flags computation (for flags page)
+  const computeFlagsForPdf = () => {
+    interface PdfFlag { severity: 'red' | 'amber' | 'info'; title: string; detail: string; omVal: string; benchmark: string; noImpact?: string }
+    const flags: PdfFlag[] = []
+    const age = yearBuilt ? new Date().getFullYear() - yearBuilt : null
+    if (inputs.price > 0 && inputs.tax > 0) {
+      const effectiveRate = (inputs.tax / inputs.price) * 100
+      if (effectiveRate < 1.8) {
+        const projectedTax = inputs.price * 0.020
+        const delta = projectedTax - inputs.tax
+        flags.push({ severity: effectiveRate < 1.2 ? 'red' : 'amber', title: 'Property taxes likely understated (pre-sale assessment)',
+          detail: `Effective tax rate is ${effectiveRate.toFixed(2)}% of purchase price. Post-purchase taxes will be ~$${Math.round(projectedTax).toLocaleString()}/yr.`,
+          omVal: `$${inputs.tax.toLocaleString()} (${effectiveRate.toFixed(2)}% of price)`, benchmark: `~$${Math.round(projectedTax).toLocaleString()} (~2.0%)`, noImpact: `($${Math.round(delta).toLocaleString()}) NOI` })
+      }
+    }
+    if (inputs.tu > 0 && inputs.ou > 0 && inputs.ou < inputs.tu) {
+      const physVac = ((inputs.tu - inputs.ou) / inputs.tu) * 100
+      if (physVac > inputs.vp) {
+        const gsr = inputs.rent * inputs.tu * 12
+        flags.push({ severity: 'red', title: 'Physical vacancy exceeds stated vacancy rate',
+          detail: `${inputs.tu - inputs.ou} of ${inputs.tu} units vacant (${physVac.toFixed(1)}%).`,
+          omVal: `${inputs.vp}% vacancy`, benchmark: `${physVac.toFixed(1)}% physical`, noImpact: `($${Math.round(gsr * (physVac - inputs.vp) / 100).toLocaleString()}) EGI` })
+      }
+    }
+    if (inputs.tu > 0 && inputs.ins > 0) {
+      const bm = age && age > 60 ? 3000 : age && age > 40 ? 2500 : 2000
+      if (inputs.ins < bm) flags.push({ severity: inputs.ins < 2000 ? 'red' : 'amber', title: 'Insurance may be understated',
+        detail: `$${inputs.ins.toLocaleString()}/door vs $${bm.toLocaleString()}+ benchmark.`,
+        omVal: `$${inputs.ins.toLocaleString()}/door`, benchmark: `$${bm.toLocaleString()}+/door`, noImpact: `($${((bm - inputs.ins) * inputs.tu).toLocaleString()}) NOI` })
+    }
+    if (inputs.tu > 0 && inputs.rm >= 0) {
+      const bm = age && age > 60 ? 900 : age && age > 40 ? 700 : 500
+      if (inputs.rm < bm) flags.push({ severity: inputs.rm < bm * 0.6 ? 'red' : 'amber', title: `R&M understated for ${age ? age + '-year-old' : 'older'} building`,
+        detail: `$${inputs.rm}/unit/yr vs $${bm}+ benchmark.`,
+        omVal: `$${inputs.rm}/unit/yr`, benchmark: `$${bm}+/unit/yr`, noImpact: `($${((bm - inputs.rm) * inputs.tu).toLocaleString()}) NOI` })
+    }
+    if (inputs.tu > 0 && inputs.res >= 0) {
+      const bm = age && age > 60 ? 700 : age && age > 40 ? 500 : 350
+      if (inputs.res < bm) flags.push({ severity: inputs.res < bm * 0.5 ? 'red' : 'amber', title: `Reserves understated for ${age ? age + '-year-old' : 'older'} building`,
+        detail: `$${inputs.res}/unit/yr vs $${bm}+ benchmark.`,
+        omVal: `$${inputs.res}/unit/yr`, benchmark: `$${bm}+/unit/yr`, noImpact: `($${((bm - inputs.res) * inputs.tu).toLocaleString()}) NOI` })
+    }
+    // Stressed scenario
+    const projTax = inputs.price > 0 ? inputs.price * 0.020 : inputs.tax
+    const insB = age && age > 60 ? 3000 : age && age > 40 ? 2500 : 2000
+    const rmB = age && age > 60 ? 900 : age && age > 40 ? 700 : 500
+    const resB = age && age > 60 ? 700 : age && age > 40 ? 500 : 350
+    const stressedInputs = { ...inputs, tax: Math.max(inputs.tax, projTax), ins: Math.max(inputs.ins, insB), rm: Math.max(inputs.rm, rmB), res: Math.max(inputs.res, resB) }
+    const ds = calculate(stressedInputs, true)
+    return { flags, stressed: ds }
+  }
+
   return (
     <Document title={`${propertyName} — ${scenarioName} — Investment Analysis`}>
 
       {/* ── Cover ──────────────────────────────────────────────────────── */}
-      <Page size="LETTER" style={s.coverPage}>
+      {showCover && <Page size="LETTER" style={s.coverPage}>
         {/* Logo */}
         <Image src={logoSrc} style={s.coverLogo} />
 
@@ -238,13 +302,13 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
 
         <Text style={s.coverFooter}>Scenario: {scenarioName}  ·  {methodLabel}  ·  Prepared {date}</Text>
         <Text style={s.coverConfidential}>CONFIDENTIAL — For Discussion Purposes Only</Text>
-      </Page>
+      </Page>}
 
       {/* ── P&L + Tax ──────────────────────────────────────────────────── */}
-      <Page size="LETTER" style={s.page}>
+      {(showPL || showTax) && <Page size="LETTER" style={s.page}>
         <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} />
 
-        <SectionHdr title="Key metrics" />
+        {showPL && <><SectionHdr title="Key metrics" />
         <View style={s.metricsRow}>
           <View style={s.metricCard}>
             <Text style={s.metricLabel}>NOI</Text>
@@ -298,10 +362,10 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
               ? `DCR CAUTION: ${fmtX(d.dcr)} — Below 1.20× minimum. NOI must reach ${fmtDollar(d.ds * 1.2)}`
               : `DCR OK: ${fmtX(d.dcr)} — Clears 1.20× minimum. Cushion: ${fmtDollar(d.NOI - d.ds)}/yr`}
           </Text>
-        </View>
+        </View></>}
 
         <View style={s.twoCol}>
-          <View style={s.col}>
+          {showPL && <View style={s.col}>
             <SectionHdr title={`${isOM ? 'OM method' : 'Physical occupancy'} — income & expense`} />
             <PLRowComp label={isOM ? 'Gross scheduled rent' : 'Gross potential rent'} value={fmtDollar(d.GSR)} variant="pos" />
             <PLRowComp
@@ -324,9 +388,9 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
             <PLRowComp label="Net operating income" value={fmtDollar(d.NOI)} variant="noi" />
             <PLRowComp label="Annual debt service" value={`(${fmtDollar(d.ds)})`} variant="neg" indent />
             <PLRowComp label="Pre-tax cash flow" value={fmtNeg(d.CF)} variant="total" />
-          </View>
+          </View>}
 
-          <View style={s.col}>
+          {showTax && <View style={s.col}>
             <SectionHdr title="Tax analysis — REP · 100% bonus dep · 1031" />
             <PLRowComp label="NOI" value={fmtDollar(d.NOI)} variant="noi" />
             <PLRowComp label="Less: Y1 mortgage interest" value={`(${fmtDollar(d.int1)})`} variant="neg" indent />
@@ -366,11 +430,11 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
             <PLRowComp label="Lender origination fee" value={d.lfee > 0 ? `(${fmtDollar(d.lfee)})` : '$0'} variant="neg" indent />
             {d.ccAmt > 0 && <PLRowComp label={`Closing costs (${inputs.cc}%)`} value={`(${fmtDollar(d.ccAmt)})`} variant="neg" indent />}
             <PLRowComp label="Est. total cash to close" value={fmtDollar(d.eq + d.ccAmt)} variant="total" />
-          </View>
+          </View>}
         </View>
 
         {/* ── Tax Benefit — Dynamic Table ─────────────────────────── */}
-        {d.brk > 0 && (inputs.costSeg > 0 || inputs.land < 100) && (() => {
+        {showTax && d.brk > 0 && (inputs.costSeg > 0 || inputs.land < 100) && (() => {
           const bracket = d.brk / 100
           const bonusDeprBase = d.deprBase * (inputs.costSeg / 100)
           const slDeprBase = d.deprBase - bonusDeprBase
@@ -494,10 +558,10 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
             </>
           )
         })()}
-      </Page>
+      </Page>}
 
       {/* ── Rent roll page ──────────────────────────────────────────────── */}
-      {inputs.useRentRoll && (inputs.rentRoll ?? []).length > 0 && (
+      {showRentRoll && inputs.useRentRoll && (inputs.rentRoll ?? []).length > 0 && (
         <Page size="LETTER" style={s.page}>
           <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} />
           <SectionHdr title="Rent roll" />
@@ -537,7 +601,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
       )}
 
       {/* ── Side by side: actual scenarios ──────────────────────────────── */}
-      {allCols.length > 1 && (
+      {showCompare && allCols.length > 1 && (
       <Page size="LETTER" style={s.page}>
         <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} />
         <SectionHdr title="Side-by-side: scenario comparison" />
@@ -624,6 +688,218 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
           Property tax estimate reflects post-sale Florida reassessment — verify with county Property Appraiser.
         </Text>
       </Page>
+      )}
+
+      {/* ── Flags page ─────────────────────────────────────────────────── */}
+      {showFlags && (() => {
+        const { flags, stressed } = computeFlagsForPdf()
+        return (
+          <Page size="LETTER" style={s.page}>
+            <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} />
+            <SectionHdr title="Underwriting flags" />
+            {flags.length === 0 ? (
+              <View style={[s.alertGreen, { marginTop: 8 }]}>
+                <Text style={s.alertText}>No flags detected — all inputs within expected benchmarks</Text>
+              </View>
+            ) : (
+              <>
+                <View style={[s.alertRed, { marginBottom: 8 }]}>
+                  <Text style={s.alertText}>{flags.filter(f => f.severity === 'red').length} high-risk · {flags.filter(f => f.severity === 'amber').length} watch items</Text>
+                </View>
+                {flags.map((flag, i) => (
+                  <View key={i} style={[flag.severity === 'red' ? s.alertRed : flag.severity === 'amber' ? s.alertAmber : s.alertGreen, { marginBottom: 6 }]}>
+                    <Text style={[s.alertText, { marginBottom: 3 }]}>{flag.title}</Text>
+                    <Text style={{ fontSize: 8, color: C.textLight, marginBottom: 4 }}>{flag.detail}</Text>
+                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 7, color: C.textMuted }}>OM figure</Text>
+                        <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold' }}>{flag.omVal}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 7, color: C.textMuted }}>Benchmark</Text>
+                        <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold' }}>{flag.benchmark}</Text>
+                      </View>
+                    </View>
+                    {flag.noImpact && <Text style={{ fontSize: 8, color: C.red, fontFamily: 'Helvetica-Bold', marginTop: 3 }}>NOI impact: {flag.noImpact}</Text>}
+                  </View>
+                ))}
+                <SectionHdr title="Stressed scenario — benchmarks applied" />
+                <View style={s.metricsRow}>
+                  <View style={s.metricCard}>
+                    <Text style={s.metricLabel}>Stressed NOI</Text>
+                    <Text style={[s.metricValue, { color: C.red }]}>{fmtDollar(stressed.NOI)}</Text>
+                    <Text style={s.metricSub}>{fmtDelta(stressed.NOI - d.NOI)} vs OM</Text>
+                  </View>
+                  <View style={s.metricCard}>
+                    <Text style={s.metricLabel}>Stressed Cap</Text>
+                    <Text style={s.metricValue}>{fmtPct(stressed.cap)}</Text>
+                    <Text style={s.metricSub}>{fmtDeltaPct(stressed.cap - d.cap)} vs OM</Text>
+                  </View>
+                  <View style={s.metricCard}>
+                    <Text style={s.metricLabel}>Stressed DCR</Text>
+                    <Text style={[s.metricValue, { color: stressed.dcr < 1.2 ? C.red : C.green }]}>{fmtX(stressed.dcr)}</Text>
+                    <Text style={s.metricSub}>{((stressed.dcr - d.dcr) >= 0 ? '+' : '') + (stressed.dcr - d.dcr).toFixed(2)}× vs OM</Text>
+                  </View>
+                  <View style={s.metricCard}>
+                    <Text style={s.metricLabel}>Stressed CoC</Text>
+                    <Text style={s.metricValue}>{fmtPct(stressed.coc)}</Text>
+                    <Text style={s.metricSub}>{fmtDeltaPct(stressed.coc - d.coc)} vs OM</Text>
+                  </View>
+                </View>
+              </>
+            )}
+          </Page>
+        )
+      })()}
+
+      {/* ── OM As-Presented page ────────────────────────────────────── */}
+      {showOM && (
+        <Page size="LETTER" style={s.page}>
+          <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} />
+          <SectionHdr title="OM As-Presented — broker figures" />
+          <View style={s.table}>
+            <View style={s.tableHdrRow}>
+              <Text style={[s.tableHdrCell, { flex: 3 }]}>Line Item</Text>
+              <Text style={[s.tableHdrCell, { flex: 1.5, textAlign: 'right' }]}>OM Value</Text>
+              <Text style={[s.tableHdrCell, { flex: 1.5, textAlign: 'right' }]}>Per Unit</Text>
+            </View>
+            {[
+              { label: 'Purchase Price', val: fmtDollar(inputs.price), per: units > 0 ? fmtDollar(inputs.price / units) : '—' },
+              { label: isOM ? 'Gross Scheduled Rent' : 'Gross Potential Rent', val: fmtDollar(d.GSR), per: units > 0 ? fmtDollar(d.GSR / units) : '—' },
+              { label: `Vacancy (${inputs.vp}%)`, val: `(${fmtDollar(d.vac)})`, per: units > 0 ? `(${fmtDollar(d.vac / units)})` : '—' },
+              { label: 'Effective Gross Income', val: fmtDollar(d.EGI), per: units > 0 ? fmtDollar(d.EGI / units) : '—', bold: true },
+              { label: 'Real Estate Taxes', val: `(${fmtDollar(d.taxTotal)})`, per: units > 0 ? `(${fmtDollar(d.taxTotal / units)})` : '—' },
+              { label: 'Insurance', val: `(${fmtDollar(d.ins)})`, per: `$${inputs.ins.toLocaleString()}/door` },
+              { label: 'Utilities', val: `(${fmtDollar(d.util)})`, per: units > 0 ? `(${fmtDollar(d.util / units)})` : '—' },
+              { label: 'R&M', val: `(${fmtDollar(d.rm)})`, per: `$${inputs.rm.toLocaleString()}/unit` },
+              { label: 'Contract Services', val: `(${fmtDollar(d.cs)})`, per: units > 0 ? `(${fmtDollar(d.cs / units)})` : '—' },
+              { label: 'G&A', val: `(${fmtDollar(d.ga)})`, per: units > 0 ? `(${fmtDollar(d.ga / units)})` : '—' },
+              { label: 'Reserves', val: `(${fmtDollar(d.res)})`, per: `$${inputs.res.toLocaleString()}/unit` },
+              { label: `Prop. Mgmt (${d.pmPct.toFixed(1)}%)`, val: `(${fmtDollar(d.pm)})`, per: units > 0 ? `(${fmtDollar(d.pm / units)})` : '—' },
+              { label: 'Total Expenses', val: `(${fmtDollar(d.exp)})`, per: units > 0 ? `(${fmtDollar(d.exp / units)})` : '—', bold: true },
+              { label: 'NOI', val: fmtDollar(d.NOI), per: units > 0 ? fmtDollar(d.NOI / units) : '—', bold: true },
+            ].map((row, i) => (
+              <View key={i} style={[row.bold ? s.plTotal : (i % 2 === 0 ? s.tableRow : s.tableRowAlt)]}>
+                <Text style={[s.tableCell, { flex: 3, fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica' }]}>{row.label}</Text>
+                <Text style={[s.tableCellR, { flex: 1.5, fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica' }]}>{row.val}</Text>
+                <Text style={[s.tableCellR, { flex: 1.5, fontSize: 8, color: C.textLight }]}>{row.per}</Text>
+              </View>
+            ))}
+          </View>
+          <View style={s.metricsRow}>
+            <View style={s.metricCard}>
+              <Text style={s.metricLabel}>Cap Rate</Text>
+              <Text style={s.metricValue}>{fmtPct(d.cap)}</Text>
+            </View>
+            <View style={s.metricCard}>
+              <Text style={s.metricLabel}>Price / Unit</Text>
+              <Text style={s.metricValue}>{units > 0 ? fmtDollar(inputs.price / units) : '—'}</Text>
+            </View>
+            <View style={s.metricCard}>
+              <Text style={s.metricLabel}>Expense Ratio</Text>
+              <Text style={s.metricValue}>{d.EGI > 0 ? fmtPct(d.exp / d.EGI) : '—'}</Text>
+            </View>
+          </View>
+        </Page>
+      )}
+
+      {/* ── Inputs summary page ────────────────────────────────────── */}
+      {showInputs && (
+        <Page size="LETTER" style={s.page}>
+          <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} />
+          <View style={s.twoCol}>
+            <View style={s.col}>
+              <SectionHdr title="Income inputs" />
+              <View style={s.table}>
+                <View style={s.tableHdrRow}>
+                  <Text style={[s.tableHdrCell, { flex: 2 }]}>Field</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1.5, textAlign: 'right' }]}>Value</Text>
+                </View>
+                {[
+                  ['Total Units', `${inputs.tu}`],
+                  ['Occupied Units', `${inputs.ou}`],
+                  ['Avg Rent / Unit / Mo', fmtDollar(inputs.rent)],
+                  ['Vacancy %', `${inputs.vp}%`],
+                  ...(inputs.otherIncome ?? []).map(oi => [oi.label, fmtDollar(oi.amount)]),
+                ].map(([label, val], i) => (
+                  <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
+                    <Text style={[s.tableCell, { flex: 2 }]}>{label}</Text>
+                    <Text style={[s.tableCellR, { flex: 1.5 }]}>{val}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <SectionHdr title="Financing inputs" />
+              <View style={s.table}>
+                <View style={s.tableHdrRow}>
+                  <Text style={[s.tableHdrCell, { flex: 2 }]}>Field</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1.5, textAlign: 'right' }]}>Value</Text>
+                </View>
+                {[
+                  ['Purchase Price', fmtDollar(inputs.price)],
+                  ['Interest Rate', `${inputs.ir}%`],
+                  ['LTV', `${inputs.lev}%`],
+                  ['Amortization', `${inputs.am} years`],
+                  ['Lender Fee', `${inputs.lf}%`],
+                  ['Closing Costs', `${inputs.cc}%`],
+                ].map(([label, val], i) => (
+                  <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
+                    <Text style={[s.tableCell, { flex: 2 }]}>{label}</Text>
+                    <Text style={[s.tableCellR, { flex: 1.5 }]}>{val}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            <View style={s.col}>
+              <SectionHdr title="Expense inputs" />
+              <View style={s.table}>
+                <View style={s.tableHdrRow}>
+                  <Text style={[s.tableHdrCell, { flex: 2 }]}>Field</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1.5, textAlign: 'right' }]}>Value</Text>
+                </View>
+                {[
+                  ['Real Estate Taxes', fmtDollar(inputs.tax)],
+                  ['Insurance', `$${inputs.ins.toLocaleString()}/door`],
+                  ['Electric', `${fmtDollar(inputs.utilElec ?? 0)}${inputs.utilElecSubmetered ? ' (sub-metered)' : ''}`],
+                  ['Water & Sewer', `${fmtDollar(inputs.utilWater ?? 0)}${inputs.utilWaterSubmetered ? ' (sub-metered)' : ''}`],
+                  ['Trash', fmtDollar(inputs.utilTrash ?? 0)],
+                  ['R&M', `$${inputs.rm.toLocaleString()}/unit/yr`],
+                  ['Contract Services', fmtDollar(inputs.cs)],
+                  ['G&A', fmtDollar(inputs.ga)],
+                  ['Reserves', `$${inputs.res.toLocaleString()}/unit/yr`],
+                  ['Prop. Management', `${inputs.pm}%`],
+                  ...(inputs.otherExpenses ?? []).map(oe => [oe.label, fmtDollar(oe.amount)]),
+                ].map(([label, val], i) => (
+                  <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
+                    <Text style={[s.tableCell, { flex: 2 }]}>{label}</Text>
+                    <Text style={[s.tableCellR, { flex: 1.5 }]}>{val}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <SectionHdr title="Tax inputs" />
+              <View style={s.table}>
+                <View style={s.tableHdrRow}>
+                  <Text style={[s.tableHdrCell, { flex: 2 }]}>Field</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1.5, textAlign: 'right' }]}>Value</Text>
+                </View>
+                {[
+                  ['Tax Bracket', `${inputs.brk}%`],
+                  ['Land %', `${inputs.land}%`],
+                  ['Cost Seg %', `${inputs.costSeg}%`],
+                  ['1031 Exchange', inputs.is1031 ? 'Yes' : 'No'],
+                  ...(inputs.is1031 ? [['1031 Basis', fmtDollar(inputs.basis1031 ?? 0)], ['1031 Equity', fmtDollar(inputs.equity1031 ?? 0)]] : []),
+                ].map(([label, val], i) => (
+                  <View key={i} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
+                    <Text style={[s.tableCell, { flex: 2 }]}>{label}</Text>
+                    <Text style={[s.tableCellR, { flex: 1.5 }]}>{val}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        </Page>
       )}
 
     </Document>
