@@ -1677,7 +1677,7 @@ export function ModelCalculator({
               const afterTaxSale = priorSale - taxDeferred
               return (
                 <>
-                  <SectionHeader title="1031 Exchange Analysis" tooltip="Compare tax-deferred 1031 exchange vs. selling and paying capital gains tax on the relinquished property." />
+                  <SectionHeader title="1031 Exchange Analysis" tooltip="A 1031 exchange lets you sell a property and defer all capital gains taxes by rolling the proceeds into a new like-kind property. The deferred tax stays invested — effectively an interest-free loan from the IRS that compounds over your hold period." />
                   <div className="grid grid-cols-3 gap-2 mb-3">
                     <InputField label="Prior sale price" type="number" dollar value={priorSale}
                       onChange={e => set('priorSalePrice' as keyof ModelInputs, +e.target.value)} />
@@ -1730,7 +1730,7 @@ export function ModelCalculator({
               const taxableArr = years.map(y => y === 1 ? d.NOI - bonusDed - slAnnual : d.NOI - slAnnual)
               return (
                 <>
-                  <SectionHeader title="Bonus Depreciation" tooltip="Year 1 bonus depreciation on cost-segregated components (5/7/15-year property). Assumes 100% bonus depreciation and Real Estate Professional status." />
+                  <SectionHeader title="Bonus Depreciation" tooltip="Cost segregation identifies building components (fixtures, land improvements, personal property) that qualify for 5, 7, or 15-year depreciation instead of 27.5 years. Under current bonus depreciation rules, these assets can be fully expensed in Year 1, creating a large paper loss that offsets your other ordinary income at your bracket rate. Cash flow is unchanged — only your tax bill moves." />
                   <div className="border border-gray-100 rounded-lg p-3 mb-3">
                     <PLRow label="Year 1 bonus deduction" value={fmtDollar(bonusDed)} variant="pos" />
                     <PLRow label="Year 1 paper loss" value={y1PaperLoss < 0 ? `(${fmtDollar(Math.abs(y1PaperLoss))})` : fmtDollar(y1PaperLoss)} variant={y1PaperLoss < 0 ? 'pos' : 'neg'} indent />
@@ -1770,7 +1770,7 @@ export function ModelCalculator({
               const cumulArr = years28.map((_, i) => shieldArr.slice(0, i + 1).reduce((a, b) => a + b, 0))
               return (
                 <>
-                  <SectionHeader title="27.5-Year Depreciation Schedule" tooltip="Straight-line depreciation on the building value not allocated to cost segregation. Provides an annual tax shield for the full 27.5-year recovery period." />
+                  <SectionHeader title="27.5-Year Depreciation Schedule" tooltip="Residential rental property is depreciated straight-line (SL) over 27.5 years — meaning an equal deduction every year for 27.5 years. Each year you deduct an equal share of the depreciable basis (purchase price minus land value, minus any cost-segregated assets), creating a consistent annual tax shield. The shield ends when the basis is fully depreciated." />
                   <div className="border border-gray-100 rounded-lg p-3 mb-3">
                     <PLRow label="Depreciable basis (after cost seg)" value={fmtDollar(depBasis)} />
                     <PLRow label="Annual deduction" value={fmtDollar(annualDed)} variant="pos" indent />
