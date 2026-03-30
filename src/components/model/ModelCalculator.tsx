@@ -1035,18 +1035,13 @@ export function ModelCalculator({
     <div className="flex flex-col h-full bg-white">
       {/* Scenario name + actions */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
-        <input
-          value={name}
-          onChange={e => setName(e.target.value)}
-          className="flex-1 text-sm font-semibold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-navy focus:outline-none pb-0.5 min-w-0"
-          spellCheck={false}
-        />
+        <span className="flex-1 text-sm font-semibold text-gray-900 truncate min-w-0">{name}</span>
         {siblings.filter(s => s.id !== currentScenarioId).length > 0 && (
           <select
             value=""
             onChange={e => handleScenarioSwitch(e.target.value)}
             className="text-xs text-gray-400 bg-transparent border border-gray-200 rounded px-1.5 py-1 cursor-pointer focus:outline-none hover:border-gray-300">
-            <option value="" disabled>Switch…</option>
+            <option value="" disabled>Scenarios</option>
             {siblings.filter(s => s.id !== currentScenarioId).map(s => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}

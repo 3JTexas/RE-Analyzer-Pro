@@ -21,6 +21,8 @@ export function PropertyPage() {
   const [photoUploading, setPhotoUploading] = useState(false)
   const [editingCrexi, setEditingCrexi] = useState(false)
   const [crexiDraft, setCrexiDraft] = useState('')
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameDraft, setRenameDraft] = useState('')
   const photoRef = useRef<HTMLInputElement>(null)
 
   const loadData = async () => {
@@ -47,6 +49,14 @@ export function PropertyPage() {
     if (!window.confirm('Delete this scenario?')) return
     await deleteScenario(sid)
     setScenarios(prev => prev.filter(s => s.id !== sid))
+  }
+
+  const handleRename = async (sid: string) => {
+    const trimmed = renameDraft.trim()
+    if (!trimmed) { setRenamingId(null); return }
+    await supabase.from('scenarios').update({ name: trimmed, updated_at: new Date().toISOString() }).eq('id', sid)
+    setScenarios(prev => prev.map(s => s.id === sid ? { ...s, name: trimmed } : s))
+    setRenamingId(null)
   }
 
   const startDuplicate = (s: Scenario) => {
@@ -195,13 +205,29 @@ export function PropertyPage() {
                       <BarChart3 size={18} className={s.method === 'om' ? 'text-blue-600' : 'text-amber-600'} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-900 truncate">{s.name}</div>
+                      {renamingId === s.id ? (
+                        <div className="flex items-center gap-1.5" onClick={e => e.preventDefault()}>
+                          <input value={renameDraft} onChange={e => setRenameDraft(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') handleRename(s.id); if (e.key === 'Escape') setRenamingId(null) }}
+                            autoFocus
+                            className="text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded px-1.5 py-0.5 focus:border-[#c9a84c] focus:outline-none flex-1 min-w-0" />
+                          <button onClick={(e) => { e.preventDefault(); handleRename(s.id) }} className="text-green-600 hover:text-green-700"><Check size={14} /></button>
+                          <button onClick={(e) => { e.preventDefault(); setRenamingId(null) }} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+                        </div>
+                      ) : (
+                        <div className="text-sm font-medium text-gray-900 truncate">{s.name}</div>
+                      )}
                       <div className="text-[10px] text-gray-400 mt-0.5">
                         {s.method === 'om' ? 'OM method' : 'Physical occupancy'} · {new Date(s.updated_at).toLocaleDateString()}
                       </div>
                     </div>
                   </Link>
                   <div className="border-t border-gray-100 flex">
+                    <button onClick={() => { setRenamingId(s.id); setRenameDraft(s.name) }}
+                      className="flex items-center gap-1 px-3 py-2 text-[10px] text-gray-400 hover:text-[#c9a84c] transition-colors">
+                      <Pencil size={11} /> Rename
+                    </button>
+                    <div className="w-px bg-gray-100" />
                     <button onClick={() => startDuplicate(s)}
                       className="flex items-center gap-1 px-3 py-2 text-[10px] text-gray-400 hover:text-[#c9a84c] transition-colors">
                       <Copy size={11} /> Duplicate
