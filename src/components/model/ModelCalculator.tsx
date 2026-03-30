@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import ReactDOM from 'react-dom'
-import { Download, Save, RotateCcw, FileText, X, Eye } from 'lucide-react'
+import { Download, Save, RotateCcw, FileText, X, Eye, Trash2 } from 'lucide-react'
 import { calculate, OM_DEFAULTS, fmtDollar, fmtNeg, fmtPct, fmtX, fmtDelta, fmtDeltaPct } from '../../lib/calc'
-import type { ModelInputs, Method, Scenario } from '../../types'
+import type { ModelInputs, Method, Scenario, RentRollUnit } from '../../types'
 import {
   InputField, SectionHeader, MetricCard, PLRow, Alert, Toggle, DCRBar, Badge
 } from '../ui'
@@ -812,6 +812,31 @@ export function ModelCalculator({
   const removeOtherIncome = (i: number) =>
     setInputs(prev => ({ ...prev, otherIncome: (prev.otherIncome ?? []).filter((_, idx) => idx !== i) }))
 
+  // Rent roll helpers
+  const makeUnit = (i: number): RentRollUnit => ({
+    id: crypto.randomUUID(), label: `Unit ${i + 1}`, type: '', sqft: 0, rent: 0,
+  })
+  const syncRentRoll = (tu: number) => {
+    setInputs(prev => {
+      const existing = prev.rentRoll ?? []
+      if (existing.length >= tu) return { ...prev, rentRoll: existing.slice(0, tu) }
+      const added = Array.from({ length: tu - existing.length }, (_, i) => makeUnit(existing.length + i))
+      return { ...prev, rentRoll: [...existing, ...added] }
+    })
+  }
+  const updateRentRollUnit = (id: string, key: keyof RentRollUnit, val: string | number | boolean) =>
+    setInputs(prev => ({
+      ...prev,
+      rentRoll: (prev.rentRoll ?? []).map(u => u.id === id ? { ...u, [key]: val } : u),
+    }))
+  const removeRentRollUnit = (id: string) =>
+    setInputs(prev => ({ ...prev, rentRoll: (prev.rentRoll ?? []).filter(u => u.id !== id) }))
+  const addRentRollUnit = () =>
+    setInputs(prev => ({
+      ...prev,
+      rentRoll: [...(prev.rentRoll ?? []), makeUnit((prev.rentRoll ?? []).length)],
+    }))
+
   const addOtherExpense = () => setInputs(prev => ({
     ...prev, otherExpenses: [...(prev.otherExpenses ?? []), { label: 'New expense', amount: 0 }]
   }))
@@ -864,6 +889,7 @@ export function ModelCalculator({
     setInputs(prev => {
       const next = { ...prev }
       keys[section].forEach(k => { (next as any)[k] = (OM_DEFAULTS as any)[k] })
+      if (section === 'income') { next.rentRoll = []; next.useRentRoll = false }
       return next
     })
   }
@@ -1057,21 +1083,133 @@ export function ModelCalculator({
             <div className="grid grid-cols-2 gap-2 mb-1">
               <InputField label="Total units" type="number" value={inputs.tu} min={1} max={100} step={1}
                 tooltip="Total number of rentable units in the property"
-                badge="OM" onChange={e => set('tu', +e.target.value)} />
-              <InputField label="Units occupied" type="number" value={inputs.ou} min={0} max={inputs.tu} step={1}
-                tooltip="Units currently occupied. If less than total units, physical vacancy method is used instead of OM method"
-                badge="OM" onChange={e => set('ou', +e.target.value)} />
+                badge="OM" onChange={e => { const v = +e.target.value; set('tu', v); if (inputs.useRentRoll) syncRentRoll(v) }} />
+              {!inputs.useRentRoll && (
+                <InputField label="Units occupied" type="number" value={inputs.ou} min={0} max={inputs.tu} step={1}
+                  tooltip="Units currently occupied. If less than total units, physical vacancy method is used instead of OM method"
+                  badge="OM" onChange={e => set('ou', +e.target.value)} />
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <InputField label="Avg rent / unit / mo ($)" type="number" dollar value={inputs.rent} min={500} step={25}
-                tooltip="Blended average monthly rent across all units"
-                badge="OM" onChange={e => set('rent', +e.target.value)} />
-              <InputField
-                label={method === 'om' ? 'Vacancy % (of GSR)' : 'Turnover buffer %'}
-                type="number" value={inputs.vp} min={0} max={50} step={0.5}
-                tooltip="Economic vacancy allowance - used in OM method only. Typically 4-5% for stabilized properties"
-                badge="OM" onChange={e => set('vp', +e.target.value)} />
+            {/* Rent roll toggle */}
+            <div className="flex items-center gap-2 mb-2 mt-1">
+              <button
+                onClick={() => {
+                  const next = !inputs.useRentRoll
+                  setInputs(prev => ({ ...prev, useRentRoll: next }))
+                  if (next && (inputs.rentRoll ?? []).length === 0 && inputs.tu > 0) syncRentRoll(inputs.tu)
+                }}
+                className={`relative w-8 h-4 rounded-full transition-colors ${inputs.useRentRoll ? 'bg-blue-500' : 'bg-gray-300'}`}>
+                <span className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${inputs.useRentRoll ? 'translate-x-4' : ''}`} />
+              </button>
+              <span className="text-[10px] text-gray-500 font-medium">Use rent roll</span>
             </div>
+            {!inputs.useRentRoll ? (
+              <div className="grid grid-cols-2 gap-2">
+                <InputField label="Avg rent / unit / mo ($)" type="number" dollar value={inputs.rent} min={500} step={25}
+                  tooltip="Blended average monthly rent across all units"
+                  badge="OM" onChange={e => set('rent', +e.target.value)} />
+                <InputField
+                  label={method === 'om' ? 'Vacancy % (of GSR)' : 'Turnover buffer %'}
+                  type="number" value={inputs.vp} min={0} max={50} step={0.5}
+                  tooltip="Economic vacancy allowance - used in OM method only. Typically 4-5% for stabilized properties"
+                  badge="OM" onChange={e => set('vp', +e.target.value)} />
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <InputField
+                    label={method === 'om' ? 'Vacancy % (of GSR)' : 'Turnover buffer %'}
+                    type="number" value={inputs.vp} min={0} max={50} step={0.5}
+                    tooltip="Economic vacancy allowance"
+                    badge="OM" onChange={e => set('vp', +e.target.value)} />
+                </div>
+                {/* Rent roll table */}
+                <div className="border border-gray-200 rounded-lg overflow-hidden mb-2">
+                  <table className="w-full text-[10px]">
+                    <thead>
+                      <tr className="bg-gray-100 text-gray-500 font-semibold">
+                        <th className="py-1.5 px-1.5 text-left">Unit</th>
+                        <th className="py-1.5 px-1 text-left">Type</th>
+                        <th className="py-1.5 px-1 text-right w-14">Sq Ft</th>
+                        <th className="py-1.5 px-1 text-right w-20">Rent/mo</th>
+                        <th className="py-1.5 px-1 text-center w-20">Lease End</th>
+                        <th className="py-1.5 px-0.5 text-center w-8">Vac</th>
+                        <th className="py-1.5 px-0.5 w-5"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(inputs.rentRoll ?? []).map((u, i) => (
+                        <tr key={u.id} className={`border-t border-gray-100 ${i % 2 === 1 ? 'bg-gray-50/50' : ''} ${u.vacant ? 'opacity-40' : ''}`}>
+                          <td className="py-0.5 px-1.5">
+                            <input value={u.label} onChange={e => updateRentRollUnit(u.id, 'label', e.target.value)}
+                              className="w-full bg-transparent text-[10px] focus:outline-none border-b border-transparent focus:border-blue-400" />
+                          </td>
+                          <td className="py-0.5 px-1">
+                            <input value={u.type} onChange={e => updateRentRollUnit(u.id, 'type', e.target.value)}
+                              placeholder="1bd/1ba"
+                              className="w-full bg-transparent text-[10px] focus:outline-none border-b border-transparent focus:border-blue-400" />
+                          </td>
+                          <td className="py-0.5 px-1">
+                            <input type="number" value={u.sqft || ''} onChange={e => updateRentRollUnit(u.id, 'sqft', +e.target.value)}
+                              className="w-full bg-transparent text-[10px] text-right focus:outline-none border-b border-transparent focus:border-blue-400" />
+                          </td>
+                          <td className="py-0.5 px-1">
+                            <div className="relative">
+                              <span className="absolute left-0 top-1/2 -translate-y-1/2 text-[9px] text-gray-400">$</span>
+                              <input type="number" value={u.rent || ''} step={25}
+                                onChange={e => updateRentRollUnit(u.id, 'rent', +e.target.value)}
+                                className="w-full bg-transparent text-[10px] text-right pl-2 focus:outline-none border-b border-transparent focus:border-blue-400" />
+                            </div>
+                          </td>
+                          <td className="py-0.5 px-1">
+                            <input value={u.leaseEnd ?? ''} placeholder="MM/DD/YYYY"
+                              onChange={e => updateRentRollUnit(u.id, 'leaseEnd', e.target.value)}
+                              className="w-full bg-transparent text-[10px] text-center focus:outline-none border-b border-transparent focus:border-blue-400" />
+                          </td>
+                          <td className="py-0.5 px-0.5 text-center">
+                            <input type="checkbox" checked={!!u.vacant}
+                              onChange={e => updateRentRollUnit(u.id, 'vacant', e.target.checked)}
+                              className="w-3 h-3 rounded border-gray-300" />
+                          </td>
+                          <td className="py-0.5 px-0.5">
+                            <button onClick={() => removeRentRollUnit(u.id)} className="text-gray-300 hover:text-red-400">
+                              <Trash2 size={10} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-gray-300 bg-gray-50 font-semibold text-gray-700">
+                        <td className="py-1.5 px-1.5" colSpan={3}>Total</td>
+                        <td className="py-1.5 px-1 text-right">
+                          ${(inputs.rentRoll ?? []).filter(u => !u.vacant).reduce((s, u) => s + (u.rent || 0), 0).toLocaleString()}
+                        </td>
+                        <td colSpan={3}></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                <button onClick={addRentRollUnit}
+                  className="flex items-center gap-1 text-[10px] text-blue-500 hover:text-blue-700 font-medium mb-2">
+                  <span className="text-base leading-none">+</span> Add unit
+                </button>
+                {/* Rent roll summary */}
+                {(() => {
+                  const rr = inputs.rentRoll ?? []
+                  const occ = rr.filter(u => !u.vacant)
+                  const totalMo = occ.reduce((s, u) => s + (u.rent || 0), 0)
+                  return (
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px] text-gray-500 bg-gray-50 rounded-lg p-2 mb-1">
+                      <span>Occupied units</span><span className="text-right font-medium text-gray-700">{occ.length} of {rr.length}</span>
+                      <span>Total monthly</span><span className="text-right font-medium text-gray-700">${totalMo.toLocaleString()}</span>
+                      <span>Annual gross</span><span className="text-right font-medium text-gray-700">${(totalMo * 12).toLocaleString()}</span>
+                      <span>Blended avg</span><span className="text-right font-medium text-gray-700">${inputs.tu > 0 ? Math.round(totalMo / inputs.tu).toLocaleString() : 0}/unit</span>
+                    </div>
+                  )
+                })()}
+              </>
+            )}
             <div className="mt-2 space-y-1">
               {(inputs.otherIncome ?? []).map((item, i) => (
                 <div key={i} className="flex gap-1 items-center">

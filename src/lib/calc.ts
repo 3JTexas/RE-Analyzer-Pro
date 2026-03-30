@@ -60,13 +60,20 @@ export function calculate(inputs: ModelInputs, useOM: boolean): ModelOutputs {
   const otherIncome = inputs.otherIncome ?? []
   const otherExpenses = inputs.otherExpenses ?? []
 
-  // Income
-  const GSR = rent * tu * 12
+  // Income — rent roll path vs blended avg
+  const rentRoll = inputs.rentRoll
+  const useRR = inputs.useRentRoll && rentRoll && rentRoll.length > 0
+  const rrMonthly = useRR ? rentRoll!.filter(u => !u.vacant).reduce((s, u) => s + (u.rent || 0), 0) : 0
+  const rrOccupied = useRR ? rentRoll!.filter(u => !u.vacant).length : ou
+  const effectiveRent = useRR ? (tu > 0 ? rrMonthly / tu : 0) : rent
+  const effectiveOu = useRR ? rrOccupied : ou
+
+  const GSR = useRR ? rrMonthly * 12 : rent * tu * 12
   let pv: number, av: number, col: number
   if (useOM) {
     pv = GSR * vp / 100; av = 0; col = GSR - pv
   } else {
-    const baseCol = rent * ou * 12
+    const baseCol = useRR ? rrMonthly * 12 : effectiveRent * effectiveOu * 12
     pv = GSR - baseCol; av = baseCol * vp / 100; col = baseCol - av
   }
   const vac = pv + av
@@ -133,6 +140,6 @@ export function calculate(inputs: ModelInputs, useOM: boolean): ModelOutputs {
     exp, NOI, CF, cap, dcr,
     deprBase, bd, sl, ti, loss, ts, at, y1,
     coc, atc, r1, r2,
-    price, lev, lfp: lf, ir, am, land, costSeg, tu, ou, rent, vp, brk,
+    price, lev, lfp: lf, ir, am, land, costSeg, tu, ou: effectiveOu, rent: effectiveRent, vp, brk,
   }
 }

@@ -1,3 +1,14 @@
+// ── Rent roll unit ────────────────────────────────────────────────────────
+export interface RentRollUnit {
+  id: string           // uuid, generated client-side
+  label: string        // e.g. "Unit 1", "Unit A"
+  type: string         // e.g. "1bd/1ba", "Studio", "2bd/1ba"
+  sqft: number
+  rent: number         // monthly rent
+  leaseEnd?: string    // lease expiration date string e.g. "06/04/2026"
+  vacant?: boolean     // true if unit is vacant
+}
+
 // ── Model inputs ──────────────────────────────────────────────────────────
 export interface ModelInputs {
   // Income
@@ -40,6 +51,9 @@ export interface ModelInputs {
   targetCapRate?: number // offer calculator target cap rate %
   targetOfferPrice?: number // offer calculator target price $
   offerCalcMode?: 'cap' | 'price' // which offer calculator mode is active
+  // Rent roll
+  rentRoll?: RentRollUnit[]
+  useRentRoll?: boolean   // toggle: true = use rent roll, false = use blended avg rent
   // 1031 exchange analysis
   priorSalePrice?: number   // what the relinquished property sold for
   priorBasis?: number       // original purchase price of relinquished property

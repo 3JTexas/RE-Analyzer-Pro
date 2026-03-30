@@ -496,6 +496,46 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
         })()}
       </Page>
 
+      {/* ── Rent roll page ──────────────────────────────────────────────── */}
+      {inputs.useRentRoll && (inputs.rentRoll ?? []).length > 0 && (
+        <Page size="LETTER" style={s.page}>
+          <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} />
+          <SectionHdr title="Rent roll" />
+          <View style={s.table}>
+            <View style={s.tableHdrRow}>
+              <Text style={[s.tableHdrCell, { flex: 2 }]}>Unit</Text>
+              <Text style={[s.tableHdrCell, { flex: 2 }]}>Type</Text>
+              <Text style={[s.tableHdrCell, { flex: 1.2, textAlign: 'right' }]}>Sq Ft</Text>
+              <Text style={[s.tableHdrCell, { flex: 1.5, textAlign: 'right' }]}>Rent/mo</Text>
+              <Text style={[s.tableHdrCell, { flex: 2, textAlign: 'center' }]}>Lease End</Text>
+            </View>
+            {(inputs.rentRoll ?? []).map((u, i) => (
+              <View key={u.id ?? i} style={[s.tableRow, i % 2 === 1 ? { backgroundColor: C.bgLight } : {}, u.vacant ? { opacity: 0.4 } : {}]}>
+                <Text style={[s.tableCell, { flex: 2 }]}>{u.label}{u.vacant ? ' (vacant)' : ''}</Text>
+                <Text style={[s.tableCell, { flex: 2 }]}>{u.type}</Text>
+                <Text style={[s.tableCell, { flex: 1.2, textAlign: 'right' }]}>{u.sqft ? u.sqft.toLocaleString() : '—'}</Text>
+                <Text style={[s.tableCell, { flex: 1.5, textAlign: 'right', color: u.vacant ? C.textMuted : C.text }]}>
+                  {u.rent ? `$${u.rent.toLocaleString()}` : '—'}
+                </Text>
+                <Text style={[s.tableCell, { flex: 2, textAlign: 'center' }]}>{u.leaseEnd ?? '—'}</Text>
+              </View>
+            ))}
+            <View style={[s.tableRow, { backgroundColor: C.bgCard, borderTopWidth: 1, borderTopColor: C.border }]}>
+              <Text style={[s.tableCell, { flex: 2, fontFamily: 'Helvetica-Bold' }]}>Total</Text>
+              <Text style={[s.tableCell, { flex: 2 }]}></Text>
+              <Text style={[s.tableCell, { flex: 1.2 }]}></Text>
+              <Text style={[s.tableCell, { flex: 1.5, textAlign: 'right', fontFamily: 'Helvetica-Bold' }]}>
+                ${(inputs.rentRoll ?? []).filter(u => !u.vacant).reduce((sum, u) => sum + (u.rent || 0), 0).toLocaleString()}
+              </Text>
+              <Text style={[s.tableCell, { flex: 2 }]}></Text>
+            </View>
+          </View>
+          <Text style={{ fontSize: 7.5, color: C.textMuted, marginTop: 6 }}>
+            {(inputs.rentRoll ?? []).filter(u => !u.vacant).length} of {(inputs.rentRoll ?? []).length} units occupied · Annual gross: ${((inputs.rentRoll ?? []).filter(u => !u.vacant).reduce((sum, u) => sum + (u.rent || 0), 0) * 12).toLocaleString()}
+          </Text>
+        </Page>
+      )}
+
       {/* ── Side by side: actual scenarios ──────────────────────────────── */}
       {allCols.length > 1 && (
       <Page size="LETTER" style={s.page}>

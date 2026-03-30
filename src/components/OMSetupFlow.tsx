@@ -3,7 +3,7 @@ import { Upload, FileText, X, Loader2, CheckCircle, AlertCircle, Camera } from '
 import { OM_DEFAULTS } from '../lib/calc'
 import { supabase } from '../lib/supabase'
 import { useUserDefaults } from '../hooks/useUserDefaults'
-import type { ModelInputs } from '../types'
+import type { ModelInputs, RentRollUnit } from '../types'
 
 const FIELDS: { key: keyof ModelInputs; label: string; step: number; prefix?: string; suffix?: string }[] = [
   { key: 'price', label: 'Purchase price',       step: 10000, prefix: '$' },
@@ -193,6 +193,20 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
       const utilSub = (merged.utilElec ?? 0) + (merged.utilWater ?? 0) + (merged.utilTrash ?? 0)
       if (utilSub > 0 && !merged.util) {
         merged.util = utilSub
+      }
+
+      // Map rent roll if extracted
+      if (Array.isArray(parsed.rentRoll) && parsed.rentRoll.length > 0) {
+        merged.rentRoll = parsed.rentRoll.map((u: any) => ({
+          id: crypto.randomUUID(),
+          label: String(u.label ?? ''),
+          type: String(u.type ?? ''),
+          sqft: typeof u.sqft === 'number' ? u.sqft : parseFloat(String(u.sqft)) || 0,
+          rent: typeof u.rent === 'number' ? u.rent : parseFloat(String(u.rent)) || 0,
+          leaseEnd: u.leaseEnd ? String(u.leaseEnd) : undefined,
+          vacant: u.vacant === true,
+        } as RentRollUnit))
+        merged.useRentRoll = true
       }
 
       console.log('FORM STATE AFTER MAP:', JSON.stringify(merged, null, 2))

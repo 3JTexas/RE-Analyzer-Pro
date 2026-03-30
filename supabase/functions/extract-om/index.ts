@@ -55,6 +55,7 @@ Deno.serve(async (req) => {
   "res": "Annual capital reserves for the ENTIRE PROPERTY in dollars — this must be the annual total, NOT per-unit. Look for 'reserves', 'replacement reserves', 'capital reserves' in expenses (number)",
   "pm": "Property management fee as a percentage of income e.g. 8 not 0.08. Look for 'management', 'property management', 'mgmt fee' (number)",
   "otherIncome": "Array of other income items not included in rent. Each item: { label: string, amount: number (annual dollars) }. Look for 'laundry', 'parking', 'storage', 'other income', 'ancillary income'. Return [] if none found.",
+  "rentRoll": "Array of individual units if a rent roll table exists in the OM. Each item: { label: string (e.g. 'Unit 1'), type: string (e.g. '1bd/1ba', 'Studio'), sqft: number, rent: number (monthly rent), leaseEnd: string (MM/DD/YYYY if shown), vacant: boolean (true if shown as vacant) }. Return [] if no rent roll table — do not guess individual rents.",
   "propertyImageUrl": null
 }
 
@@ -66,7 +67,8 @@ Important extraction tips:
 - LTV and interest rate are often in a 'financing' or 'loan assumptions' section
 - If you see a pro forma or T12 operating statement, prefer the T12 (trailing 12 months) figures over pro forma projections
 - On Crexi-format OMs, financial data is often in tables labeled 'Financial Summary', 'Income & Expenses', 'Operating Statement', or 'Financials'
-- Look at ALL pages of the document — expenses and financing details are often on page 2 or 3`
+- Look at ALL pages of the document — expenses and financing details are often on page 2 or 3
+- If the OM contains a rent roll table with individual unit rents, extract each unit as a separate object in the rentRoll array. If only a blended or average rent is shown, return rentRoll as [] and use the rent field instead.`
 
     // Diagnostic log — structure verification
     console.error(`[extract-om] Sending ${pdfContents.length} PDF document block(s), base64 lengths: ${pdfs.map((p: string) => cleanBase64(p).length).join(', ')}, prompt starts: "${extractionPrompt.slice(0, 200)}..."`)
