@@ -2149,12 +2149,12 @@ export function ModelCalculator({
       {showLOI && loiData && (
         <LOIModal initial={loiData} onClose={() => setShowLOI(false)} />
       )}
-      {showPdfPreview && pdfPreviewProps && (() => {
+      {showPdfPreview && pdfPreviewProps && ReactDOM.createPortal((() => {
         const safeProp = (pdfPreviewProps.propertyName || 'Property').replace(/[^a-zA-Z0-9]/g, '_')
         const tabSuffix: Record<ExportTab, string> = { full: 'Full_Report', pl: 'PL', tax: 'Tax', flags: 'Flags', om: 'OM', inputs: 'Inputs' }
         const fileName = `${safeProp}_${tabSuffix[exportTab]}.pdf`
         return (
-          <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center" style={{ zIndex: 9999 }}>
             <div className="bg-white w-full max-w-4xl mx-4 rounded-xl shadow-2xl flex flex-col" style={{ height: '90vh' }}>
               <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 flex-shrink-0">
                 <h2 className="text-sm font-semibold text-gray-800">Report Preview{exportTab !== 'full' && <span className="ml-2 text-xs font-normal text-[#c9a84c]">— {({ pl: 'P&L', tax: 'Tax', flags: 'Flags', om: 'OM As-Presented', inputs: 'Inputs', full: '' } as Record<ExportTab, string>)[exportTab]}</span>}</h2>
@@ -2184,7 +2184,7 @@ export function ModelCalculator({
             </div>
           </div>
         )
-      })()}
+      })(), document.body)}
     </div>
   )
 }
