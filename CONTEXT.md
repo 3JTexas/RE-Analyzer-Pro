@@ -72,8 +72,9 @@ supabase/
 ## Database Schema
 
 ```sql
-properties (id, user_id, name, address, units, year_built, notes, compare_state jsonb, created_at, updated_at)
-scenarios  (id, property_id, user_id, name, method, inputs jsonb, is_default, created_at, updated_at)
+properties     (id, user_id, name, address, units, year_built, notes, compare_state jsonb, display_order, crexi_url, property_image_url, created_at, updated_at)
+scenarios      (id, property_id, user_id, name, method, inputs jsonb, is_default, created_at, updated_at)
+user_defaults  (id, user_id, defaults jsonb, created_at, updated_at)
 ```
 
 ---
@@ -84,18 +85,26 @@ scenarios  (id, property_id, user_id, name, method, inputs jsonb, is_default, cr
 // Income
 tu, ou, rent, vp
 otherIncome: { label, amount }[]
+rentRoll?: RentRollUnit[]       // per-unit rent roll
+useRentRoll?: boolean           // toggle: true = use rent roll, false = blended avg
 
 // Financing
 price, ir, lev, am, lf, cc
 
 // Expenses
-tax, ins, util, rm, cs, ga, res, pm
+tax, ins, utilElec, utilElecSubmetered, utilWater, utilWaterSubmetered, utilTrash, util
+rm, cs, ga, res, pm
 expCollapse: boolean
 expPct: number
 otherExpenses: { label, amount }[]
 
-// Tax
+// Tax (all on Tax tab — NOT Inputs tab)
 brk, land, costSeg, is1031, basis1031, equity1031
+
+// 1031 Exchange Analysis
+priorSalePrice?, priorSellingCostsPct? (default 5), priorMortgagePayoff?
+priorPurchasePrice?, priorImprovements?, priorDepreciation?
+cgRate? (default 20), reclaimRate? (default 25), applyExcessToDown?
 
 // Offer calculator
 targetCapRate?: number
@@ -109,11 +118,14 @@ offerCalcMode?: 'cap' | 'price'
 
 ## Model Logic (calc.ts)
 
+- Income: rent roll path (sum non-vacant unit rents) OR blended avg (rent × tu × 12)
 - EGI = collected + sum(otherIncome)
 - Expenses: itemized OR EGI × expPct% + otherExpenses
 - Depreciation: is1031 + basis1031 > 0 → carryover basis; else price × (1 - land%)
 - Cost seg: costSeg% of deprBase → 100% bonus; remainder → 27.5yr SL
-- equity1031 reduces cash to close
+- 1031: calc1031() computes adjusted basis, capital gain, recapture tax, cap gains tax, total tax deferred, net proceeds, excess capital
+- applyExcessToDown overrides loan = price - netProceeds (improves DCR)
+- equity1031 auto-set from calc1031 netProceeds when priorSalePrice > 0
 - All defaults zero
 
 ---
@@ -136,9 +148,9 @@ const effectiveMethod = (inputs.ou > 0 && inputs.ou < inputs.tu) ? 'physical' : 
 
 1. **OM** — broker's as-presented figures, read-only, unlock to edit
 2. **Flags** — auto-computed OM discrepancy flags + stressed scenario metrics. Red dot when high-risk flags exist.
-3. **Inputs** — buyer's underwriting inputs
-4. **P&L** — income statement + offer calculator
-5. **Tax** — REP + bonus dep + 1031 analysis (hidden on OM scenario)
+3. **Inputs** — buyer's underwriting inputs (Income, Financing, Expenses only — no tax fields)
+4. **P&L** — income statement + offer calculator + 1031 equity applied banner
+5. **Tax** — Tax Strategy inputs (brk, land%, costSeg%, 1031 toggle) + 1031 Exchange Analysis + Bonus Depreciation + 27.5yr Depreciation Schedule + REP analysis + Return on equity (hidden on OM scenario)
 6. **Compare** — multi-scenario side-by-side (A baseline + B/C/D vs A)
 
 ---
@@ -167,11 +179,16 @@ Fields: `targetCapRate`, `targetOfferPrice`, `offerCalcMode` persist in `ModelIn
 
 ---
 
-## 1031 Exchange Fields
+## 1031 Exchange Analysis
 
-When `is1031` toggled on (hidden on OM scenario):
-- `equity1031` — proceeds rolling in (reduces cash to close)
-- `basis1031` — estimated carryover adjusted basis (determines depreciation base)
+Toggle `is1031` on Tax tab (hidden on OM scenario). Full analysis:
+- **Inputs:** priorSalePrice, sellingCostsPct (5%), mortgagePayoff, priorPurchasePrice, priorImprovements, priorDepreciation, cgRate (20%), reclaimRate (25%)
+- **Computed:** adjustedBasis, capitalGain, recaptureTax, capGainsTax, totalTaxDeferred, netProceeds, requiredDown, excessCapital
+- **applyExcessToDown** checkbox: applies excess 1031 proceeds to additional down payment, overrides loan amount in main calc, improves DCR
+- **equity1031** auto-calculated from netProceeds when priorSalePrice > 0 (read-only on Tax tab); editable when no prior sale data
+- **basis1031** — carryover adjusted basis for depreciation on new property (always editable)
+- **P&L tab** shows amber "1031 equity applied: $X" banner when active
+- Bar chart: "Sell & pay tax" vs "1031 Exchange" net proceeds comparison
 
 ---
 
@@ -197,22 +214,28 @@ When `is1031` toggled on (hidden on OM scenario):
 ## Supabase Edge Function: extract-om
 
 - **URL:** `https://mrraacrijhzlchskuzru.supabase.co/functions/v1/extract-om`
-- **Deployed:** Yes (last deployed Mar 23 2026)
-- **max_tokens:** 2000
+- **Deployed:** Yes (last deployed Mar 29 2026)
+- **max_tokens:** 4000
+- **Model:** claude-sonnet-4-20250514
 
 ### Extraction status:
 - ✅ price, tu, ou, rent (broker stated avg), vp, lev, ir, am
-- ✅ tax, ins, util, rm, cs, ga, res, pm
+- ✅ tax, ins, util, utilElec, utilWater, utilTrash, rm, cs, ga, res, pm — ALL as annual totals
+- ✅ utilElecSubmetered, utilWaterSubmetered booleans
 - ✅ otherIncome array, propertyName, propertyAddress, yearBuilt
+- ✅ rentRoll array — individual unit data when rent roll table present in OM
+- Post-extraction: ins/rm/res divided by tu (app stores per-unit internally)
 
 ---
 
 ## PDF Report
 
-- Cover page: property, address, units, year built, price, scenario, date
+- Cover page: property, address, units, year built, price, scenario, date, property photo
 - Page 2: key metrics, P&L, tax analysis, cash to close
-- Page 3: scenario comparison — columns from Compare tab selection order (A, B, C, D)
+- Rent roll page: when useRentRoll=true, Unit | Type | Sq Ft | Rent/mo | Lease End table with totals
+- Scenario comparison page: columns from Compare tab selection order (A, B, C, D)
 - Side-by-side only renders when 2+ scenarios selected in Compare tab
+- PDF preview modal before download
 
 ---
 
@@ -414,14 +437,87 @@ Note: `node_modules/`, `dist/`, and `ios/` are gitignored — `npm install` recr
 
 ---
 
-## Pending Features / Known Issues (updated)
+## Session — March 29, 2026
 
-1. **Method refactor** — remove `method` field from DB/types; derive purely from inputs
-2. **Settings / User Defaults page** — gear icon; user_defaults table; preferred defaults
-3. **Per-unit rent roll** — individual unit rows replacing blended avg
-4. **Update Node.js 20 → 24 in `deploy.yml`** — before June 2026 EOL
-5. **Responsive layout** — desktop breakpoint-aware design
+**Auth / Infrastructure fixes:**
+- Fixed 401 on extract-om edge function — root cause was "Verify JWT with legacy secret" toggle enabled in Supabase Edge Functions settings. Disabled it. Also switched OMSetupFlow from raw fetch to supabase.functions.invoke() for correct auth.
+- Fixed empty VITE_SUPABASE_ANON_KEY GitHub Actions secret — was blank, causing all production builds to have no key baked in.
+- Node.js 20 → 24 in deploy.yml
+
+**LOI template updates:**
+- Corrected legal language to match Andrew's reviewed PDF
+- Signature block: "Andrew Schildcrout for Chai Holdings, LLC / Its Managing Member"
+- Added Property Alterations, Purchase and Sale Agreement, and Brokers sections
+- Fixed two-column signature layout
+
+**Settings modal:**
+- Built SettingsModal with user defaults (brk, IR, LTV, land%, costSeg%, am, pm)
+- user_defaults Supabase table created
+- Accessible from avatar dropdown menu
+- Auto-closes after save confirmation
+
+**OM extraction fixes:**
+- Insurance, R&M, reserves now extracted as annual totals (were incorrectly per-unit)
+- Post-extraction conversion divides ins/rm/res by tu before storing (app stores per-unit internally)
+- OMSetupFlow stale data bug fixed — full state reset on mount
+
+**Per-unit rent roll:**
+- RentRollUnit type added (id, label, type, sqft, rent, leaseEnd, vacant)
+- useRentRoll toggle on Inputs tab
+- Rent roll table UI with add/delete rows, vacant checkbox, lease end dates
+- calc.ts income path: sum non-vacant unit rents when useRentRoll=true
+- OM extraction maps individual unit data to RentRollUnit[] when rent roll table present
+- PDF report shows rent roll table when useRentRoll is true
+
+**Tax tab — full reorganization:**
+- Moved brk, land%, costSeg%, is1031, equity1031, basis1031 OFF Inputs tab
+- Tax tab now has "Tax Strategy" section at top with all tax inputs in two-column layout
+- 1031 toggle gates entire 1031 Exchange Analysis section
+- Inputs tab now clean: Income, Financing, Expenses only
+- P&L tab shows amber "1031 equity applied: $X" banner when active
+
+**1031 Exchange Analysis — complete build:**
+- Full field set: prior sale price, selling costs %, mortgage payoff, original purchase price, capital improvements, depreciation taken, cap gains rate %, recapture rate %
+- calc1031() function in calc.ts: adjusted basis, capital gain, recapture tax, cap gains tax, total tax deferred, net proceeds, required down, excess capital
+- applyExcessToDown checkbox — applies excess 1031 proceeds to down payment, reduces loan in main calc, improves DCR
+- equity1031 auto-calculated from net proceeds when priorSalePrice > 0
+- All 8 fields have descriptive tooltips
+- Bar chart: "Sell & pay tax" vs "1031 Exchange" net proceeds comparison
+
+**Tax tab — bonus dep and depreciation visualizations:**
+- Three chart sections: 1031 Exchange Analysis, Bonus Depreciation, 27.5-Year Depreciation Schedule
+- Each has summary card + Chart.js bar chart (via react-chartjs-2)
+- Bonus dep chart shows Year 1 red bar (paper loss) vs green years 2-10
+- 27.5-yr chart shows teal annual bars + blue cumulative line, dual y-axis
+- Descriptive tooltips on all section headers explaining SL, bonus dep, 1031 mechanics
+
+**Tooltip clipping fix:**
+- InfoTooltip component uses position:fixed + ReactDOM.createPortal to escape overflow:hidden containers
+- Applied to InputField, SectionHeader, and ColTip tooltips
+
+**PDF preview modal:**
+- PDF now previews in modal before download
+- PDFViewer renders inline, Download button in modal header
+
+**Crexi URL field:**
+- crexi_url column added to properties table
+- "View on Crexi" button in property header when URL is set
+- Inline edit via pencil icon
+
+**Drag to reorder properties:**
+- display_order column added to properties table
+- Grip handle on property cards for drag reorder
+- Order persists to Supabase
 
 ---
 
-*Last updated: March 25, 2026*
+## Pending Features / Known Issues (updated)
+
+1. **Method refactor** — remove `method` field from DB/types; derive purely from inputs. Currently auto-derived at runtime as workaround.
+2. **Responsive layout** — desktop breakpoint-aware design
+3. **Verify rent roll extraction** — test end-to-end with Bay Drive OM
+4. **Tax assessor PDF import** — extract-tax-record edge function + TaxRecordImport component (built Mar 25, needs testing)
+
+---
+
+*Last updated: March 29, 2026*
