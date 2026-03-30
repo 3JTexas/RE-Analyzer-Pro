@@ -8,7 +8,7 @@ import {
 } from '../ui'
 import { generatePDF, ReportDocument, fetchImageAsBase64 } from '../pdf/PdfReport'
 import type { ScenarioCol, ReportProps, ExportTab } from '../pdf/PdfReport'
-import { PDFViewer, BlobProvider } from '@react-pdf/renderer'
+import { PDFViewer, BlobProvider, pdf } from '@react-pdf/renderer'
 import { loadCompareState, saveCompareState } from '../../lib/uiState'
 import { LOIModal } from '../loi/LOIModal'
 import { TaxRecordImport } from '../TaxRecordImport'
@@ -944,6 +944,27 @@ export function ModelCalculator({
     })
     setShowPdfPreview(true)
   }
+  const handlePrintAll = async () => {
+    const compareOrder = [compareA, compareB, ...compareCols]
+    const cols: ScenarioCol[] = compareOrder
+      .map(sid => { const r = resolveInputs(sid); return { label: r.label, inputs: r.inputs, method: r.method as Method } })
+      .filter((col, i, arr) => arr.findIndex(c => c.label === col.label) === i)
+    let imageData: string | undefined
+    if (propertyImageUrl) { const b64 = await fetchImageAsBase64(propertyImageUrl); if (b64) imageData = b64 }
+    const safeProp = (propertyName || 'Property').replace(/[^a-zA-Z0-9]/g, '_')
+    const tabs: [ExportTab, string][] = [['full', 'Full_Report'], ['pl', 'PL'], ['tax', 'Tax'], ['flags', 'Flags'], ['om', 'OM'], ['inputs', 'Inputs']]
+    for (const [tab, suffix] of tabs) {
+      const blob = await pdf(
+        <ReportDocument inputs={inputs} method={effectiveMethod} propertyName={propertyName}
+          address={propertyAddress} units={propertyUnits ?? inputs.tu} yearBuilt={propertyYearBuilt ?? 0}
+          scenarioName={name} scenarioCols={cols} propertyImageUrl={imageData} exportTab={tab} />
+      ).toBlob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = `${safeProp}_${suffix}.pdf`; a.click()
+      URL.revokeObjectURL(url)
+    }
+  }
   const handleScenarioSwitch = (sid: string) => {
     const s = siblings.find(x => x.id === sid)
     if (s) window.location.href = `/scenario/${s.id}`
@@ -1014,15 +1035,23 @@ export function ModelCalculator({
     <div className="flex flex-col h-full bg-white">
       {/* Scenario name + actions */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
-        <select
-          value={currentScenarioId ?? 'current'}
-          onChange={e => handleScenarioSwitch(e.target.value)}
-          className="flex-1 text-sm font-semibold text-gray-900 bg-transparent border-b border-transparent focus:border-navy focus:outline-none pb-0.5 cursor-pointer">
-          <option value={currentScenarioId ?? 'current'}>{name}</option>
-          {siblings.filter(s => s.id !== currentScenarioId).map(s => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
+        <input
+          value={name}
+          onChange={e => setName(e.target.value)}
+          className="flex-1 text-sm font-semibold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-navy focus:outline-none pb-0.5 min-w-0"
+          spellCheck={false}
+        />
+        {siblings.filter(s => s.id !== currentScenarioId).length > 0 && (
+          <select
+            value=""
+            onChange={e => handleScenarioSwitch(e.target.value)}
+            className="text-xs text-gray-400 bg-transparent border border-gray-200 rounded px-1.5 py-1 cursor-pointer focus:outline-none hover:border-gray-300">
+            <option value="" disabled>Switch…</option>
+            {siblings.filter(s => s.id !== currentScenarioId).map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        )}
         {onSave && (
           <button onClick={handleSave} disabled={saving}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-navy text-white
@@ -1054,6 +1083,11 @@ export function ModelCalculator({
                   {label}
                 </button>
               ))}
+              <div className="border-t border-gray-200 my-1" />
+              <button onClick={() => { setShowPdfMenu(false); handlePrintAll() }}
+                className="w-full text-left px-3 py-1.5 text-xs font-semibold text-[#1a1a2e] hover:bg-[#c9a84c]/15 transition-colors">
+                Print All
+              </button>
             </div>
           )}
         </div>
@@ -2123,7 +2157,7 @@ export function ModelCalculator({
           <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center">
             <div className="bg-white w-full max-w-4xl mx-4 rounded-xl shadow-2xl flex flex-col" style={{ height: '90vh' }}>
               <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 flex-shrink-0">
-                <h2 className="text-sm font-semibold text-gray-800">Report Preview</h2>
+                <h2 className="text-sm font-semibold text-gray-800">Report Preview{exportTab !== 'full' && <span className="ml-2 text-xs font-normal text-[#c9a84c]">— {({ pl: 'P&L', tax: 'Tax', flags: 'Flags', om: 'OM As-Presented', inputs: 'Inputs', full: '' } as Record<ExportTab, string>)[exportTab]}</span>}</h2>
                 <div className="flex items-center gap-3">
                   <BlobProvider document={<ReportDocument {...pdfPreviewProps} />}>
                     {({ url, loading: pdfLoading }) => (
