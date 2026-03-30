@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import ReactDOM from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { Download, Save, RotateCcw, FileText, X, Eye, Trash2, ChevronDown } from 'lucide-react'
 import { calculate, calc1031, pmtCalcExport, OM_DEFAULTS, fmtDollar, fmtNeg, fmtPct, fmtX, fmtDelta, fmtDeltaPct } from '../../lib/calc'
 import type { ModelInputs, Method, Scenario, RentRollUnit } from '../../types'
@@ -751,6 +752,7 @@ export function ModelCalculator({
   propertyName = 'Investment Property', propertyAddress = '',
   propertyUnits, propertyYearBuilt, propertyId, propertyImageUrl,
 }: ModelProps) {
+  const navigate = useNavigate()
   const [inputs, setInputs] = useState<ModelInputs>({
     ...OM_DEFAULTS,
     ...initialInputs,
@@ -967,7 +969,7 @@ export function ModelCalculator({
   }
   const handleScenarioSwitch = (sid: string) => {
     const s = siblings.find(x => x.id === sid)
-    if (s) window.location.href = `/scenario/${s.id}`
+    if (s) navigate(`/scenario/${s.id}`)
   }
 
   const openLOI = () => {
