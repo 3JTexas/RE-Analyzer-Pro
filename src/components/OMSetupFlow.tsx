@@ -67,14 +67,6 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
   const [inputs, setInputs] = useState<ModelInputs>({ ...OM_DEFAULTS })
   const { loadDefaults } = useUserDefaults()
 
-  // Merge user defaults into initial inputs on mount
-  useEffect(() => {
-    loadDefaults().then(d => {
-      if (Object.keys(d).length > 0) {
-        setInputs(prev => ({ ...prev, ...d }))
-      }
-    })
-  }, [])
   const [pdfStatus, setPdfStatus] = useState<PdfStatus>('idle')
   const [pdfError, setPdfError] = useState('')
   const [pdfFiles, setPdfFiles] = useState<File[]>([])
@@ -84,6 +76,26 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
   const [propertyYearBuilt, setPropertyYearBuilt] = useState<number | undefined>(undefined)
   const [propertyImageUrl, setPropertyImageUrl] = useState<string | undefined>(undefined)
   const [photoUploading, setPhotoUploading] = useState(false)
+
+  // Reset all form state on mount — prevents stale data when component is reused
+  useEffect(() => {
+    setMode('choose')
+    setInputs({ ...OM_DEFAULTS })
+    setPdfStatus('idle')
+    setPdfError('')
+    setPdfFiles([])
+    setScenarioName(defaultScenarioName)
+    setPropertyName('')
+    setPropertyAddress('')
+    setPropertyYearBuilt(undefined)
+    setPropertyImageUrl(undefined)
+    // Merge user defaults (financing prefs only) into clean state
+    loadDefaults().then(d => {
+      if (Object.keys(d).length > 0) {
+        setInputs(prev => ({ ...prev, ...d }))
+      }
+    })
+  }, [defaultScenarioName])
   const fileRef = useRef<HTMLInputElement>(null)
   const photoRef = useRef<HTMLInputElement>(null)
 
@@ -168,6 +180,13 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
       // Default ou to tu if not extracted (100% occupied assumption)
       if ((merged.ou === 0 || merged.ou === undefined) && merged.tu > 0) {
         merged.ou = merged.tu
+      }
+
+      // Extraction returns annual totals — convert ins, rm, res to per-unit
+      if (merged.tu > 0) {
+        if (merged.ins > 0) merged.ins = Math.round(merged.ins / merged.tu)
+        if (merged.rm > 0) merged.rm = Math.round(merged.rm / merged.tu)
+        if (merged.res > 0) merged.res = Math.round(merged.res / merged.tu)
       }
 
       // Auto-sum utility sub-fields if util wasn't extracted directly

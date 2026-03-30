@@ -42,30 +42,29 @@ Deno.serve(async (req) => {
   "ir": "Interest rate as a percentage e.g. 6.5 not 0.065. Look for 'interest rate', 'note rate', 'mortgage rate' (number)",
   "am": "Loan amortization in years e.g. 30. Look for 'amortization', 'loan term' (number)",
   "tax": "Annual real estate taxes in dollars. Look for 'real estate taxes', 'property taxes', 'taxes' in the expense section (number)",
-  "ins": "Insurance cost PER UNIT PER YEAR in dollars. If the OM shows a total, divide by number of units. Look for 'insurance' in the expense section (number)",
+  "ins": "Annual insurance cost for the ENTIRE PROPERTY in dollars — this must be the annual total, NOT per-unit. Look for 'insurance' in the expense section (number)",
   "utilElec": "Annual landlord-paid electric costs in dollars. Look for 'electric', 'electricity', 'common area electric' in the expense section (number)",
   "utilElecSubmetered": "true if the document mentions tenants paying electric directly: 'tenant pays electric', 'separately metered', 'sub-metered electric', 'individually metered', 'tenants responsible for electric', 'FPL in tenant name'. Also check investment highlights, property description, and unit amenities sections. false if landlord pays or no mention found (boolean)",
   "utilWater": "Annual water and sewer costs in dollars. Look for 'water', 'sewer', 'water & sewer' in the expense section (number)",
   "utilWaterSubmetered": "true if the document mentions tenants paying water separately: 'tenant pays water', 'sub-metered water', 'individually metered water', 'RUBS', 'ratio utility billing'. Also check investment highlights and property description. false if landlord pays or no mention found (boolean)",
   "utilTrash": "Annual trash removal costs in dollars. Look for 'trash', 'garbage', 'waste removal' in the expense section (number)",
   "util": "Total annual utilities in dollars. If individual utility line items are found, this should be their sum. If only a single combined utility figure is shown, use that here and leave the individual fields null (number)",
-  "rm": "Repairs and maintenance PER UNIT PER YEAR in dollars. If the OM shows a total, divide by number of units. Look for 'repairs', 'maintenance', 'R&M' in expenses (number)",
+  "rm": "Annual repairs and maintenance for the ENTIRE PROPERTY in dollars — this must be the annual total, NOT per-unit. Look for 'repairs', 'maintenance', 'R&M' in expenses (number)",
   "cs": "Annual contract services in dollars. Look for 'contract services', 'landscaping', 'pest control', 'janitorial' in expenses (number)",
   "ga": "Annual general and administrative costs in dollars. Look for 'G&A', 'general and administrative', 'admin' in expenses (number)",
-  "res": "Capital reserves PER UNIT PER YEAR in dollars. If the OM shows a total, divide by number of units. Look for 'reserves', 'replacement reserves', 'capital reserves' in expenses (number)",
+  "res": "Annual capital reserves for the ENTIRE PROPERTY in dollars — this must be the annual total, NOT per-unit. Look for 'reserves', 'replacement reserves', 'capital reserves' in expenses (number)",
   "pm": "Property management fee as a percentage of income e.g. 8 not 0.08. Look for 'management', 'property management', 'mgmt fee' (number)",
   "otherIncome": "Array of other income items not included in rent. Each item: { label: string, amount: number (annual dollars) }. Look for 'laundry', 'parking', 'storage', 'other income', 'ancillary income'. Return [] if none found.",
   "propertyImageUrl": null
 }
 
 Important extraction tips:
-- Expenses may be shown as annual totals OR per-unit amounts — if per-unit, multiply by number of units to get annual total
-- Rent may be shown as monthly gross potential rent — divide by number of units to get per-unit monthly rent
+- All expense figures must be ANNUAL TOTALS for the ENTIRE PROPERTY. If an expense is shown per-unit, multiply by the number of units. If shown monthly, multiply by 12. Never return per-unit or per-month figures.
+- This applies to ALL expense fields: tax, ins, util, utilElec, utilWater, utilTrash, rm, cs, ga, res — every one must be the full annual total for the whole property.
+- Rent is the ONLY field that should be per-unit (monthly per-unit rent).
 - Vacancy may be shown as a dollar amount — divide by gross potential rent to get percentage
 - LTV and interest rate are often in a 'financing' or 'loan assumptions' section
 - If you see a pro forma or T12 operating statement, prefer the T12 (trailing 12 months) figures over pro forma projections
-- Insurance (ins), R&M (rm), and Reserves (res) should be returned as PER-UNIT ANNUAL amounts — if the OM shows a total, divide by number of units
-- Tax (tax), utilities (util, utilElec, utilWater, utilTrash), contract services (cs), and G&A (ga) should be returned as ANNUAL TOTALS for the whole property — if shown monthly, multiply by 12
 - On Crexi-format OMs, financial data is often in tables labeled 'Financial Summary', 'Income & Expenses', 'Operating Statement', or 'Financials'
 - Look at ALL pages of the document — expenses and financing details are often on page 2 or 3`
 
