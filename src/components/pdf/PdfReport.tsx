@@ -575,6 +575,20 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
               <PLRowComp label="Net 1031 proceeds" value={fmtDollar(ex.netProceeds)} variant="noi" />
               <PLRowComp label={`Required down (${inputs.lev}% LTV)`} value={fmtDollar(ex.requiredDown)} indent />
               <PLRowComp label="Excess capital" value={ex.excessCapital > 0 ? fmtDollar(ex.excessCapital) : '$0'} variant={ex.excessCapital > 0 ? 'pos' : 'normal'} />
+
+              {/* 1031 comparison — replaces bar chart */}
+              <View style={[s.metricsRow, { marginTop: 8 }]}>
+                <View style={[s.metricCard, { backgroundColor: '#FCEBEB', borderWidth: 0.5, borderColor: '#f09595' }]}>
+                  <Text style={{ fontSize: 7, color: '#888', marginBottom: 3 }}>Sell &amp; Pay Tax</Text>
+                  <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: C.red }}>{fmtDollar(Math.max(0, ex.netProceeds - ex.totalTaxDeferred))}</Text>
+                  <Text style={{ fontSize: 7, color: '#888', marginTop: 3 }}>Net after {fmtDollar(ex.totalTaxDeferred)} tax</Text>
+                </View>
+                <View style={[s.metricCard, { backgroundColor: '#EAF3DE', borderWidth: 0.5, borderColor: '#97c459' }]}>
+                  <Text style={{ fontSize: 7, color: '#888', marginBottom: 3 }}>1031 Exchange</Text>
+                  <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: C.green }}>{fmtDollar(ex.netProceeds)}</Text>
+                  <Text style={{ fontSize: 7, color: '#888', marginTop: 3 }}>Tax deferred — {fmtDollar(ex.totalTaxDeferred)} saved</Text>
+                </View>
+              </View>
             </>
           )
         })()}
@@ -598,11 +612,59 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
               <PLRowComp label="Year 1 paper loss" value={y1PaperLoss < 0 ? `(${fmtDollar(Math.abs(y1PaperLoss))})` : fmtDollar(y1PaperLoss)} variant={y1PaperLoss < 0 ? 'pos' : 'normal'} indent />
               <PLRowComp label={`Year 1 tax benefit @ ${d.brk}%`} value={fmtDollar(y1TaxBenefit)} variant="total" />
 
+              {/* 10-year NOI vs Taxable Income table — replaces bar chart */}
+              <View style={[s.table, { marginTop: 6 }]}>
+                <View style={[s.tableHdrRow, { backgroundColor: '#1a1a2e' }]}>
+                  <Text style={[s.tableHdrCell, { width: 28, color: 'white' }]}>Yr</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>NOI</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>Deductions</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>Taxable</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>Tax Shield</Text>
+                </View>
+                {Array.from({ length: 10 }, (_, i) => i + 1).map(yr => {
+                  const ded = yr === 1 ? bonusDed + slAnnual : slAnnual
+                  const taxable = d.NOI - ded
+                  const shield = Math.max(0, -taxable) * bracket
+                  return (
+                    <View key={yr} style={[s.tableRow, { backgroundColor: yr === 1 ? '#EFF6FF' : yr % 2 === 0 ? '#f9f9f9' : '#fff' }]}>
+                      <Text style={[s.tableCell, { width: 28, fontFamily: 'Helvetica-Bold' }]}>{yr}</Text>
+                      <Text style={[s.tableCellR, { flex: 1 }]}>{fmtDollar(d.NOI)}</Text>
+                      <Text style={[s.tableCellR, { flex: 1, color: C.green }]}>({fmtDollar(ded)})</Text>
+                      <Text style={[s.tableCellR, { flex: 1, color: taxable < 0 ? C.red : C.green }]}>{taxable < 0 ? `(${fmtDollar(Math.abs(taxable))})` : fmtDollar(taxable)}</Text>
+                      <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: shield > 0 ? C.green : C.textMuted }]}>{shield > 0 ? fmtDollar(shield) : '\u2014'}</Text>
+                    </View>
+                  )
+                })}
+              </View>
+
               <SectionHdr title="27.5-Year straight-line depreciation" />
               <PLRowComp label="SL depreciable basis" value={fmtDollar(slDepBasis)} />
               <PLRowComp label="Annual SL deduction" value={fmtDollar(slDepBasis / 27.5)} variant="pos" indent />
               <PLRowComp label={`Annual tax shield @ ${d.brk}%`} value={fmtDollar(annualShield)} variant="total" />
               <PLRowComp label="Total shield over 27.5 yrs" value={fmtDollar(annualShield * 27.5)} variant="pos" indent />
+
+              {/* Depreciation schedule — sampled years */}
+              <View style={[s.table, { marginTop: 6 }]}>
+                <View style={[s.tableHdrRow, { backgroundColor: '#1a1a2e' }]}>
+                  <Text style={[s.tableHdrCell, { width: 28, color: 'white' }]}>Yr</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>Annual Deduction</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>Annual Shield</Text>
+                  <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>Cumulative Saved</Text>
+                </View>
+                {[1, 2, 5, 10, 15, 20, 25, 27, 28].map((yr, idx) => {
+                  const annDed = yr <= 27 ? slDepBasis / 27.5 : yr === 28 ? (slDepBasis / 27.5) * 0.5 : slDepBasis / 27.5
+                  const shield = yr <= 28 ? (yr <= 27 ? annualShield : annualShield * 0.5) : 0
+                  const cum = yr <= 27 ? annualShield * yr : annualShield * 27 + annualShield * 0.5
+                  return (
+                    <View key={yr} style={[s.tableRow, { backgroundColor: idx % 2 === 0 ? '#fff' : '#f9f9f9' }]}>
+                      <Text style={[s.tableCell, { width: 28, fontFamily: 'Helvetica-Bold' }]}>{yr}</Text>
+                      <Text style={[s.tableCellR, { flex: 1, color: C.green }]}>{yr <= 28 ? fmtDollar(annDed) : '\u2014'}</Text>
+                      <Text style={[s.tableCellR, { flex: 1, color: C.green }]}>{shield > 0 ? fmtDollar(shield) : '\u2014'}</Text>
+                      <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: C.blue }]}>{fmtDollar(cum)}</Text>
+                    </View>
+                  )
+                })}
+              </View>
             </>
           )
         })()}
