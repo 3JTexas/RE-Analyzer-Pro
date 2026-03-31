@@ -994,6 +994,28 @@ export function ModelCalculator({
       el.style.height = 'auto'
       el.style.maxHeight = 'none'
 
+      // Replace input/select elements with styled spans for accurate text rendering
+      const replacements: { el: HTMLElement; parent: HTMLElement; placeholder: HTMLElement }[] = []
+      el.querySelectorAll('input, select').forEach(input => {
+        const inp = input as HTMLInputElement | HTMLSelectElement
+        const span = document.createElement('span')
+        const computed = window.getComputedStyle(inp)
+        span.textContent = inp.tagName === 'SELECT'
+          ? (inp as HTMLSelectElement).options[(inp as HTMLSelectElement).selectedIndex]?.text ?? inp.value
+          : inp.value
+        span.style.cssText = `
+          display: block; width: ${computed.width}; font-size: ${computed.fontSize};
+          font-weight: ${computed.fontWeight}; font-family: ${computed.fontFamily};
+          color: ${computed.color}; background: ${computed.backgroundColor};
+          border: ${computed.border}; border-radius: ${computed.borderRadius};
+          padding: ${computed.padding}; line-height: ${computed.lineHeight};
+          box-sizing: border-box; white-space: nowrap; overflow: visible;
+        `
+        inp.parentElement!.insertBefore(span, inp)
+        inp.style.display = 'none'
+        replacements.push({ el: inp as HTMLElement, parent: inp.parentElement! as HTMLElement, placeholder: span })
+      })
+
       const canvas = await html2canvas(el, {
         scale: 2,
         useCORS: true,
@@ -1003,7 +1025,11 @@ export function ModelCalculator({
         windowHeight: el.scrollHeight,
       })
 
-      // Restore
+      // Restore inputs
+      replacements.forEach(({ el: inp, placeholder }) => {
+        (inp as HTMLElement).style.display = ''
+        placeholder.remove()
+      })
       el.style.overflow = prevOverflow
       el.style.height = prevHeight
       el.style.maxHeight = prevMaxHeight
