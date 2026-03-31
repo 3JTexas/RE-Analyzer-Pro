@@ -1629,7 +1629,7 @@ export function ModelCalculator({
             <DCRBar dcr={d.dcr} />
             <div className="mt-2 mb-3"><Alert type={dcrAlert.type}>{dcrAlert.msg}</Alert></div>
             <div className="grid grid-cols-2 gap-2 mb-3">
-              <MetricCard label="Loan amount" value={fmtDollar(d.loan)} sub={inputs.applyExcessToDown && inputs.is1031 ? 'reduced by 1031 equity' : `${d.lev.toFixed(0)}% LTV`} />
+              <MetricCard label="Loan amount" value={fmtDollar(d.loan)} sub={inputs.applyExcessToDown && inputs.is1031 && Math.max(0, (inputs.equity1031 ?? 0) - inputs.price * (1 - inputs.lev / 100) - (inputs.price * inputs.lev / 100) * inputs.lf / 100 - d.ccAmt) > 0 ? 'reduced by 1031 equity' : `${d.lev.toFixed(0)}% LTV`} />
               <MetricCard label="Annual debt service" value={fmtDollar(d.ds)} sub={`${fmtDollar(d.mp)}/mo`} />
               <MetricCard label="Equity required" value={fmtDollar(d.eq)} sub={inputs.is1031 && inputs.equity1031 >= d.eq ? `covered by 1031 · ${fmtDollar(Math.max(0, inputs.equity1031 - d.eq - d.ccAmt))} excess` : 'down + lender fee'} valueColor={inputs.is1031 && inputs.equity1031 >= d.eq ? 'text-green-700' : undefined} />
               <MetricCard label="Cash to close" value={fmtDollar(Math.max(0, d.eq + d.ccAmt - (inputs.equity1031 ?? 0)))} sub={inputs.is1031 && inputs.equity1031 > 0 ? `after $${Math.round(inputs.equity1031).toLocaleString()} 1031 equity` : inputs.cc > 0 ? `incl. ${inputs.cc}% closing costs` : "closing costs not set"} valueColor={inputs.equity1031 > d.eq + d.ccAmt ? "text-amber-600" : undefined} />
@@ -1653,7 +1653,7 @@ export function ModelCalculator({
                       <span>Purchase price</span><span className="font-medium">{fmtDollar(inputs.price)}</span>
                     </div>
                     <div className="flex justify-between text-gray-600">
-                      <span>Loan ({inputs.applyExcessToDown ? 'after 1031' : `${d.lev.toFixed(0)}% LTV`})</span>
+                      <span>Loan ({inputs.applyExcessToDown && excessBeforeApply > 0 ? 'after 1031' : `${d.lev.toFixed(0)}% LTV`})</span>
                       <span className="font-medium">({fmtDollar(d.loan)})</span>
                     </div>
                     <div className="flex justify-between text-gray-900 font-semibold border-t border-gray-200 pt-1">
