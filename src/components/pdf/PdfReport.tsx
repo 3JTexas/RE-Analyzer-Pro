@@ -197,6 +197,119 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
     </View>
   ) : null
 
+  // Tax benefit table renderer — used by both standalone tax page and full report
+  const renderTaxBenefitTable = () => {
+    if (!(d.brk > 0 && (inputs.costSeg > 0 || inputs.land < 100))) return null
+    const bracket = d.brk / 100
+    const bonusDeprBase = d.deprBase * (inputs.costSeg / 100)
+    const slDeprBase = d.deprBase - bonusDeprBase
+    const bonusDeprSavings = bonusDeprBase * bracket
+    const slAnnualDepr = slDeprBase / 27.5
+    const slAnnualSavings = slAnnualDepr * bracket
+    const preTaxCF = d.NOI - d.ds
+    const preTaxTaxSavings = Math.abs(Math.min(preTaxCF, 0)) * bracket
+    const afterTaxY1 = preTaxCF + bonusDeprSavings + slAnnualSavings + preTaxTaxSavings
+    const afterTaxY2 = preTaxCF + slAnnualSavings + preTaxTaxSavings
+
+    type TR = { yr: number; ptCF: number; bonus: number; sl: number; opLoss: number; total: number; cum: number; isExhaust: boolean }
+    const rows: TR[] = []
+    let cum = 0
+    let exhaustYear = 0
+    for (let yr = 1; yr <= 30; yr++) {
+      const bonus = yr === 1 ? bonusDeprSavings : 0
+      const total = yr === 1 ? afterTaxY1 : afterTaxY2
+      cum += total
+      const isExhaust = exhaustYear === 0 && cum <= 0 && yr > 1
+      if (isExhaust) exhaustYear = yr
+      rows.push({ yr, ptCF: preTaxCF, bonus, sl: slAnnualSavings, opLoss: preTaxTaxSavings, total, cum, isExhaust })
+      if (exhaustYear > 0 && yr >= Math.max(exhaustYear, 3)) break
+      if (yr >= 30) break
+    }
+    const showRows = exhaustYear > 0 ? rows : rows.slice(0, 10)
+    const neverExhausted = exhaustYear === 0
+    const fmtV = (v: number) => Math.abs(v) < 0.5 ? '\u2014' : v < 0 ? `(${fmtDollar(Math.abs(v))})` : fmtDollar(v)
+    const vc = (v: number) => Math.abs(v) < 0.5 ? '#9CA3AF' : v < 0 ? '#DC2626' : '#15803D'
+    const totPt = showRows.reduce((a, r) => a + r.ptCF, 0)
+    const totBonus = bonusDeprSavings
+    const totSl = showRows.reduce((a, r) => a + r.sl, 0)
+    const totOp = showRows.reduce((a, r) => a + r.opLoss, 0)
+    const totTotal = showRows.reduce((a, r) => a + r.total, 0)
+    const y1Total = bonusDeprSavings + slAnnualSavings + preTaxTaxSavings
+    const y2Total = slAnnualSavings + preTaxTaxSavings
+    const exLabel = neverExhausted ? '30+ Years' : `Year ${exhaustYear}`
+
+    return (
+      <>
+        <Text style={{ fontSize: 9, color: '#444444', marginBottom: 4, marginTop: 8, lineHeight: 1.5 }}>
+          Year 1 delivers a one-time tax benefit of {fmtDollar(y1Total)} through bonus depreciation on {fmtDollar(bonusDeprBase)} of cost-segregated assets at a {d.brk}% bracket — a real cash return from reduced tax liability on other income.
+        </Text>
+        <Text style={{ fontSize: 9, color: '#444444', marginBottom: 10, lineHeight: 1.5 }}>
+          Ongoing straight-line depreciation generates {fmtDollar(slAnnualSavings)}/year through Year {Math.floor(27.5)} before the depreciable basis is fully recovered.{' '}
+          {neverExhausted
+            ? 'The after-tax benefit is not exhausted within 30 years.'
+            : `The after-tax benefit exhausts in Year ${exhaustYear} when the cumulative balance reaches zero.`}
+        </Text>
+        <View style={s.metricsRow}>
+          <View style={[s.metricCard, { backgroundColor: '#f8f8f8', borderWidth: 0.5, borderColor: '#e0e0e0' }]}>
+            <Text style={{ fontSize: 7, color: '#888', marginBottom: 3 }}>Year 1 Tax Benefit</Text>
+            <Text style={{ fontSize: 15, fontFamily: 'Helvetica-Bold', color: '#1a1a2e' }}>{fmtDollar(y1Total)}</Text>
+            <Text style={{ fontSize: 7, color: '#888', marginTop: 3 }}>Bonus dep + SL dep + op loss savings</Text>
+          </View>
+          <View style={[s.metricCard, { backgroundColor: '#f8f8f8', borderWidth: 0.5, borderColor: '#e0e0e0' }]}>
+            <Text style={{ fontSize: 7, color: '#888', marginBottom: 3 }}>Annual Ongoing (Yr 2+)</Text>
+            <Text style={{ fontSize: 15, fontFamily: 'Helvetica-Bold', color: '#1a1a2e' }}>{fmtDollar(y2Total)}</Text>
+            <Text style={{ fontSize: 7, color: '#888', marginTop: 3 }}>SL dep savings each year after Year 1</Text>
+          </View>
+          <View style={[s.metricCard, { backgroundColor: '#f8f8f8', borderWidth: 0.5, borderColor: '#e0e0e0' }]}>
+            <Text style={{ fontSize: 7, color: '#888', marginBottom: 3 }}>Benefit Exhausted</Text>
+            <Text style={{ fontSize: 15, fontFamily: 'Helvetica-Bold', color: '#1a1a2e' }}>{exLabel}</Text>
+            <Text style={{ fontSize: 7, color: '#888', marginTop: 3 }}>When cumulative after-tax returns to zero</Text>
+          </View>
+        </View>
+        <SectionHdr title="After-Tax Cash Flow — Year-by-Year" />
+        <View style={[s.table, { marginBottom: 4 }]}>
+          <View style={[s.tableHdrRow, { backgroundColor: '#1a1a2e' }]}>
+            <Text style={[s.tableHdrCell, { width: 28, color: 'white' }]}>Yr</Text>
+            <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>Pre-Tax CF</Text>
+            <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>Bonus Dep</Text>
+            <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>SL Dep</Text>
+            <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>Op. Loss</Text>
+            <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>After-Tax</Text>
+            <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>Cumulative</Text>
+          </View>
+          {showRows.map((r, i) => (
+            <View key={i} style={[s.tableRow, { backgroundColor: r.isExhaust ? '#FEF2F2' : r.yr === 1 ? '#EFF6FF' : i % 2 === 0 ? '#fff' : '#f9f9f9' }]}>
+              <Text style={[s.tableCell, { width: 28, fontFamily: 'Helvetica-Bold' }]}>{r.yr}</Text>
+              <Text style={[s.tableCellR, { flex: 1, color: vc(r.ptCF) }]}>{fmtV(r.ptCF)}</Text>
+              <Text style={[s.tableCellR, { flex: 1, color: r.bonus > 0.5 ? '#15803D' : '#9CA3AF' }]}>{r.bonus > 0.5 ? fmtDollar(r.bonus) : '\u2014'}</Text>
+              <Text style={[s.tableCellR, { flex: 1, color: '#15803D' }]}>{fmtV(r.sl)}</Text>
+              <Text style={[s.tableCellR, { flex: 1, color: r.opLoss > 0.5 ? '#15803D' : '#9CA3AF' }]}>{r.opLoss > 0.5 ? fmtDollar(r.opLoss) : '\u2014'}</Text>
+              <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: vc(r.total) }]}>{fmtV(r.total)}</Text>
+              <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: vc(r.cum) }]}>{fmtV(r.cum)}{r.isExhaust ? ' *' : ''}</Text>
+            </View>
+          ))}
+          <View style={[s.tableRow, { backgroundColor: '#1a1a2e' }]}>
+            <Text style={[s.tableCell, { width: 28, fontFamily: 'Helvetica-Bold', color: 'white' }]}>Tot</Text>
+            <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totPt)}</Text>
+            <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtDollar(totBonus)}</Text>
+            <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totSl)}</Text>
+            <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{totOp > 0.5 ? fmtDollar(totOp) : '\u2014'}</Text>
+            <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totTotal)}</Text>
+            <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(showRows[showRows.length - 1].cum)}</Text>
+          </View>
+        </View>
+        {neverExhausted && (
+          <Text style={{ fontSize: 7, color: '#888', fontFamily: 'Helvetica-Oblique', marginBottom: 4 }}>
+            * Benefit not exhausted within {showRows.length} years shown. Cumulative after-tax balance remains positive.
+          </Text>
+        )}
+        <Text style={{ fontSize: 7, color: '#888', fontFamily: 'Helvetica-Oblique', marginTop: 4, lineHeight: 1.5 }}>
+          Bonus depreciation reflects 100% first-year deduction on cost-segregated assets at stated bracket. Straight-line depreciation continues over 27.5 years. Operating loss savings apply only when pre-tax cash flow is negative. Tax benefit &quot;exhaustion&quot; represents the point at which cumulative after-tax returns equal zero — the property then relies solely on pre-tax cash flow. Consult a licensed CPA before making tax or investment decisions.
+        </Text>
+      </>
+    )
+  }
+
   // Flags computation (for flags page)
   const computeFlagsForPdf = () => {
     interface PdfFlag { severity: 'red' | 'amber' | 'info'; title: string; detail: string; omVal: string; benchmark: string; noImpact?: string }
@@ -322,11 +435,12 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
       </Page>}
 
       {/* ── P&L + Tax ──────────────────────────────────────────────────── */}
-      {(showPL || showTax) && <Page size="LETTER" style={s.page}>
+      {/* ── P&L standalone page (tab-specific export) ─────────────────── */}
+      {exportTab === 'pl' && <Page size="LETTER" style={s.page}>
         <Watermark />
-        <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} logoSrc={logoSrc} tabLabel={exportTab === 'pl' ? 'P&L' : exportTab === 'tax' ? 'Tax' : 'P&L + Tax'} />
+        <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} logoSrc={logoSrc} tabLabel="P&L" />
 
-        {showPL && <><SectionHdr title="Key metrics" />
+        <SectionHdr title="Key metrics" />
         <View style={s.metricsRow}>
           <View style={s.metricCard}>
             <Text style={s.metricLabel}>NOI</Text>
@@ -380,10 +494,146 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
               ? `DCR CAUTION: ${fmtX(d.dcr)} — Below 1.20× minimum. NOI must reach ${fmtDollar(d.ds * 1.2)}`
               : `DCR OK: ${fmtX(d.dcr)} — Clears 1.20× minimum. Cushion: ${fmtDollar(d.NOI - d.ds)}/yr`}
           </Text>
-        </View></>}
+        </View>
+
+        <SectionHdr title={`${isOM ? 'OM method' : 'Physical occupancy'} — income & expense`} />
+        <PLRowComp label={isOM ? 'Gross scheduled rent' : 'Gross potential rent'} value={fmtDollar(d.GSR)} variant="pos" />
+        <PLRowComp
+          label={isOM ? `Less: vacancy (${d.vp}%)` : `Less: physical vacancy (${d.tu - d.ou} units)`}
+          value={`(${fmtDollar(d.pv)})`} variant="neg" indent />
+        {!isOM && d.av > 0 && (
+          <PLRowComp label={`Less: turnover buffer (${d.vp}%)`} value={`(${fmtDollar(d.av)})`} variant="neg" indent />
+        )}
+        <PLRowComp label="Collected rental income" value={fmtDollar(d.col)} indent />
+        <PLRowComp label="Effective gross income" value={fmtDollar(d.EGI)} variant="total" />
+        <PLRowComp label="Real estate taxes" value={`(${fmtDollar(d.taxTotal)})`} variant="neg" indent />
+        <PLRowComp label={`Insurance (${d.tu} doors)`} value={`(${fmtDollar(d.ins)})`} variant="neg" indent />
+        <PLRowComp label="Utilities" value={`(${fmtDollar(d.util)})`} variant="neg" indent />
+        <PLRowComp label="R&M" value={`(${fmtDollar(d.rm)})`} variant="neg" indent />
+        <PLRowComp label="Contract services" value={`(${fmtDollar(d.cs)})`} variant="neg" indent />
+        <PLRowComp label="G&A" value={`(${fmtDollar(d.ga)})`} variant="neg" indent />
+        <PLRowComp label="Reserves" value={`(${fmtDollar(d.res)})`} variant="neg" indent />
+        <PLRowComp label={`Prop. mgmt (${d.pmPct.toFixed(1)}%)`} value={`(${fmtDollar(d.pm)})`} variant="neg" indent />
+        <PLRowComp label="Total expenses" value={`(${fmtDollar(d.exp)})`} variant="total" />
+        <PLRowComp label="Net operating income" value={fmtDollar(d.NOI)} variant="noi" />
+        <PLRowComp label="Annual debt service" value={`(${fmtDollar(d.ds)})`} variant="neg" indent />
+        <PLRowComp label="Pre-tax cash flow" value={fmtNeg(d.CF)} variant="total" />
+
+        <SectionHdr title="Cash to close" />
+        <PLRowComp label="Down payment" value={fmtDollar(d.down)} />
+        <PLRowComp label="Lender origination fee" value={d.lfee > 0 ? `(${fmtDollar(d.lfee)})` : '$0'} variant="neg" indent />
+        {d.ccAmt > 0 && <PLRowComp label={`Closing costs (${inputs.cc}%)`} value={`(${fmtDollar(d.ccAmt)})`} variant="neg" indent />}
+        <PLRowComp label="Est. total cash to close" value={fmtDollar(d.eq + d.ccAmt)} variant="total" />
+      </Page>}
+
+      {/* ── Tax standalone page (tab-specific export) ─────────────────── */}
+      {exportTab === 'tax' && <Page size="LETTER" style={s.page}>
+        <Watermark />
+        <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} logoSrc={logoSrc} tabLabel="Tax" />
+
+        <SectionHdr title="Tax analysis — REP · 100% bonus dep · 1031" />
+        <PLRowComp label="NOI" value={fmtDollar(d.NOI)} variant="noi" />
+        <PLRowComp label="Less: Y1 mortgage interest" value={`(${fmtDollar(d.int1)})`} variant="neg" indent />
+        <PLRowComp label="Income before depreciation" value={fmtNeg(d.ti)} variant="total" />
+        <PLRowComp label="Bonus dep 5/7/15-yr (100%)" value={`(${fmtDollar(d.bd)})`} variant="pos" indent />
+        <PLRowComp label="27.5-yr SL depreciation" value={`(${fmtDollar(d.sl)})`} variant="pos" indent />
+        <PLRowComp label="Year 1 paper loss (REP)" value={`(${fmtDollar(Math.abs(d.loss))})`} variant="total" />
+        <PLRowComp label={`Tax savings @ ${d.brk}%`} value={fmtDollar(d.ts)} variant="pos" />
+        <PLRowComp label="After-tax cash flow" value={fmtNeg(d.at)} />
+        <PLRowComp label="Principal reduction (Y1)" value={fmtDollar(d.prin1)} variant="pos" indent />
+        <PLRowComp label="Total Y1 economic return" value={fmtDollar(d.y1)} variant="total" />
+
+        <SectionHdr title="Return on equity" />
+        <View style={s.metricsRow}>
+          <View style={s.metricCard}>
+            <Text style={s.metricLabel}>Pre-tax CoC</Text>
+            <Text style={[s.metricValue, { fontSize: 12, color: d.coc < 0 ? C.red : C.green }]}>{fmtPct(d.coc)}</Text>
+          </View>
+          <View style={s.metricCard}>
+            <Text style={s.metricLabel}>After-tax CoC</Text>
+            <Text style={[s.metricValue, { fontSize: 12, color: C.green }]}>{fmtPct(d.atc)}</Text>
+          </View>
+          <View style={s.metricCard}>
+            <Text style={s.metricLabel}>Y1 total ROE</Text>
+            <Text style={[s.metricValue, { fontSize: 12, color: C.green }]}>{fmtPct(d.r1)}</Text>
+          </View>
+          <View style={s.metricCard}>
+            <Text style={s.metricLabel}>Yr 2+ ROE</Text>
+            <Text style={[s.metricValue, { fontSize: 12 }]}>{fmtPct(d.r2)}</Text>
+          </View>
+        </View>
+
+        <SectionHdr title="Cash to close" />
+        <PLRowComp label="Down payment" value={fmtDollar(d.down)} />
+        <PLRowComp label="Lender origination fee" value={d.lfee > 0 ? `(${fmtDollar(d.lfee)})` : '$0'} variant="neg" indent />
+        {d.ccAmt > 0 && <PLRowComp label={`Closing costs (${inputs.cc}%)`} value={`(${fmtDollar(d.ccAmt)})`} variant="neg" indent />}
+        <PLRowComp label="Est. total cash to close" value={fmtDollar(d.eq + d.ccAmt)} variant="total" />
+        {renderTaxBenefitTable()}
+      </Page>}
+
+      {/* ── P&L + Tax combined page (full report) ──────────────────────── */}
+      {exportTab === 'full' && <Page size="LETTER" style={s.page}>
+        <Watermark />
+        <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} logoSrc={logoSrc} tabLabel="P&L + Tax" />
+
+        <SectionHdr title="Key metrics" />
+        <View style={s.metricsRow}>
+          <View style={s.metricCard}>
+            <Text style={s.metricLabel}>NOI</Text>
+            <Text style={[s.metricValue, { color: C.blue }]}>{fmtDollar(d.NOI)}</Text>
+            <Text style={s.metricSub}>{methodLabel}</Text>
+          </View>
+          <View style={s.metricCard}>
+            <Text style={s.metricLabel}>Cap rate</Text>
+            <Text style={s.metricValue}>{fmtPct(d.cap)}</Text>
+            <Text style={s.metricSub}>on purchase price</Text>
+          </View>
+          <View style={s.metricCard}>
+            <Text style={s.metricLabel}>DCR</Text>
+            <Text style={[s.metricValue, { color: dcrColor }]}>{fmtX(d.dcr)}</Text>
+            <Text style={s.metricSub}>lender min 1.20×</Text>
+          </View>
+          <View style={s.metricCard}>
+            <Text style={s.metricLabel}>Pre-tax cash flow</Text>
+            <Text style={[s.metricValue, { color: d.CF < 0 ? C.red : C.green }]}>{fmtNeg(d.CF)}</Text>
+            <Text style={s.metricSub}>after debt service</Text>
+          </View>
+        </View>
+        <View style={s.metricsRow}>
+          <View style={s.metricCard}>
+            <Text style={s.metricLabel}>Loan amount</Text>
+            <Text style={s.metricValue}>{fmtDollar(d.loan)}</Text>
+            <Text style={s.metricSub}>{d.lev.toFixed(0)}% LTV</Text>
+          </View>
+          <View style={s.metricCard}>
+            <Text style={s.metricLabel}>Annual debt service</Text>
+            <Text style={s.metricValue}>{fmtDollar(d.ds)}</Text>
+            <Text style={s.metricSub}>{fmtDollar(d.mp)}/mo</Text>
+          </View>
+          <View style={s.metricCard}>
+            <Text style={s.metricLabel}>Equity required</Text>
+            <Text style={s.metricValue}>{fmtDollar(d.eq)}</Text>
+            <Text style={s.metricSub}>down + lender fee</Text>
+          </View>
+          <View style={s.metricCard}>
+            <Text style={s.metricLabel}>Y1 total ROE</Text>
+            <Text style={[s.metricValue, { color: C.green }]}>{fmtPct(d.r1)}</Text>
+            <Text style={s.metricSub}>REP + bonus dep</Text>
+          </View>
+        </View>
+
+        <View style={d.dcr < 1 ? s.alertRed : d.dcr < 1.2 ? s.alertAmber : s.alertGreen}>
+          <Text style={s.alertText}>
+            {d.dcr < 1
+              ? `DCR FAIL: ${fmtX(d.dcr)} — NOI ${fmtDollar(d.NOI)} cannot cover debt service ${fmtDollar(d.ds)}`
+              : d.dcr < 1.2
+              ? `DCR CAUTION: ${fmtX(d.dcr)} — Below 1.20× minimum. NOI must reach ${fmtDollar(d.ds * 1.2)}`
+              : `DCR OK: ${fmtX(d.dcr)} — Clears 1.20× minimum. Cushion: ${fmtDollar(d.NOI - d.ds)}/yr`}
+          </Text>
+        </View>
 
         <View style={s.twoCol}>
-          {showPL && <View style={s.col}>
+          <View style={s.col}>
             <SectionHdr title={`${isOM ? 'OM method' : 'Physical occupancy'} — income & expense`} />
             <PLRowComp label={isOM ? 'Gross scheduled rent' : 'Gross potential rent'} value={fmtDollar(d.GSR)} variant="pos" />
             <PLRowComp
@@ -406,9 +656,9 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
             <PLRowComp label="Net operating income" value={fmtDollar(d.NOI)} variant="noi" />
             <PLRowComp label="Annual debt service" value={`(${fmtDollar(d.ds)})`} variant="neg" indent />
             <PLRowComp label="Pre-tax cash flow" value={fmtNeg(d.CF)} variant="total" />
-          </View>}
+          </View>
 
-          {showTax && <View style={s.col}>
+          <View style={s.col}>
             <SectionHdr title="Tax analysis — REP · 100% bonus dep · 1031" />
             <PLRowComp label="NOI" value={fmtDollar(d.NOI)} variant="noi" />
             <PLRowComp label="Less: Y1 mortgage interest" value={`(${fmtDollar(d.int1)})`} variant="neg" indent />
@@ -448,134 +698,11 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
             <PLRowComp label="Lender origination fee" value={d.lfee > 0 ? `(${fmtDollar(d.lfee)})` : '$0'} variant="neg" indent />
             {d.ccAmt > 0 && <PLRowComp label={`Closing costs (${inputs.cc}%)`} value={`(${fmtDollar(d.ccAmt)})`} variant="neg" indent />}
             <PLRowComp label="Est. total cash to close" value={fmtDollar(d.eq + d.ccAmt)} variant="total" />
-          </View>}
+          </View>
         </View>
 
         {/* ── Tax Benefit — Dynamic Table ─────────────────────────── */}
-        {showTax && d.brk > 0 && (inputs.costSeg > 0 || inputs.land < 100) && (() => {
-          const bracket = d.brk / 100
-          const bonusDeprBase = d.deprBase * (inputs.costSeg / 100)
-          const slDeprBase = d.deprBase - bonusDeprBase
-          const bonusDeprSavings = bonusDeprBase * bracket
-          const slAnnualDepr = slDeprBase / 27.5
-          const slAnnualSavings = slAnnualDepr * bracket
-          const preTaxCF = d.NOI - d.ds
-          const preTaxTaxSavings = Math.abs(Math.min(preTaxCF, 0)) * bracket
-          const afterTaxY1 = preTaxCF + bonusDeprSavings + slAnnualSavings + preTaxTaxSavings
-          const afterTaxY2 = preTaxCF + slAnnualSavings + preTaxTaxSavings
-
-          // Build rows until cumulative <= 0 or max 30yr, min 3yr
-          type TR = { yr: number; ptCF: number; bonus: number; sl: number; opLoss: number; total: number; cum: number; isExhaust: boolean }
-          const rows: TR[] = []
-          let cum = 0
-          let exhaustYear = 0
-          for (let yr = 1; yr <= 30; yr++) {
-            const bonus = yr === 1 ? bonusDeprSavings : 0
-            const total = yr === 1 ? afterTaxY1 : afterTaxY2
-            cum += total
-            const isExhaust = exhaustYear === 0 && cum <= 0 && yr > 1
-            if (isExhaust) exhaustYear = yr
-            rows.push({ yr, ptCF: preTaxCF, bonus, sl: slAnnualSavings, opLoss: preTaxTaxSavings, total, cum, isExhaust })
-            if (exhaustYear > 0 && yr >= Math.max(exhaustYear, 3)) break
-            if (yr >= 30) break
-          }
-          // If never exhausted and rows > 10, trim to 10
-          const showRows = exhaustYear > 0 ? rows : rows.slice(0, 10)
-          const neverExhausted = exhaustYear === 0
-
-          const fmtV = (v: number) => Math.abs(v) < 0.5 ? '\u2014' : v < 0 ? `(${fmtDollar(Math.abs(v))})` : fmtDollar(v)
-          const vc = (v: number) => Math.abs(v) < 0.5 ? '#9CA3AF' : v < 0 ? '#DC2626' : '#15803D'
-
-          // Totals
-          const totPt = showRows.reduce((s, r) => s + r.ptCF, 0)
-          const totBonus = bonusDeprSavings
-          const totSl = showRows.reduce((s, r) => s + r.sl, 0)
-          const totOp = showRows.reduce((s, r) => s + r.opLoss, 0)
-          const totTotal = showRows.reduce((s, r) => s + r.total, 0)
-
-          const y1Total = bonusDeprSavings + slAnnualSavings + preTaxTaxSavings
-          const y2Total = slAnnualSavings + preTaxTaxSavings
-          const exLabel = neverExhausted ? '30+ Years' : `Year ${exhaustYear}`
-
-          return (
-            <>
-              {/* Summary narrative */}
-              <Text style={{ fontSize: 9, color: '#444444', marginBottom: 4, marginTop: 8, lineHeight: 1.5 }}>
-                Year 1 delivers a one-time tax benefit of {fmtDollar(y1Total)} through bonus depreciation on {fmtDollar(bonusDeprBase)} of cost-segregated assets at a {d.brk}% bracket — a real cash return from reduced tax liability on other income.
-              </Text>
-              <Text style={{ fontSize: 9, color: '#444444', marginBottom: 10, lineHeight: 1.5 }}>
-                Ongoing straight-line depreciation generates {fmtDollar(slAnnualSavings)}/year through Year {Math.floor(27.5)} before the depreciable basis is fully recovered.{' '}
-                {neverExhausted
-                  ? 'The after-tax benefit is not exhausted within 30 years.'
-                  : `The after-tax benefit exhausts in Year ${exhaustYear} when the cumulative balance reaches zero.`}
-              </Text>
-
-              {/* Three metric cards */}
-              <View style={s.metricsRow}>
-                <View style={[s.metricCard, { backgroundColor: '#f8f8f8', borderWidth: 0.5, borderColor: '#e0e0e0' }]}>
-                  <Text style={{ fontSize: 7, color: '#888', marginBottom: 3 }}>Year 1 Tax Benefit</Text>
-                  <Text style={{ fontSize: 15, fontFamily: 'Helvetica-Bold', color: '#1a1a2e' }}>{fmtDollar(y1Total)}</Text>
-                  <Text style={{ fontSize: 7, color: '#888', marginTop: 3 }}>Bonus dep + SL dep + op loss savings</Text>
-                </View>
-                <View style={[s.metricCard, { backgroundColor: '#f8f8f8', borderWidth: 0.5, borderColor: '#e0e0e0' }]}>
-                  <Text style={{ fontSize: 7, color: '#888', marginBottom: 3 }}>Annual Ongoing (Yr 2+)</Text>
-                  <Text style={{ fontSize: 15, fontFamily: 'Helvetica-Bold', color: '#1a1a2e' }}>{fmtDollar(y2Total)}</Text>
-                  <Text style={{ fontSize: 7, color: '#888', marginTop: 3 }}>SL dep savings each year after Year 1</Text>
-                </View>
-                <View style={[s.metricCard, { backgroundColor: '#f8f8f8', borderWidth: 0.5, borderColor: '#e0e0e0' }]}>
-                  <Text style={{ fontSize: 7, color: '#888', marginBottom: 3 }}>Benefit Exhausted</Text>
-                  <Text style={{ fontSize: 15, fontFamily: 'Helvetica-Bold', color: '#1a1a2e' }}>{exLabel}</Text>
-                  <Text style={{ fontSize: 7, color: '#888', marginTop: 3 }}>When cumulative after-tax returns to zero</Text>
-                </View>
-              </View>
-
-              {/* Dynamic after-tax table */}
-              <SectionHdr title="After-Tax Cash Flow — Year-by-Year" />
-              <View style={[s.table, { marginBottom: 4 }]}>
-                <View style={[s.tableHdrRow, { backgroundColor: '#1a1a2e' }]}>
-                  <Text style={[s.tableHdrCell, { width: 28, color: 'white' }]}>Yr</Text>
-                  <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>Pre-Tax CF</Text>
-                  <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>Bonus Dep</Text>
-                  <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>SL Dep</Text>
-                  <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>Op. Loss</Text>
-                  <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>After-Tax</Text>
-                  <Text style={[s.tableHdrCell, { flex: 1, textAlign: 'right', color: 'white' }]}>Cumulative</Text>
-                </View>
-                {showRows.map((r, i) => (
-                  <View key={i} style={[s.tableRow, { backgroundColor: r.isExhaust ? '#FEF2F2' : r.yr === 1 ? '#EFF6FF' : i % 2 === 0 ? '#fff' : '#f9f9f9' }]}>
-                    <Text style={[s.tableCell, { width: 28, fontFamily: 'Helvetica-Bold' }]}>{r.yr}</Text>
-                    <Text style={[s.tableCellR, { flex: 1, color: vc(r.ptCF) }]}>{fmtV(r.ptCF)}</Text>
-                    <Text style={[s.tableCellR, { flex: 1, color: r.bonus > 0.5 ? '#15803D' : '#9CA3AF' }]}>{r.bonus > 0.5 ? fmtDollar(r.bonus) : '\u2014'}</Text>
-                    <Text style={[s.tableCellR, { flex: 1, color: '#15803D' }]}>{fmtV(r.sl)}</Text>
-                    <Text style={[s.tableCellR, { flex: 1, color: r.opLoss > 0.5 ? '#15803D' : '#9CA3AF' }]}>{r.opLoss > 0.5 ? fmtDollar(r.opLoss) : '\u2014'}</Text>
-                    <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: vc(r.total) }]}>{fmtV(r.total)}</Text>
-                    <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: vc(r.cum) }]}>{fmtV(r.cum)}{r.isExhaust ? ' *' : ''}</Text>
-                  </View>
-                ))}
-                {/* Totals row */}
-                <View style={[s.tableRow, { backgroundColor: '#1a1a2e' }]}>
-                  <Text style={[s.tableCell, { width: 28, fontFamily: 'Helvetica-Bold', color: 'white' }]}>Tot</Text>
-                  <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totPt)}</Text>
-                  <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtDollar(totBonus)}</Text>
-                  <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totSl)}</Text>
-                  <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{totOp > 0.5 ? fmtDollar(totOp) : '\u2014'}</Text>
-                  <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(totTotal)}</Text>
-                  <Text style={[s.tableCellR, { flex: 1, fontFamily: 'Helvetica-Bold', color: 'white' }]}>{fmtV(showRows[showRows.length - 1].cum)}</Text>
-                </View>
-              </View>
-
-              {neverExhausted && (
-                <Text style={{ fontSize: 7, color: '#888', fontFamily: 'Helvetica-Oblique', marginBottom: 4 }}>
-                  * Benefit not exhausted within {showRows.length} years shown. Cumulative after-tax balance remains positive.
-                </Text>
-              )}
-
-              <Text style={{ fontSize: 7, color: '#888', fontFamily: 'Helvetica-Oblique', marginTop: 4, lineHeight: 1.5 }}>
-                Bonus depreciation reflects 100% first-year deduction on cost-segregated assets at stated bracket. Straight-line depreciation continues over 27.5 years. Operating loss savings apply only when pre-tax cash flow is negative. Tax benefit &quot;exhaustion&quot; represents the point at which cumulative after-tax returns equal zero — the property then relies solely on pre-tax cash flow. Consult a licensed CPA before making tax or investment decisions.
-              </Text>
-            </>
-          )
-        })()}
+        {renderTaxBenefitTable()}
       </Page>}
 
       {/* ── Rent roll page ──────────────────────────────────────────────── */}
