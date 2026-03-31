@@ -511,13 +511,27 @@ Note: `node_modules/`, `dist/`, and `ios/` are gitignored — `npm install` recr
 
 ---
 
+## Session — March 30, 2026
+
+**PDF button → per-tab export dropdown:**
+- Converted the PDF button into a dropdown menu with options: Full Report, P&L, Tax, Flags, OM As-Presented, Inputs
+- Each option opens the existing preview modal rendering only the selected tab's page(s)
+- `PdfReport.tsx` — added `exportTab?: 'full' | 'pl' | 'tax' | 'flags' | 'om' | 'inputs'` prop; each value renders only the relevant page(s)
+- Flags, OM, and Inputs did not previously have dedicated PDF pages — simple clean pages added matching existing light theme (#f8f7f4 bg, navy text, gold accents)
+- `ModelCalculator.tsx` — PDF button now a dropdown (absolute-positioned div, closes on outside click); sets `exportTab` state and opens preview modal
+- Download filename is tab-specific: `[PropertyName]_PL.pdf`, `[PropertyName]_Tax.pdf`, etc.; Full Report retains `[PropertyName]_Full_Report.pdf`
+- LOI button unchanged
+
+---
+
 ## Pending Features / Known Issues (updated)
 
 1. **Method refactor** — remove `method` field from DB/types; derive purely from inputs. Currently auto-derived at runtime as workaround.
 2. **Responsive layout** — desktop breakpoint-aware design
 3. **Verify rent roll extraction** — test end-to-end with Bay Drive OM
 4. **Tax assessor PDF import** — extract-tax-record edge function + TaxRecordImport component (built Mar 25, needs testing)
+5. **PDF tab pages QA** — verify Flags, OM, and Inputs PDF pages render clean data after Mar 30 build
 
 ---
 
-*Last updated: March 29, 2026*
+*Last updated: March 30, 2026*
