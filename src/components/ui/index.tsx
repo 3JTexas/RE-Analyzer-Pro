@@ -128,7 +128,8 @@ export function InputField({ label, badge, badgeColor = 'blue', tooltip, dollar,
           }
         }}
         className={`w-full text-sm font-medium text-gray-900 bg-white border border-gray-200
-          rounded-md px-2 py-1.5 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 leading-normal ${className ?? ''}`}
+          rounded-md px-2 py-2 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 ${className ?? ''}`}
+        style={{ lineHeight: '1.5' }}
       />
     </div>
   )
