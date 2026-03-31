@@ -13,6 +13,7 @@ import { generatePDF, ReportDocument, fetchImageAsBase64 } from '../pdf/PdfRepor
 import type { ScenarioCol, ReportProps, ExportTab } from '../pdf/PdfReport'
 import { PDFViewer, BlobProvider, pdf } from '@react-pdf/renderer'
 import { loadCompareState, saveCompareState } from '../../lib/uiState'
+import { exportToExcel } from '../../lib/excelExport'
 import { LOIModal } from '../loi/LOIModal'
 import { TaxRecordImport } from '../TaxRecordImport'
 import type { LOIData } from '../../types/loi'
@@ -925,6 +926,7 @@ export function ModelCalculator({
     : { type: 'green' as const, msg: `DCR OK: ${fmtX(d.dcr)} — Clears 1.20× minimum. Cushion: ${fmtDollar(d.NOI - d.ds)}/yr.` }
 
   const handleSave = async () => { if (onSave) await onSave(name, method, inputs) }
+  const handleExcelExport = () => exportToExcel(inputs, name, propertyName)
   const handlePDF = async (tab: ExportTab = 'full') => {
     // Build cols in Compare tab order: A, B, then any extra C/D cols
     const compareOrder = [compareA, compareB, ...compareCols]
@@ -1179,6 +1181,12 @@ export function ModelCalculator({
             {saving ? 'Saving…' : 'Save'}
           </button>
         )}
+        <button onClick={() => handleExcelExport()}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-200
+            text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
+          <FileText size={12} />
+          Excel
+        </button>
         <div className="relative" ref={pdfMenuRef}>
           <button onClick={() => setShowPdfMenu(prev => !prev)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-200
