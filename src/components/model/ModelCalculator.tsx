@@ -1530,7 +1530,7 @@ export function ModelCalculator({
                       <span>Cash to close</span>
                       <span className={cashToClose === 0 ? 'text-green-700' : ''}>{fmtDollar(cashToClose)}</span>
                     </div>
-                    {excessBeforeApply > 0 && (
+                    {(excessBeforeApply > 0 || inputs.applyExcessToDown) && (
                       <div className="bg-amber-50 border-t border-amber-200 rounded-b -mx-3 -mb-2 mt-2 px-3 py-2">
                         <div className="flex justify-between items-center text-[11px] text-amber-700 font-semibold">
                           <span>{inputs.applyExcessToDown ? 'Excess applied to reduce loan' : 'Excess 1031 capital'}</span>
