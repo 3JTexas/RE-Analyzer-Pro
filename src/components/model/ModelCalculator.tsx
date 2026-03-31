@@ -1491,8 +1491,12 @@ export function ModelCalculator({
             </div>
             {inputs.is1031 && inputs.equity1031 > 0 && (() => {
               const equity1031 = inputs.equity1031 ?? 0
+              // Compute standard (non-reduced) down to determine excess regardless of toggle state
+              const stdDown = inputs.price * (1 - inputs.lev / 100)
+              const stdLfee = (inputs.price * inputs.lev / 100) * inputs.lf / 100
+              const stdEq = stdDown + stdLfee
               const cashToClose = Math.max(0, d.eq + d.ccAmt - equity1031)
-              const excessAfterClose = Math.max(0, equity1031 - d.eq - d.ccAmt)
+              const excessBeforeApply = Math.max(0, equity1031 - stdEq - d.ccAmt)
               return (
                 <div className="mb-3 border border-amber-200 rounded-lg overflow-hidden">
                   <div className="bg-amber-50 px-3 py-2 flex justify-between items-center">
@@ -1526,11 +1530,11 @@ export function ModelCalculator({
                       <span>Cash to close</span>
                       <span className={cashToClose === 0 ? 'text-green-700' : ''}>{fmtDollar(cashToClose)}</span>
                     </div>
-                    {excessAfterClose > 0 && (
+                    {excessBeforeApply > 0 && (
                       <div className="bg-amber-50 border-t border-amber-200 rounded-b -mx-3 -mb-2 mt-2 px-3 py-2">
                         <div className="flex justify-between items-center text-[11px] text-amber-700 font-semibold">
                           <span>{inputs.applyExcessToDown ? 'Excess applied to reduce loan' : 'Excess 1031 capital'}</span>
-                          <span>{fmtDollar(excessAfterClose)}</span>
+                          <span>{fmtDollar(excessBeforeApply)}</span>
                         </div>
                         <div className="flex items-center justify-between mt-1.5">
                           <p className="text-[9px] text-amber-600">{inputs.applyExcessToDown ? 'Loan reduced — lower debt service & better DCR' : 'Apply to reduce loan?'}</p>
