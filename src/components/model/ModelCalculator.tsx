@@ -1,7 +1,9 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import ReactDOM from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Download, Save, RotateCcw, FileText, X, Eye, Trash2, ChevronDown } from 'lucide-react'
+import { Download, Save, RotateCcw, FileText, X, Eye, Trash2, ChevronDown, Printer } from 'lucide-react'
+import html2canvas from 'html2canvas'
+import { jsPDF } from 'jspdf'
 import { calculate, calc1031, pmtCalcExport, OM_DEFAULTS, fmtDollar, fmtNeg, fmtPct, fmtX, fmtDelta, fmtDeltaPct } from '../../lib/calc'
 import type { ModelInputs, Method, Scenario, RentRollUnit } from '../../types'
 import {
@@ -780,8 +782,12 @@ export function ModelCalculator({
   const [showPdfPreview, setShowPdfPreview] = useState(false)
   const [pdfPreviewProps, setPdfPreviewProps] = useState<ReportProps | null>(null)
   const [showPdfMenu, setShowPdfMenu] = useState(false)
+  const [showPrintMenu, setShowPrintMenu] = useState(false)
   const [exportTab, setExportTab] = useState<ExportTab>('full')
+  const [printing, setPrinting] = useState(false)
   const pdfMenuRef = useRef<HTMLDivElement>(null)
+  const printMenuRef = useRef<HTMLDivElement>(null)
+  const tabContentRef = useRef<HTMLDivElement>(null)
 
   // Compare tab: which two scenarios to diff
   const [compareA, setCompareA] = useState<string>(currentScenarioId ?? 'current')
@@ -804,15 +810,16 @@ export function ModelCalculator({
     })
   }, [propertyId])
 
-  // Close PDF menu on outside click
+  // Close PDF/Print menus on outside click
   useEffect(() => {
-    if (!showPdfMenu) return
+    if (!showPdfMenu && !showPrintMenu) return
     const handler = (e: MouseEvent) => {
-      if (pdfMenuRef.current && !pdfMenuRef.current.contains(e.target as Node)) setShowPdfMenu(false)
+      if (showPdfMenu && pdfMenuRef.current && !pdfMenuRef.current.contains(e.target as Node)) setShowPdfMenu(false)
+      if (showPrintMenu && printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) setShowPrintMenu(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [showPdfMenu])
+  }, [showPdfMenu, showPrintMenu])
 
   const set = useCallback((key: keyof ModelInputs, val: number | boolean) => {
     setInputs(prev => ({ ...prev, [key]: val }))
@@ -967,6 +974,93 @@ export function ModelCalculator({
       URL.revokeObjectURL(url)
     }
   }
+  type PrintTab = 'pl' | 'tax' | 'flags' | 'om' | 'inputs'
+  const printTabLabels: Record<PrintTab, string> = { pl: 'P&L', tax: 'Tax', flags: 'Flags', om: 'OM', inputs: 'Inputs' }
+
+  const handleCanvasPrint = async (tab: PrintTab) => {
+    const prevTab = activeTab
+    setActiveTab(tab)
+    setPrinting(true)
+    // Wait for React to render the tab
+    await new Promise(r => setTimeout(r, 300))
+    const el = tabContentRef.current
+    if (!el) { setPrinting(false); setActiveTab(prevTab); return }
+    try {
+      // Temporarily expand the container to show full content (no scroll clipping)
+      const prevOverflow = el.style.overflow
+      const prevHeight = el.style.height
+      const prevMaxHeight = el.style.maxHeight
+      el.style.overflow = 'visible'
+      el.style.height = 'auto'
+      el.style.maxHeight = 'none'
+
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        windowWidth: el.scrollWidth,
+        windowHeight: el.scrollHeight,
+      })
+
+      // Restore
+      el.style.overflow = prevOverflow
+      el.style.height = prevHeight
+      el.style.maxHeight = prevMaxHeight
+
+      const imgData = canvas.toDataURL('image/png')
+      const imgW = canvas.width
+      const imgH = canvas.height
+
+      // Letter size in points: 612 x 792, with margins
+      const pageW = 612
+      const pageH = 792
+      const margin = 36 // 0.5in
+      const usableW = pageW - margin * 2
+      const usableH = pageH - margin * 2
+
+      const ratio = usableW / imgW
+      const scaledH = imgH * ratio
+
+      const doc = new jsPDF({ unit: 'pt', format: 'letter' })
+      let yOffset = 0
+      let page = 0
+
+      while (yOffset < scaledH) {
+        if (page > 0) doc.addPage()
+        // Calculate which slice of the image to draw
+        const sliceH = Math.min(usableH, scaledH - yOffset)
+        const srcY = (yOffset / ratio)
+        const srcH = (sliceH / ratio)
+
+        // Create a canvas for this page slice
+        const sliceCanvas = document.createElement('canvas')
+        sliceCanvas.width = imgW
+        sliceCanvas.height = Math.round(srcH)
+        const ctx = sliceCanvas.getContext('2d')!
+        ctx.drawImage(canvas, 0, Math.round(srcY), imgW, Math.round(srcH), 0, 0, imgW, Math.round(srcH))
+
+        doc.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', margin, margin, usableW, sliceH)
+        yOffset += usableH
+        page++
+      }
+
+      const safeProp = (propertyName || 'Property').replace(/[^a-zA-Z0-9]/g, '_')
+      doc.save(`${safeProp}_${tab.toUpperCase()}_Print.pdf`)
+    } catch (e) {
+      console.error('Print capture failed:', e)
+    }
+    setPrinting(false)
+    setActiveTab(prevTab)
+  }
+
+  const handleCanvasPrintAll = async () => {
+    const tabs: PrintTab[] = ['pl', 'tax', 'flags', 'om', 'inputs']
+    for (const tab of tabs) {
+      await handleCanvasPrint(tab)
+    }
+  }
+
   const handleScenarioSwitch = (sid: string) => {
     const s = siblings.find(x => x.id === sid)
     if (s) navigate(`/scenario/${s.id}`)
@@ -1088,6 +1182,31 @@ export function ModelCalculator({
             </div>
           )}
         </div>
+        <div className="relative" ref={printMenuRef}>
+          <button onClick={() => setShowPrintMenu(prev => !prev)}
+            disabled={printing}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-200
+              text-gray-600 rounded-lg hover:bg-gray-50 transition-colors ${printing ? 'opacity-50' : ''}`}>
+            <Printer size={12} />
+            {printing ? 'Printing…' : 'Print'}
+            <ChevronDown size={10} />
+          </button>
+          {showPrintMenu && (
+            <div className="absolute top-full left-0 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1 overflow-hidden">
+              {(['pl', 'tax', 'flags', 'om', 'inputs'] as PrintTab[]).map(tab => (
+                <button key={tab} onClick={() => { setShowPrintMenu(false); handleCanvasPrint(tab) }}
+                  className="w-full text-left px-3 py-1.5 text-xs text-[#1a1a2e] hover:bg-[#c9a84c]/15 hover:text-[#1a1a2e] transition-colors">
+                  {printTabLabels[tab]}
+                </button>
+              ))}
+              <div className="border-t border-gray-200 my-1" />
+              <button onClick={() => { setShowPrintMenu(false); handleCanvasPrintAll() }}
+                className="w-full text-left px-3 py-1.5 text-xs font-semibold text-[#1a1a2e] hover:bg-[#c9a84c]/15 transition-colors">
+                Print All
+              </button>
+            </div>
+          )}
+        </div>
         {!isDefaultOM && (
           <button onClick={openLOI}
             className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-500 border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-500 whitespace-nowrap">
@@ -1117,7 +1236,7 @@ export function ModelCalculator({
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto px-4 pb-6">
+      <div ref={tabContentRef} className="flex-1 overflow-y-auto px-4 pb-6">
 
         {/* ── INPUTS TAB ────────────────────────────────────────────────── */}
         {activeTab === 'inputs' && (
