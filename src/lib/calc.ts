@@ -5,7 +5,7 @@ export const OM_DEFAULTS: ModelInputs = {
   tu: 0, ou: 0, rent: 0, vp: 0,
   price: 0, ir: 0, lev: 0, am: 0, lf: 0, cc: 0,
   tax: 0, ins: 0, utilElec: 0, utilElecSubmetered: false, utilWater: 0, utilWaterSubmetered: false, utilTrash: 0, util: 0, rm: 0, cs: 0,
-  ga: 0, res: 0, pm: 0, expCollapse: false, expPct: 0,
+  ga: 0, res: 0, pm: 0, pmMode: 'pct', pmPerUnit: 0, expCollapse: false, expPct: 0,
   brk: 0, land: 0, costSeg: 0, is1031: false, basis1031: 0, equity1031: 0,
   otherIncome: [],
   otherExpenses: [],
@@ -154,7 +154,7 @@ export function calculate(inputs: ModelInputs, useOM: boolean): ModelOutputs {
     insTotal = inputs.ins * tu
     rmTotal = inputs.rm * tu
     resTotal = inputs.res * tu
-    pmAmt = EGI * inputs.pm / 100
+    pmAmt = inputs.pmMode === 'unit' ? inputs.pmPerUnit * 12 * tu : EGI * inputs.pm / 100
     exp = tax + insTotal + util + rmTotal + cs + ga + resTotal + pmAmt + otherExpensesTotal
   }
 
@@ -187,7 +187,7 @@ export function calculate(inputs: ModelInputs, useOM: boolean): ModelOutputs {
     GSR, pv, av, vac, col, EGI,
     loan, down, lfee, ccAmt, eq, mp, ds, int1, prin1,
     taxTotal: tax, ins: insTotal, util, rm: rmTotal, cs, ga, res: resTotal, pm: pmAmt,
-    pmPct: inputs.pm,
+    pmPct: EGI ? (pmAmt / EGI) * 100 : 0,
     otherIncomeTotal, otherExpensesTotal,
     exp, NOI, CF, cap, dcr,
     deprBase, bd, sl, ti, loss, ts, at, y1,

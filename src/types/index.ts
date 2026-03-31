@@ -37,6 +37,8 @@ export interface ModelInputs {
   ga: number       // G&A $
   res: number      // reserves $/unit/yr
   pm: number       // property management % of EGI
+  pmMode: 'pct' | 'unit'  // % of EGI or $/unit/month
+  pmPerUnit: number        // $/unit/month (used when pmMode = 'unit')
   expCollapse: boolean  // use blended expense ratio instead of itemized
   expPct: number        // expense ratio % of EGI (when expCollapse = true)
   otherIncome: { label: string; amount: number }[]   // user-defined income line items

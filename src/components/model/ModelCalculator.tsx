@@ -768,6 +768,8 @@ export function ModelCalculator({
     equity1031: (initialInputs as any)?.equity1031 ?? 0,
     otherIncome: (initialInputs as any)?.otherIncome ?? [],
     otherExpenses: (initialInputs as any)?.otherExpenses ?? [],
+    pmMode: (initialInputs as any)?.pmMode ?? 'pct',
+    pmPerUnit: (initialInputs as any)?.pmPerUnit ?? 0,
   })
   const [method, setMethod] = useState<Method>(initialMethod)
   const [name, setName] = useState(scenarioName)
@@ -821,7 +823,7 @@ export function ModelCalculator({
     return () => document.removeEventListener('mousedown', handler)
   }, [showPdfMenu, showPrintMenu])
 
-  const set = useCallback((key: keyof ModelInputs, val: number | boolean) => {
+  const set = useCallback((key: keyof ModelInputs, val: number | boolean | string) => {
     setInputs(prev => ({ ...prev, [key]: val }))
   }, [])
 
@@ -1584,9 +1586,28 @@ export function ModelCalculator({
                     badge="OM" onChange={e => set('res', +e.target.value)} />
                   <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.res > 0 && inputs.tu > 0 && <>${Math.round(inputs.res * inputs.tu / 12).toLocaleString()}/mo total · ${(inputs.res * inputs.tu).toLocaleString()}/yr</>}</div>
                 </div>
-                <InputField {...omBadge('pm')} label="Prop. mgmt (%)" type="number" value={inputs.pm} step={0.5}
-                  tooltip="Property management fee as % of effective gross income. Typically 8-10% for small multifamily"
-                  badge="OM" onChange={e => set('pm', +e.target.value)} />
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-gray-500">Prop. mgmt</label>
+                    <button
+                      onClick={() => set('pmMode', inputs.pmMode === 'pct' ? 'unit' : 'pct')}
+                      className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors">
+                      {inputs.pmMode === 'pct' ? '% EGI' : '$/unit'}
+                    </button>
+                  </div>
+                  {inputs.pmMode === 'pct' ? (
+                    <InputField {...omBadge('pm')} label="Fee (%)" type="number" value={inputs.pm} step={0.5}
+                      tooltip="Property management fee as % of effective gross income. Typically 8-10% for small multifamily"
+                      badge="OM" onChange={e => set('pm', +e.target.value)} />
+                  ) : (
+                    <InputField label="Fee ($/unit/mo)" type="number" dollar value={inputs.pmPerUnit} step={25}
+                      tooltip="Property management fee per unit per month. Typically $75-$150/unit for small multifamily"
+                      onChange={e => set('pmPerUnit', Math.max(0, +e.target.value))} />
+                  )}
+                  <div className="text-[10px] text-gray-400 mt-0.5 h-3">
+                    {d.pm > 0 && <>{fmtDollar(d.pm)}/yr · {d.pmPct.toFixed(1)}% EGI{inputs.pmMode === 'unit' && inputs.tu > 0 ? ` · ${fmtDollar(inputs.pmPerUnit)}/unit/mo` : ''}</>}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1731,7 +1752,7 @@ export function ModelCalculator({
                   </div>
                 } />
               ))}
-              <PLRow label={`Prop. mgmt (${d.pmPct.toFixed(1)}% EGI)`} value={`(${fmtDollar(d.pm)})`} variant="neg" indent />
+              <PLRow label={`Prop. mgmt (${inputs.pmMode === 'unit' ? `$${inputs.pmPerUnit}/unit · ${d.pmPct.toFixed(1)}%` : `${d.pmPct.toFixed(1)}% EGI`})`} value={`(${fmtDollar(d.pm)})`} variant="neg" indent />
               {(inputs.otherExpenses ?? []).map((item, i) => (
                 <PLRow key={i} label={item.label} value={`(${fmtDollar(item.amount)})`} variant="neg" indent />
               ))}
@@ -1746,6 +1767,7 @@ export function ModelCalculator({
               <PLRow label="Net operating income" value={fmtDollar(d.NOI)} variant="noi" />
               <PLRow label="Annual debt service" value={`(${fmtDollar(d.ds)})`} variant="neg" indent />
               <PLRow label="Pre-tax cash flow" value={fmtNeg(d.CF)} variant="cf" />
+              <PLRow label="Cash-on-cash return" value={fmtPct(d.coc)} variant="cf" />
             </div>
             <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-500">
               <strong>Prepayment penalty (3/2/1)</strong><br />
@@ -2289,7 +2311,7 @@ export function ModelCalculator({
               <PLRow label="Contract services" value={`(${fmtDollar(d.cs)})`} variant="neg" indent />
               <PLRow label="G&A" value={`(${fmtDollar(d.ga)})`} variant="neg" indent />
               <PLRow label="Reserves" value={`(${fmtDollar(d.res)})`} variant="neg" indent />
-              <PLRow label={`Prop. mgmt (${d.pmPct.toFixed(1)}% EGI)`} value={`(${fmtDollar(d.pm)})`} variant="neg" indent />
+              <PLRow label={`Prop. mgmt (${inputs.pmMode === 'unit' ? `$${inputs.pmPerUnit}/unit · ${d.pmPct.toFixed(1)}%` : `${d.pmPct.toFixed(1)}% EGI`})`} value={`(${fmtDollar(d.pm)})`} variant="neg" indent />
               <PLRow label="Total expenses" value={`(${fmtDollar(d.exp)})`} variant="total" />
               <PLRow label="Net operating income" value={fmtDollar(d.NOI)} variant="noi" />
               <PLRow label={`Annual debt service (${d.lev.toFixed(0)}% LTV)`} value={`(${fmtDollar(d.ds)})`} variant="neg" indent />

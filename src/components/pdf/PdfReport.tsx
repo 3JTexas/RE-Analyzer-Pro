@@ -513,11 +513,12 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
         <PLRowComp label="Contract services" value={`(${fmtDollar(d.cs)})`} variant="neg" indent />
         <PLRowComp label="G&A" value={`(${fmtDollar(d.ga)})`} variant="neg" indent />
         <PLRowComp label="Reserves" value={`(${fmtDollar(d.res)})`} variant="neg" indent />
-        <PLRowComp label={`Prop. mgmt (${d.pmPct.toFixed(1)}%)`} value={`(${fmtDollar(d.pm)})`} variant="neg" indent />
+        <PLRowComp label={`Prop. mgmt (${inputs.pmMode === 'unit' ? `$${inputs.pmPerUnit}/unit · ${d.pmPct.toFixed(1)}%` : `${d.pmPct.toFixed(1)}% EGI`})`} value={`(${fmtDollar(d.pm)})`} variant="neg" indent />
         <PLRowComp label="Total expenses" value={`(${fmtDollar(d.exp)})`} variant="total" />
         <PLRowComp label="Net operating income" value={fmtDollar(d.NOI)} variant="noi" />
         <PLRowComp label="Annual debt service" value={`(${fmtDollar(d.ds)})`} variant="neg" indent />
         <PLRowComp label="Pre-tax cash flow" value={fmtNeg(d.CF)} variant="total" />
+        <PLRowComp label="Cash-on-cash return" value={fmtPct(d.coc)} variant="total" />
 
         <SectionHdr title="Cash to close" />
         <PLRowComp label="Down payment" value={fmtDollar(d.down)} />
@@ -789,11 +790,12 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
             <PLRowComp label="Contract services" value={`(${fmtDollar(d.cs)})`} variant="neg" indent />
             <PLRowComp label="G&A" value={`(${fmtDollar(d.ga)})`} variant="neg" indent />
             <PLRowComp label="Reserves" value={`(${fmtDollar(d.res)})`} variant="neg" indent />
-            <PLRowComp label={`Prop. mgmt (${d.pmPct.toFixed(1)}%)`} value={`(${fmtDollar(d.pm)})`} variant="neg" indent />
+            <PLRowComp label={`Prop. mgmt (${inputs.pmMode === 'unit' ? `$${inputs.pmPerUnit}/unit · ${d.pmPct.toFixed(1)}%` : `${d.pmPct.toFixed(1)}% EGI`})`} value={`(${fmtDollar(d.pm)})`} variant="neg" indent />
             <PLRowComp label="Total expenses" value={`(${fmtDollar(d.exp)})`} variant="total" />
             <PLRowComp label="Net operating income" value={fmtDollar(d.NOI)} variant="noi" />
             <PLRowComp label="Annual debt service" value={`(${fmtDollar(d.ds)})`} variant="neg" indent />
             <PLRowComp label="Pre-tax cash flow" value={fmtNeg(d.CF)} variant="total" />
+            <PLRowComp label="Cash-on-cash return" value={fmtPct(d.coc)} variant="total" />
           </View>
 
           <View style={s.col}>
@@ -1062,7 +1064,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
               { label: 'Contract Services', val: `(${fmtDollar(d.cs)})`, per: units > 0 ? `(${fmtDollar(d.cs / units)})` : '—' },
               { label: 'G&A', val: `(${fmtDollar(d.ga)})`, per: units > 0 ? `(${fmtDollar(d.ga / units)})` : '—' },
               { label: 'Reserves', val: `(${fmtDollar(d.res)})`, per: `$${inputs.res.toLocaleString()}/unit` },
-              { label: `Prop. Mgmt (${d.pmPct.toFixed(1)}%)`, val: `(${fmtDollar(d.pm)})`, per: units > 0 ? `(${fmtDollar(d.pm / units)})` : '—' },
+              { label: `Prop. Mgmt (${inputs.pmMode === 'unit' ? `$${inputs.pmPerUnit}/unit · ${d.pmPct.toFixed(1)}%` : `${d.pmPct.toFixed(1)}% EGI`})`, val: `(${fmtDollar(d.pm)})`, per: units > 0 ? `(${fmtDollar(d.pm / units)})` : '—' },
               { label: 'Total Expenses', val: `(${fmtDollar(d.exp)})`, per: units > 0 ? `(${fmtDollar(d.exp / units)})` : '—', bold: true },
               { label: 'NOI', val: fmtDollar(d.NOI), per: units > 0 ? fmtDollar(d.NOI / units) : '—', bold: true },
             ].map((row, i) => (
