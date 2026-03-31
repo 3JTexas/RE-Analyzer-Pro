@@ -1,6 +1,6 @@
 import { Document, Page, Text, View, Image, StyleSheet, pdf } from '@react-pdf/renderer'
 import type { ModelInputs, Method } from '../../types'
-import { calculate, fmtDollar, fmtNeg, fmtPct, fmtX, fmtDelta, fmtDeltaPct } from '../../lib/calc'
+import { calculate, calc1031, fmtDollar, fmtNeg, fmtPct, fmtX, fmtDelta, fmtDeltaPct } from '../../lib/calc'
 
 // ── Colors ───────────────────────────────────────────────────────────────
 const C = {
@@ -530,6 +530,82 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
       {exportTab === 'tax' && <Page size="LETTER" style={s.page}>
         <Watermark />
         <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} logoSrc={logoSrc} tabLabel="Tax" />
+
+        {/* Tax Strategy Summary */}
+        <SectionHdr title="Tax strategy inputs" />
+        <View style={s.metricsRow}>
+          <View style={s.metricCard}>
+            <Text style={s.metricLabel}>Tax Bracket</Text>
+            <Text style={s.metricValue}>{inputs.brk}%</Text>
+          </View>
+          <View style={s.metricCard}>
+            <Text style={s.metricLabel}>Land %</Text>
+            <Text style={s.metricValue}>{inputs.land}%</Text>
+            <Text style={s.metricSub}>non-depreciable</Text>
+          </View>
+          <View style={s.metricCard}>
+            <Text style={s.metricLabel}>Cost Seg %</Text>
+            <Text style={s.metricValue}>{inputs.costSeg}%</Text>
+            <Text style={s.metricSub}>5/7/15-yr assets</Text>
+          </View>
+          <View style={s.metricCard}>
+            <Text style={s.metricLabel}>1031 Exchange</Text>
+            <Text style={s.metricValue}>{inputs.is1031 ? 'Yes' : 'No'}</Text>
+            {inputs.is1031 && <Text style={s.metricSub}>carryover basis</Text>}
+          </View>
+        </View>
+
+        {/* 1031 Exchange Analysis */}
+        {inputs.is1031 && (inputs.priorSalePrice ?? 0) > 0 && (() => {
+          const ex = calc1031(inputs)
+          if (!ex) return null
+          const cgRate = inputs.cgRate ?? 20
+          const reclaimRate = inputs.reclaimRate ?? 25
+          return (
+            <>
+              <SectionHdr title="1031 Exchange analysis" />
+              <PLRowComp label="Prior sale price" value={fmtDollar(inputs.priorSalePrice ?? 0)} />
+              <PLRowComp label={`Selling costs (${inputs.priorSellingCostsPct ?? 5}%)`} value={`(${fmtDollar((inputs.priorSalePrice ?? 0) * (inputs.priorSellingCostsPct ?? 5) / 100)})`} variant="neg" indent />
+              <PLRowComp label="Mortgage payoff" value={`(${fmtDollar(inputs.priorMortgagePayoff ?? 0)})`} variant="neg" indent />
+              <PLRowComp label="Adjusted basis" value={fmtDollar(ex.adjustedBasis)} />
+              <PLRowComp label="Capital gain" value={fmtDollar(ex.capitalGain)} variant="total" />
+              <PLRowComp label={`Cap gains tax deferred @ ${cgRate}%`} value={fmtDollar(ex.capGainsTax)} variant="pos" indent />
+              <PLRowComp label={`Recapture tax deferred @ ${reclaimRate}%`} value={fmtDollar(ex.recaptureTax)} variant="pos" indent />
+              <PLRowComp label="Total tax deferred" value={fmtDollar(ex.totalTaxDeferred)} variant="total" />
+              <PLRowComp label="Net 1031 proceeds" value={fmtDollar(ex.netProceeds)} variant="noi" />
+              <PLRowComp label={`Required down (${inputs.lev}% LTV)`} value={fmtDollar(ex.requiredDown)} indent />
+              <PLRowComp label="Excess capital" value={ex.excessCapital > 0 ? fmtDollar(ex.excessCapital) : '$0'} variant={ex.excessCapital > 0 ? 'pos' : 'normal'} />
+            </>
+          )
+        })()}
+
+        {/* Bonus Depreciation */}
+        {inputs.price > 0 && d.brk > 0 && (() => {
+          const bracket = d.brk / 100
+          const depBasis = inputs.price * (1 - inputs.land / 100)
+          const bonusDed = depBasis * (inputs.costSeg / 100)
+          const slAnnual = (depBasis * (1 - inputs.costSeg / 100)) / 27.5
+          const y1PaperLoss = d.NOI - bonusDed - slAnnual
+          const y1TaxBenefit = Math.max(0, -y1PaperLoss) * bracket
+          const slDepBasis = depBasis * (1 - inputs.costSeg / 100)
+          const annualShield = (slDepBasis / 27.5) * bracket
+          return (
+            <>
+              <SectionHdr title="Bonus depreciation — Year 1" />
+              <PLRowComp label="Depreciable basis" value={fmtDollar(depBasis)} />
+              <PLRowComp label={`Cost seg assets (${inputs.costSeg}%)`} value={fmtDollar(bonusDed)} variant="pos" indent />
+              <PLRowComp label="Year 1 bonus deduction" value={fmtDollar(bonusDed)} variant="pos" />
+              <PLRowComp label="Year 1 paper loss" value={y1PaperLoss < 0 ? `(${fmtDollar(Math.abs(y1PaperLoss))})` : fmtDollar(y1PaperLoss)} variant={y1PaperLoss < 0 ? 'pos' : 'normal'} indent />
+              <PLRowComp label={`Year 1 tax benefit @ ${d.brk}%`} value={fmtDollar(y1TaxBenefit)} variant="total" />
+
+              <SectionHdr title="27.5-Year straight-line depreciation" />
+              <PLRowComp label="SL depreciable basis" value={fmtDollar(slDepBasis)} />
+              <PLRowComp label="Annual SL deduction" value={fmtDollar(slDepBasis / 27.5)} variant="pos" indent />
+              <PLRowComp label={`Annual tax shield @ ${d.brk}%`} value={fmtDollar(annualShield)} variant="total" />
+              <PLRowComp label="Total shield over 27.5 yrs" value={fmtDollar(annualShield * 27.5)} variant="pos" indent />
+            </>
+          )
+        })()}
 
         <SectionHdr title="Tax analysis — REP · 100% bonus dep · 1031" />
         <PLRowComp label="NOI" value={fmtDollar(d.NOI)} variant="noi" />
