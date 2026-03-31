@@ -31,6 +31,12 @@
   input[type="number"]::-webkit-outer-spin-button {
     opacity: 1;
   }
+
+  input[type="number"],
+  input[type="text"] {
+    line-height: 1.75;
+    min-height: 2.25rem;
+  }
 }
 
 @layer utilities {
