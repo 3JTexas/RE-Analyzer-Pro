@@ -1486,7 +1486,7 @@ export function ModelCalculator({
             <div className="grid grid-cols-2 gap-2 mb-3">
               <MetricCard label="Loan amount" value={fmtDollar(d.loan)} sub={inputs.applyExcessToDown && inputs.is1031 ? 'reduced by 1031 equity' : `${d.lev.toFixed(0)}% LTV`} />
               <MetricCard label="Annual debt service" value={fmtDollar(d.ds)} sub={`${fmtDollar(d.mp)}/mo`} />
-              <MetricCard label="Equity required" value={fmtDollar(d.eq)} sub={inputs.is1031 && inputs.equity1031 >= d.eq ? `covered by 1031 equity` : 'down + lender fee'} valueColor={inputs.is1031 && inputs.equity1031 >= d.eq ? 'text-green-700' : undefined} />
+              <MetricCard label="Equity required" value={fmtDollar(d.eq)} sub={inputs.is1031 && inputs.equity1031 >= d.eq ? `covered by 1031 · ${fmtDollar(Math.max(0, inputs.equity1031 - d.eq - d.ccAmt))} excess` : 'down + lender fee'} valueColor={inputs.is1031 && inputs.equity1031 >= d.eq ? 'text-green-700' : undefined} />
               <MetricCard label="Cash to close" value={fmtDollar(Math.max(0, d.eq + d.ccAmt - (inputs.equity1031 ?? 0)))} sub={inputs.is1031 && inputs.equity1031 > 0 ? `after $${Math.round(inputs.equity1031).toLocaleString()} 1031 equity` : inputs.cc > 0 ? `incl. ${inputs.cc}% closing costs` : "closing costs not set"} valueColor={inputs.equity1031 > d.eq + d.ccAmt ? "text-amber-600" : undefined} />
             </div>
             {inputs.is1031 && inputs.equity1031 > 0 && (() => {

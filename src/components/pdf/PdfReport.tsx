@@ -477,7 +477,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
           <View style={s.metricCard}>
             <Text style={s.metricLabel}>Equity required</Text>
             <Text style={[s.metricValue, inputs.is1031 && (inputs.equity1031 ?? 0) >= d.eq ? { color: C.green } : {}]}>{fmtDollar(d.eq)}</Text>
-            <Text style={s.metricSub}>{inputs.is1031 && (inputs.equity1031 ?? 0) >= d.eq ? 'covered by 1031 equity' : 'down + lender fee'}</Text>
+            <Text style={s.metricSub}>{inputs.is1031 && (inputs.equity1031 ?? 0) >= d.eq ? `covered by 1031 · ${fmtDollar(Math.max(0, (inputs.equity1031 ?? 0) - d.eq - d.ccAmt))} excess` : 'down + lender fee'}</Text>
           </View>
           <View style={s.metricCard}>
             <Text style={s.metricLabel}>Y1 total ROE</Text>
@@ -751,7 +751,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
           <View style={s.metricCard}>
             <Text style={s.metricLabel}>Equity required</Text>
             <Text style={[s.metricValue, inputs.is1031 && (inputs.equity1031 ?? 0) >= d.eq ? { color: C.green } : {}]}>{fmtDollar(d.eq)}</Text>
-            <Text style={s.metricSub}>{inputs.is1031 && (inputs.equity1031 ?? 0) >= d.eq ? 'covered by 1031 equity' : 'down + lender fee'}</Text>
+            <Text style={s.metricSub}>{inputs.is1031 && (inputs.equity1031 ?? 0) >= d.eq ? `covered by 1031 · ${fmtDollar(Math.max(0, (inputs.equity1031 ?? 0) - d.eq - d.ccAmt))} excess` : 'down + lender fee'}</Text>
           </View>
           <View style={s.metricCard}>
             <Text style={s.metricLabel}>Y1 total ROE</Text>
