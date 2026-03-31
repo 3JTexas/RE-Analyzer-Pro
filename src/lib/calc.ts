@@ -121,13 +121,19 @@ export function calculate(inputs: ModelInputs, useOM: boolean): ModelOutputs {
   const otherIncomeTotal = otherIncome.reduce((s, x) => s + (x.amount || 0), 0)
   const EGI = col + otherIncomeTotal
 
-  // Debt — 1031 applyExcessToDown override
+  // Debt — 1031 applyExcessToDown: only the EXCESS beyond standard cash-to-close reduces the loan
   const ex1031 = is1031 ? calc1031(inputs) : null
   const equity1031Amt = is1031 ? (ex1031 && ex1031.netProceeds > 0 ? ex1031.netProceeds : (inputs.equity1031 ?? 0)) : 0
-  const useExcess = is1031 && inputs.applyExcessToDown && equity1031Amt > 0
+  const stdLoan = price * lev / 100
+  const stdDown = price - stdLoan
+  const stdLfee = stdLoan * lf / 100
+  const stdCcAmt = price * cc / 100
+  const stdCashToClose = stdDown + stdLfee + stdCcAmt
+  const excess1031 = Math.max(0, equity1031Amt - stdCashToClose)
+  const useExcess = is1031 && inputs.applyExcessToDown && excess1031 > 0
   const loan = useExcess
-    ? Math.max(0, price - equity1031Amt)
-    : price * lev / 100
+    ? Math.max(0, stdLoan - excess1031)
+    : stdLoan
   const down = price - loan
   const lfee = loan * lf / 100
   const ccAmt = price * cc / 100
