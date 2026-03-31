@@ -123,11 +123,11 @@ export function calculate(inputs: ModelInputs, useOM: boolean): ModelOutputs {
 
   // Debt — 1031 applyExcessToDown override
   const ex1031 = is1031 ? calc1031(inputs) : null
-  const useExcess = is1031 && inputs.applyExcessToDown && ex1031 && ex1031.netProceeds > 0
-  const effectiveLoan = useExcess
-    ? Math.max(0, price - ex1031!.netProceeds)
+  const equity1031Amt = is1031 ? (ex1031 && ex1031.netProceeds > 0 ? ex1031.netProceeds : (inputs.equity1031 ?? 0)) : 0
+  const useExcess = is1031 && inputs.applyExcessToDown && equity1031Amt > 0
+  const loan = useExcess
+    ? Math.max(0, price - equity1031Amt)
     : price * lev / 100
-  const loan = useExcess ? effectiveLoan : price * lev / 100
   const down = price - loan
   const lfee = loan * lf / 100
   const ccAmt = price * cc / 100

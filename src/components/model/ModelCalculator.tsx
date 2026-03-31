@@ -1483,18 +1483,76 @@ export function ModelCalculator({
             </div>
             <DCRBar dcr={d.dcr} />
             <div className="mt-2 mb-3"><Alert type={dcrAlert.type}>{dcrAlert.msg}</Alert></div>
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              <MetricCard label="Loan amount" value={fmtDollar(d.loan)} sub={`${d.lev.toFixed(0)}% LTV`} />
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <MetricCard label="Loan amount" value={fmtDollar(d.loan)} sub={inputs.applyExcessToDown && inputs.is1031 ? 'reduced by 1031 equity' : `${d.lev.toFixed(0)}% LTV`} />
               <MetricCard label="Annual debt service" value={fmtDollar(d.ds)} sub={`${fmtDollar(d.mp)}/mo`} />
               <MetricCard label="Equity required" value={fmtDollar(d.eq)} sub="down + lender fee" />
               <MetricCard label="Cash to close" value={fmtDollar(Math.max(0, d.eq + d.ccAmt - (inputs.equity1031 ?? 0)))} sub={inputs.is1031 && inputs.equity1031 > 0 ? `after $${Math.round(inputs.equity1031).toLocaleString()} 1031 equity` : inputs.cc > 0 ? `incl. ${inputs.cc}% closing costs` : "closing costs not set"} valueColor={inputs.equity1031 > d.eq + d.ccAmt ? "text-amber-600" : undefined} />
             </div>
-            {inputs.is1031 && inputs.equity1031 > 0 && (
-              <div className="flex justify-between items-center text-xs px-1 mb-3 text-amber-700 bg-amber-50 border border-amber-200 rounded-lg py-2 px-3">
-                <span className="font-medium">1031 equity applied</span>
-                <span className="font-semibold">{fmtDollar(inputs.equity1031)}</span>
-              </div>
-            )}
+            {inputs.is1031 && inputs.equity1031 > 0 && (() => {
+              const equity1031 = inputs.equity1031 ?? 0
+              const cashToClose = Math.max(0, d.eq + d.ccAmt - equity1031)
+              const excessAfterClose = Math.max(0, equity1031 - d.eq - d.ccAmt)
+              return (
+                <div className="mb-3 border border-amber-200 rounded-lg overflow-hidden">
+                  <div className="bg-amber-50 px-3 py-2 flex justify-between items-center">
+                    <span className="text-xs font-semibold text-amber-800">1031 Exchange — Cash Flow</span>
+                    <span className="text-xs font-semibold text-amber-700">{fmtDollar(equity1031)}</span>
+                  </div>
+                  <div className="px-3 py-2 space-y-1 text-[11px]">
+                    <div className="flex justify-between text-gray-600">
+                      <span>Purchase price</span><span className="font-medium">{fmtDollar(inputs.price)}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600">
+                      <span>Loan ({inputs.applyExcessToDown ? 'after 1031' : `${d.lev.toFixed(0)}% LTV`})</span>
+                      <span className="font-medium">({fmtDollar(d.loan)})</span>
+                    </div>
+                    <div className="flex justify-between text-gray-900 font-semibold border-t border-gray-200 pt-1">
+                      <span>Down payment</span><span>{fmtDollar(d.down)}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600">
+                      <span>+ Lender fee ({inputs.lf}%)</span><span>{fmtDollar(d.lfee)}</span>
+                    </div>
+                    {d.ccAmt > 0 && <div className="flex justify-between text-gray-600">
+                      <span>+ Closing costs ({inputs.cc}%)</span><span>{fmtDollar(d.ccAmt)}</span>
+                    </div>}
+                    <div className="flex justify-between text-gray-900 font-semibold border-t border-gray-200 pt-1">
+                      <span>Total needed</span><span>{fmtDollar(d.eq + d.ccAmt)}</span>
+                    </div>
+                    <div className="flex justify-between text-amber-700">
+                      <span>− 1031 equity</span><span>({fmtDollar(equity1031)})</span>
+                    </div>
+                    <div className="flex justify-between text-gray-900 font-bold border-t border-gray-200 pt-1">
+                      <span>Cash to close</span>
+                      <span className={cashToClose === 0 ? 'text-green-700' : ''}>{fmtDollar(cashToClose)}</span>
+                    </div>
+                    {excessAfterClose > 0 && !inputs.applyExcessToDown && (
+                      <div className="flex justify-between text-amber-600 text-[10px]">
+                        <span>Excess 1031 capital (unused)</span><span>{fmtDollar(excessAfterClose)}</span>
+                      </div>
+                    )}
+                  </div>
+                  {/* Apply to reduce loan toggle */}
+                  <div className="border-t border-amber-200 bg-amber-50/50 px-3 py-2">
+                    <label className="flex items-center justify-between cursor-pointer">
+                      <div>
+                        <p className="text-[11px] font-semibold text-amber-800">Apply 1031 funds to reduce loan</p>
+                        <p className="text-[9px] text-amber-600">Uses all 1031 proceeds as down payment — lowers debt service & improves DCR</p>
+                      </div>
+                      <button
+                        onClick={() => set('applyExcessToDown', !inputs.applyExcessToDown)}
+                        className="flex items-center ml-2">
+                        <div className={`w-8 h-4 rounded-full transition-colors flex items-center px-0.5
+                          ${inputs.applyExcessToDown ? 'bg-amber-400' : 'bg-gray-300'}`}>
+                          <div className={`w-3 h-3 bg-white rounded-full shadow transition-transform
+                            ${inputs.applyExcessToDown ? 'translate-x-4' : 'translate-x-0'}`} />
+                        </div>
+                      </button>
+                    </label>
+                  </div>
+                </div>
+              )
+            })()}
             <SectionHeader title="Income & expense statement" />
             <div className="border border-gray-100 rounded-lg p-3 mb-3">
               <PLRow label={method === 'om' ? 'Gross scheduled rent (GSR)' : 'Gross potential rent (GPR)'}
