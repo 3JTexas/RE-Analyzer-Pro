@@ -1526,29 +1526,26 @@ export function ModelCalculator({
                       <span>Cash to close</span>
                       <span className={cashToClose === 0 ? 'text-green-700' : ''}>{fmtDollar(cashToClose)}</span>
                     </div>
-                    {excessAfterClose > 0 && !inputs.applyExcessToDown && (
-                      <div className="flex justify-between text-amber-600 text-[10px]">
-                        <span>Excess 1031 capital (unused)</span><span>{fmtDollar(excessAfterClose)}</span>
+                    {excessAfterClose > 0 && (
+                      <div className="bg-amber-50 border-t border-amber-200 rounded-b -mx-3 -mb-2 mt-2 px-3 py-2">
+                        <div className="flex justify-between items-center text-[11px] text-amber-700 font-semibold">
+                          <span>{inputs.applyExcessToDown ? 'Excess applied to reduce loan' : 'Excess 1031 capital'}</span>
+                          <span>{fmtDollar(excessAfterClose)}</span>
+                        </div>
+                        <div className="flex items-center justify-between mt-1.5">
+                          <p className="text-[9px] text-amber-600">{inputs.applyExcessToDown ? 'Loan reduced — lower debt service & better DCR' : 'Apply to reduce loan?'}</p>
+                          <button
+                            onClick={() => set('applyExcessToDown', !inputs.applyExcessToDown)}
+                            className="flex items-center ml-2 flex-shrink-0">
+                            <div className={`w-8 h-4 rounded-full transition-colors flex items-center px-0.5
+                              ${inputs.applyExcessToDown ? 'bg-amber-400' : 'bg-gray-300'}`}>
+                              <div className={`w-3 h-3 bg-white rounded-full shadow transition-transform
+                                ${inputs.applyExcessToDown ? 'translate-x-4' : 'translate-x-0'}`} />
+                            </div>
+                          </button>
+                        </div>
                       </div>
                     )}
-                  </div>
-                  {/* Apply to reduce loan toggle */}
-                  <div className="border-t border-amber-200 bg-amber-50/50 px-3 py-2">
-                    <label className="flex items-center justify-between cursor-pointer">
-                      <div>
-                        <p className="text-[11px] font-semibold text-amber-800">Apply 1031 funds to reduce loan</p>
-                        <p className="text-[9px] text-amber-600">Uses all 1031 proceeds as down payment — lowers debt service & improves DCR</p>
-                      </div>
-                      <button
-                        onClick={() => set('applyExcessToDown', !inputs.applyExcessToDown)}
-                        className="flex items-center ml-2">
-                        <div className={`w-8 h-4 rounded-full transition-colors flex items-center px-0.5
-                          ${inputs.applyExcessToDown ? 'bg-amber-400' : 'bg-gray-300'}`}>
-                          <div className={`w-3 h-3 bg-white rounded-full shadow transition-transform
-                            ${inputs.applyExcessToDown ? 'translate-x-4' : 'translate-x-0'}`} />
-                        </div>
-                      </button>
-                    </label>
                   </div>
                 </div>
               )
