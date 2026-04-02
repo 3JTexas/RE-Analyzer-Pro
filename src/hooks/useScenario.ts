@@ -10,7 +10,7 @@ export function useProperties() {
     setLoading(true)
     const { data } = await supabase
       .from('properties')
-      .select('*, scenarios(id, name, method, is_default, created_at, updated_at)')
+      .select('*, scenarios(id, name, is_default, created_at, updated_at)')
       .order('display_order', { ascending: true })
       .order('created_at', { ascending: false })
     setProperties((data as Property[]) ?? [])
@@ -69,7 +69,6 @@ export function useScenario(scenarioId?: string) {
 
   const save = useCallback(async (
     name: string,
-    method: 'om' | 'physical',
     inputs: ModelInputs,
     propertyId?: string
   ) => {
@@ -78,7 +77,7 @@ export function useScenario(scenarioId?: string) {
       if (scenario?.id) {
         const { data } = await supabase
           .from('scenarios')
-          .update({ name, method, inputs, updated_at: new Date().toISOString() })
+          .update({ name, inputs, updated_at: new Date().toISOString() })
           .eq('id', scenario.id)
           .select().single()
         setScenario(data as Scenario)
@@ -87,7 +86,7 @@ export function useScenario(scenarioId?: string) {
         if (!user) return null
         const { data } = await supabase
           .from('scenarios')
-          .insert({ name, method, inputs, property_id: propertyId, user_id: user.id })
+          .insert({ name, method: 'om', inputs, property_id: propertyId, user_id: user.id })
           .select().single()
         setScenario(data as Scenario)
         return data as Scenario
@@ -101,7 +100,6 @@ export function useScenario(scenarioId?: string) {
   const createScenario = async (
     propertyId: string,
     name: string,
-    method: 'om' | 'physical',
     inputs: ModelInputs,
     isDefault: boolean = false
   ) => {
@@ -109,7 +107,7 @@ export function useScenario(scenarioId?: string) {
     if (!user) return null
     const { data } = await supabase
       .from('scenarios')
-      .insert({ name, method, inputs, property_id: propertyId, user_id: user.id, is_default: isDefault })
+      .insert({ name, method: 'om', inputs, property_id: propertyId, user_id: user.id, is_default: isDefault })
       .select().single()
     return data as Scenario
   }

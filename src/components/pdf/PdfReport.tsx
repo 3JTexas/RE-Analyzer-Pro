@@ -1,5 +1,5 @@
 import { Document, Page, Text, View, Image, StyleSheet, pdf } from '@react-pdf/renderer'
-import type { ModelInputs, Method } from '../../types'
+import type { ModelInputs } from '../../types'
 import { calculate, calc1031, fmtDollar, fmtNeg, fmtPct, fmtX, fmtDelta, fmtDeltaPct } from '../../lib/calc'
 
 // ── Colors ───────────────────────────────────────────────────────────────
@@ -92,13 +92,12 @@ interface HdrProps {
   propertyName: string
   address: string
   scenarioName: string
-  method: string
   date: string
   logoSrc?: string
   tabLabel?: string
 }
 
-function PageHdr({ propertyName, address, scenarioName, method, date, logoSrc, tabLabel }: HdrProps) {
+function PageHdr({ propertyName, address, scenarioName, date, logoSrc, tabLabel }: HdrProps) {
   return (
     <View style={{ marginBottom: 14 }} fixed>
       {logoSrc && (
@@ -109,7 +108,7 @@ function PageHdr({ propertyName, address, scenarioName, method, date, logoSrc, t
       )}
       <View style={s.pageHeader}>
         <Text style={s.pageHeaderLeft}>{propertyName.toUpperCase()}  ·  {address}</Text>
-        <Text style={s.pageHeaderRight}>{scenarioName} · {method} · {date}</Text>
+        <Text style={s.pageHeaderRight}>{scenarioName} · {date}</Text>
       </View>
     </View>
   )
@@ -139,14 +138,12 @@ function PLRowComp({ label, value, variant = 'normal', indent = false }:
 export interface ScenarioCol {
   label: string
   inputs: ModelInputs
-  method: Method
 }
 
-export type ExportTab = 'full' | 'pl' | 'tax' | 'flags' | 'om' | 'inputs'
+export type ExportTab = 'full' | 'pl' | 'tax' | 'flags' | 'broker' | 'inputs'
 
 interface ReportProps {
   inputs: ModelInputs
-  method: Method
   propertyName: string
   address: string
   units: number
@@ -157,26 +154,23 @@ interface ReportProps {
   exportTab?: ExportTab
 }
 
-function deriveMethodLabel(inputs: ModelInputs, method: Method, label?: string): string {
-  // If scenario name indicates OM As-Presented, use that
-  if (label && /om\s*as[- ]?presented/i.test(label)) return 'OM As-Presented'
-  // Auto-derive from occupancy
+function deriveVacancyLabel(inputs: ModelInputs): string {
   if (inputs.ou > 0 && inputs.ou < inputs.tu) return 'Physical Occupancy'
-  return method === 'om' ? 'OM Method' : 'Physical Occupancy'
+  return 'Gross Vacancy'
 }
 
 export { type ReportProps }
 
-export function ReportDocument({ inputs, method, propertyName, address, units, yearBuilt, scenarioName, scenarioCols = [], propertyImageUrl, exportTab = 'full' }: ReportProps) {
-  const isOM = method === 'om'
-  const d    = calculate(inputs, isOM)
+export function ReportDocument({ inputs, propertyName, address, units, yearBuilt, scenarioName, scenarioCols = [], propertyImageUrl, exportTab = 'full' }: ReportProps) {
+  const isPhysical = inputs.ou > 0 && inputs.ou < inputs.tu
+  const d    = calculate(inputs, !isPhysical)
   const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-  const methodLabel = deriveMethodLabel(inputs, method, scenarioName)
+  const vacancyLabel = deriveVacancyLabel(inputs)
   const dcrColor = d.dcr < 1 ? C.red : d.dcr < 1.2 ? C.amber : C.green
   const safeName = (propertyName || 'Investment Property').trim()
 
   // Build scenario columns for side-by-side — current scenario + siblings
-  const allCols: ScenarioCol[] = scenarioCols.length > 0 ? scenarioCols : [{ label: scenarioName, inputs, method }]
+  const allCols: ScenarioCol[] = scenarioCols.length > 0 ? scenarioCols : [{ label: scenarioName, inputs }]
 
   // Resolve logo path — works for both dev and production builds
   const logoSrc = `${import.meta.env.BASE_URL}Chai_Logo.jpeg`
@@ -185,7 +179,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
   const showPL    = exportTab === 'full' || exportTab === 'pl'
   const showTax   = exportTab === 'full' || exportTab === 'tax'
   const showFlags = exportTab === 'full' || exportTab === 'flags'
-  const showOM    = exportTab === 'full' || exportTab === 'om'
+  const showBroker = exportTab === 'full' || exportTab === 'broker'
   const showInputs = exportTab === 'full' || exportTab === 'inputs'
   const showRentRoll = exportTab === 'full'
   const showCompare  = exportTab === 'full'
@@ -404,7 +398,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
           <View style={s.coverMetricBox}>
             <Text style={s.coverMetricLabel}>NOI</Text>
             <Text style={[s.coverMetricValue, { color: C.blue }]}>{fmtDollar(d.NOI)}</Text>
-            <Text style={s.coverMetricSub}>{methodLabel.toLowerCase()}</Text>
+            <Text style={s.coverMetricSub}>{vacancyLabel.toLowerCase()}</Text>
           </View>
         </View>
         <View style={s.coverMetricsRow}>
@@ -430,7 +424,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
           </View>
         </View>
 
-        <Text style={s.coverFooter}>Scenario: {scenarioName}  ·  {methodLabel}  ·  Prepared {date}</Text>
+        <Text style={s.coverFooter}>Scenario: {scenarioName}  ·  {vacancyLabel}  ·  Prepared {date}</Text>
         <Text style={s.coverConfidential}>CONFIDENTIAL — For Discussion Purposes Only</Text>
       </Page>}
 
@@ -438,14 +432,14 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
       {/* ── P&L standalone page (tab-specific export) ─────────────────── */}
       {exportTab === 'pl' && <Page size="LETTER" style={s.page}>
         <Watermark />
-        <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} logoSrc={logoSrc} tabLabel="P&L" />
+        <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} date={date} logoSrc={logoSrc} tabLabel="P&L" />
 
         <SectionHdr title="Key metrics" />
         <View style={s.metricsRow}>
           <View style={s.metricCard}>
             <Text style={s.metricLabel}>NOI</Text>
             <Text style={[s.metricValue, { color: C.blue }]}>{fmtDollar(d.NOI)}</Text>
-            <Text style={s.metricSub}>{methodLabel}</Text>
+            <Text style={s.metricSub}>{vacancyLabel}</Text>
           </View>
           <View style={s.metricCard}>
             <Text style={s.metricLabel}>Cap rate</Text>
@@ -496,12 +490,12 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
           </Text>
         </View>
 
-        <SectionHdr title={`${isOM ? 'OM method' : 'Physical occupancy'} — income & expense`} />
-        <PLRowComp label={isOM ? 'Gross scheduled rent' : 'Gross potential rent'} value={fmtDollar(d.GSR)} variant="pos" />
+        <SectionHdr title={`${!isPhysical ? 'Gross vacancy' : 'Physical vacancy'} — income & expense`} />
+        <PLRowComp label={!isPhysical ? 'Gross scheduled rent' : 'Gross potential rent'} value={fmtDollar(d.GSR)} variant="pos" />
         <PLRowComp
-          label={isOM ? `Less: vacancy (${d.vp}%)` : `Less: physical vacancy (${d.tu - d.ou} units)`}
+          label={!isPhysical ? `Less: vacancy (${d.vp}%)` : `Less: physical vacancy (${d.tu - d.ou} units)`}
           value={`(${fmtDollar(d.pv)})`} variant="neg" indent />
-        {!isOM && d.av > 0 && (
+        {isPhysical && d.av > 0 && (
           <PLRowComp label={`Less: turnover buffer (${d.vp}%)`} value={`(${fmtDollar(d.av)})`} variant="neg" indent />
         )}
         <PLRowComp label="Collected rental income" value={fmtDollar(d.col)} indent />
@@ -530,7 +524,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
       {/* ── Tax standalone page (tab-specific export) ─────────────────── */}
       {exportTab === 'tax' && <Page size="LETTER" style={s.page}>
         <Watermark />
-        <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} logoSrc={logoSrc} tabLabel="Tax" />
+        <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} date={date} logoSrc={logoSrc} tabLabel="Tax" />
 
         {/* Tax Strategy Summary */}
         <SectionHdr title="Tax strategy inputs" />
@@ -713,14 +707,14 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
       {/* ── P&L + Tax combined page (full report) ──────────────────────── */}
       {exportTab === 'full' && <Page size="LETTER" style={s.page}>
         <Watermark />
-        <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} logoSrc={logoSrc} tabLabel="P&L + Tax" />
+        <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} date={date} logoSrc={logoSrc} tabLabel="P&L + Tax" />
 
         <SectionHdr title="Key metrics" />
         <View style={s.metricsRow}>
           <View style={s.metricCard}>
             <Text style={s.metricLabel}>NOI</Text>
             <Text style={[s.metricValue, { color: C.blue }]}>{fmtDollar(d.NOI)}</Text>
-            <Text style={s.metricSub}>{methodLabel}</Text>
+            <Text style={s.metricSub}>{vacancyLabel}</Text>
           </View>
           <View style={s.metricCard}>
             <Text style={s.metricLabel}>Cap rate</Text>
@@ -773,12 +767,12 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
 
         <View style={s.twoCol}>
           <View style={s.col}>
-            <SectionHdr title={`${isOM ? 'OM method' : 'Physical occupancy'} — income & expense`} />
-            <PLRowComp label={isOM ? 'Gross scheduled rent' : 'Gross potential rent'} value={fmtDollar(d.GSR)} variant="pos" />
+            <SectionHdr title={`${!isPhysical ? 'Gross vacancy' : 'Physical vacancy'} — income & expense`} />
+            <PLRowComp label={!isPhysical ? 'Gross scheduled rent' : 'Gross potential rent'} value={fmtDollar(d.GSR)} variant="pos" />
             <PLRowComp
-              label={isOM ? `Less: vacancy (${d.vp}%)` : `Less: physical vacancy (${d.tu - d.ou} units)`}
+              label={!isPhysical ? `Less: vacancy (${d.vp}%)` : `Less: physical vacancy (${d.tu - d.ou} units)`}
               value={`(${fmtDollar(d.pv)})`} variant="neg" indent />
-            {!isOM && d.av > 0 && (
+            {isPhysical && d.av > 0 && (
               <PLRowComp label={`Less: turnover buffer (${d.vp}%)`} value={`(${fmtDollar(d.av)})`} variant="neg" indent />
             )}
             <PLRowComp label="Collected rental income" value={fmtDollar(d.col)} indent />
@@ -849,7 +843,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
       {showRentRoll && inputs.useRentRoll && (inputs.rentRoll ?? []).length > 0 && (
         <Page size="LETTER" style={s.page}>
           <Watermark />
-          <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} logoSrc={logoSrc} tabLabel="Rent Roll" />
+          <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} date={date} logoSrc={logoSrc} tabLabel="Rent Roll" />
           <SectionHdr title="Rent roll" />
           <View style={s.table}>
             <View style={s.tableHdrRow}>
@@ -890,7 +884,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
       {showCompare && allCols.length > 1 && (
       <Page size="LETTER" style={s.page}>
         <Watermark />
-        <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} logoSrc={logoSrc} tabLabel="Scenario Comparison" />
+        <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} date={date} logoSrc={logoSrc} tabLabel="Scenario Comparison" />
         <SectionHdr title="Side-by-side: scenario comparison" />
         <View style={s.table}>
           <View style={s.tableHdrRow}>
@@ -905,7 +899,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
             {allCols.length > 1 && <Text style={[s.tableHdrCell, { textAlign: 'right', flex: 0.8 }]}>vs A</Text>}
           </View>
           {(() => {
-            const calcs = allCols.map(col => calculate(col.inputs, col.method === 'om'))
+            const calcs = allCols.map(col => calculate(col.inputs, !(col.inputs.ou > 0 && col.inputs.ou < col.inputs.tu)))
             const base = calcs[0]
             // Purchase Price row (uses inputs, not calcs)
             const priceRow = (
@@ -983,7 +977,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
         return (
           <Page size="LETTER" style={s.page}>
             <Watermark />
-            <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} logoSrc={logoSrc} tabLabel="Flags" />
+            <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} date={date} logoSrc={logoSrc} tabLabel="Flags" />
             <SectionHdr title="Underwriting flags" />
             {flags.length === 0 ? (
               <View style={[s.alertGreen, { marginTop: 8 }]}>
@@ -1000,7 +994,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
                     <Text style={{ fontSize: 8, color: C.textLight, marginBottom: 4 }}>{flag.detail}</Text>
                     <View style={{ flexDirection: 'row', gap: 12 }}>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 7, color: C.textMuted }}>OM figure</Text>
+                        <Text style={{ fontSize: 7, color: C.textMuted }}>Broker figure</Text>
                         <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold' }}>{flag.omVal}</Text>
                       </View>
                       <View style={{ flex: 1 }}>
@@ -1016,22 +1010,22 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
                   <View style={s.metricCard}>
                     <Text style={s.metricLabel}>Stressed NOI</Text>
                     <Text style={[s.metricValue, { color: C.red }]}>{fmtDollar(stressed.NOI)}</Text>
-                    <Text style={s.metricSub}>{fmtDelta(stressed.NOI - d.NOI)} vs OM</Text>
+                    <Text style={s.metricSub}>{fmtDelta(stressed.NOI - d.NOI)} vs Broker</Text>
                   </View>
                   <View style={s.metricCard}>
                     <Text style={s.metricLabel}>Stressed Cap</Text>
                     <Text style={s.metricValue}>{fmtPct(stressed.cap)}</Text>
-                    <Text style={s.metricSub}>{fmtDeltaPct(stressed.cap - d.cap)} vs OM</Text>
+                    <Text style={s.metricSub}>{fmtDeltaPct(stressed.cap - d.cap)} vs Broker</Text>
                   </View>
                   <View style={s.metricCard}>
                     <Text style={s.metricLabel}>Stressed DCR</Text>
                     <Text style={[s.metricValue, { color: stressed.dcr < 1.2 ? C.red : C.green }]}>{fmtX(stressed.dcr)}</Text>
-                    <Text style={s.metricSub}>{((stressed.dcr - d.dcr) >= 0 ? '+' : '') + (stressed.dcr - d.dcr).toFixed(2)}× vs OM</Text>
+                    <Text style={s.metricSub}>{((stressed.dcr - d.dcr) >= 0 ? '+' : '') + (stressed.dcr - d.dcr).toFixed(2)}× vs Broker</Text>
                   </View>
                   <View style={s.metricCard}>
                     <Text style={s.metricLabel}>Stressed CoC</Text>
                     <Text style={s.metricValue}>{fmtPct(stressed.coc)}</Text>
-                    <Text style={s.metricSub}>{fmtDeltaPct(stressed.coc - d.coc)} vs OM</Text>
+                    <Text style={s.metricSub}>{fmtDeltaPct(stressed.coc - d.coc)} vs Broker</Text>
                   </View>
                 </View>
               </>
@@ -1040,21 +1034,21 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
         )
       })()}
 
-      {/* ── OM As-Presented page ────────────────────────────────────── */}
-      {showOM && (
+      {/* ── Broker As-Presented page ─────────────────────────────────── */}
+      {showBroker && (
         <Page size="LETTER" style={s.page}>
           <Watermark />
-          <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} logoSrc={logoSrc} tabLabel="OM As-Presented" />
-          <SectionHdr title="OM As-Presented — broker figures" />
+          <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} date={date} logoSrc={logoSrc} tabLabel="Broker As-Presented" />
+          <SectionHdr title="Broker as-presented figures" />
           <View style={s.table}>
             <View style={s.tableHdrRow}>
               <Text style={[s.tableHdrCell, { flex: 3 }]}>Line Item</Text>
-              <Text style={[s.tableHdrCell, { flex: 1.5, textAlign: 'right' }]}>OM Value</Text>
+              <Text style={[s.tableHdrCell, { flex: 1.5, textAlign: 'right' }]}>Broker Value</Text>
               <Text style={[s.tableHdrCell, { flex: 1.5, textAlign: 'right' }]}>Per Unit</Text>
             </View>
             {[
               { label: 'Purchase Price', val: fmtDollar(inputs.price), per: units > 0 ? fmtDollar(inputs.price / units) : '—' },
-              { label: isOM ? 'Gross Scheduled Rent' : 'Gross Potential Rent', val: fmtDollar(d.GSR), per: units > 0 ? fmtDollar(d.GSR / units) : '—' },
+              { label: !isPhysical ? 'Gross Scheduled Rent' : 'Gross Potential Rent', val: fmtDollar(d.GSR), per: units > 0 ? fmtDollar(d.GSR / units) : '—' },
               { label: `Vacancy (${inputs.vp}%)`, val: `(${fmtDollar(d.vac)})`, per: units > 0 ? `(${fmtDollar(d.vac / units)})` : '—' },
               { label: 'Effective Gross Income', val: fmtDollar(d.EGI), per: units > 0 ? fmtDollar(d.EGI / units) : '—', bold: true },
               { label: 'Real Estate Taxes', val: `(${fmtDollar(d.taxTotal)})`, per: units > 0 ? `(${fmtDollar(d.taxTotal / units)})` : '—' },
@@ -1096,7 +1090,7 @@ export function ReportDocument({ inputs, method, propertyName, address, units, y
       {showInputs && (
         <Page size="LETTER" style={s.page}>
           <Watermark />
-          <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} method={methodLabel} date={date} logoSrc={logoSrc} tabLabel="Inputs" />
+          <PageHdr propertyName={propertyName} address={address} scenarioName={scenarioName} date={date} logoSrc={logoSrc} tabLabel="Inputs" />
           <View style={s.twoCol}>
             <View style={s.col}>
               <SectionHdr title="Income inputs" />
@@ -1216,7 +1210,6 @@ export async function fetchImageAsBase64(url: string): Promise<string | null> {
 // ── Export function ───────────────────────────────────────────────────────
 export async function generatePDF(
   inputs: ModelInputs,
-  method: Method,
   propertyName: string,
   address: string,
   units: number,
@@ -1235,7 +1228,6 @@ export async function generatePDF(
   const blob = await pdf(
     <ReportDocument
       inputs={inputs}
-      method={method}
       propertyName={propertyName}
       address={address}
       units={units}

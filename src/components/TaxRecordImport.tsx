@@ -167,7 +167,7 @@ export function TaxRecordImport({ currentTax, currentLand, units, purchasePrice,
                   <div className="space-y-1.5 text-[10px]">
                     {currentTax > 0 && data.annualTaxBill != null && (
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-500">Tax: OM ${currentTax.toLocaleString()} → Record {fmtD(data.annualTaxBill)}</span>
+                        <span className="text-gray-500">Tax: Current ${currentTax.toLocaleString()} → Record {fmtD(data.annualTaxBill)}</span>
                         {(() => {
                           const diff = data.annualTaxBill! - currentTax
                           return <span className={`font-semibold ${diff > 0 ? 'text-red-600' : 'text-green-700'}`}>{diff > 0 ? '+' : ''}{fmtD(diff)}</span>

@@ -15,7 +15,7 @@ export interface ModelInputs {
   tu: number       // total units
   ou: number       // occupied units
   rent: number     // avg rent / unit / month
-  vp: number       // vacancy % (of GSR in OM mode; of occupied rent in PO mode)
+  vp: number       // vacancy % (of GSR when fully occupied; turnover buffer when physically vacant)
   // Financing
   price: number
   ir: number       // interest rate %
@@ -156,7 +156,7 @@ export interface Scenario {
   property_id: string
   user_id: string
   name: string
-  method: 'om' | 'physical'
+  method?: string  // legacy DB field — ignored at runtime
   inputs: ModelInputs
   is_default: boolean
   created_at: string
@@ -164,7 +164,6 @@ export interface Scenario {
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────
-export type Method = 'om' | 'physical'
 
 export interface DeltaRow {
   label: string

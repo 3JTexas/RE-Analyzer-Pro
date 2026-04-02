@@ -4,7 +4,7 @@ import { useScenario } from '../hooks/useScenario'
 import { getScenariosForProperty } from '../hooks/useScenario'
 import { ModelCalculator } from '../components/model/ModelCalculator'
 import { Spinner } from '../components/ui'
-import type { ModelInputs, Method, Scenario } from '../types'
+import type { ModelInputs, Scenario } from '../types'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
@@ -20,19 +20,17 @@ export function ScenarioPage() {
   const { id } = useParams<{ id: string }>()
   const { scenario, loading, saving, save } = useScenario(id)
   const [siblings, setSiblings] = useState<Scenario[]>([])
-  const [omScenario, setOmScenario] = useState<Scenario | null>(null)
+  const [brokerScenario, setBrokerScenario] = useState<Scenario | null>(null)
   const [property, setProperty] = useState<PropertyMeta | null>(null)
 
   useEffect(() => {
     if (scenario?.property_id) {
-      // Load sibling scenarios
       getScenariosForProperty(scenario.property_id).then(all => {
         setSiblings(all)
-        const om = all.find(s => s.is_default)
-        if (om) setOmScenario(om)
+        const broker = all.find(s => s.is_default)
+        if (broker) setBrokerScenario(broker)
       })
 
-      // Load property metadata for PDF export
       supabase
         .from('properties')
         .select('name, address, units, year_built, property_image_url')
@@ -44,8 +42,8 @@ export function ScenarioPage() {
     }
   }, [scenario?.property_id])
 
-  const handleSave = async (name: string, method: Method, inputs: ModelInputs) => {
-    await save(name, method, inputs)
+  const handleSave = async (name: string, inputs: ModelInputs) => {
+    await save(name, inputs)
   }
 
   if (loading) return <Spinner />
@@ -65,13 +63,12 @@ export function ScenarioPage() {
         <div className="flex-1 overflow-hidden">
           <ModelCalculator
             initialInputs={scenario.inputs}
-            initialMethod={scenario.method}
             scenarioName={scenario.name}
             onSave={handleSave}
             saving={saving}
             siblings={siblings}
             currentScenarioId={scenario.id}
-            omScenario={omScenario}
+            brokerScenario={brokerScenario}
             propertyName={property?.name ?? ''}
             propertyAddress={property?.address ?? ''}
             propertyUnits={property?.units ?? 0}

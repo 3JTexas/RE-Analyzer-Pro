@@ -4,8 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { Download, Save, RotateCcw, FileText, X, Eye, Trash2, ChevronDown, Printer } from 'lucide-react'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
-import { calculate, calc1031, pmtCalcExport, OM_DEFAULTS, fmtDollar, fmtNeg, fmtPct, fmtX, fmtDelta, fmtDeltaPct } from '../../lib/calc'
-import type { ModelInputs, Method, Scenario, RentRollUnit } from '../../types'
+import { calculate, calc1031, pmtCalcExport, DEFAULT_INPUTS, fmtDollar, fmtNeg, fmtPct, fmtX, fmtDelta, fmtDeltaPct } from '../../lib/calc'
+import type { ModelInputs, Scenario, RentRollUnit } from '../../types'
 import {
   InputField, SectionHeader, MetricCard, PLRow, Alert, Toggle, DCRBar, Badge
 } from '../ui'
@@ -334,21 +334,23 @@ interface CompareTabProps {
   compareB: string; setCompareB: (v: string) => void
   compareCols: string[]; setCompareCols: (v: string[]) => void
   scenarioOptions: { id: string; name: string }[]
-  resolveInputs: (sid: string) => { inputs: ModelInputs; method: Method; label: string }
+  resolveInputs: (sid: string) => { inputs: ModelInputs; label: string }
+  siblings: Scenario[]
   deltaRows: (a: any, b: any) => any[]
   onSaveCompare?: () => Promise<void>
   compareSaving?: boolean
 }
 
 function CompareTab({ compareA, setCompareA, compareB, setCompareB,
-  compareCols, setCompareCols, scenarioOptions, resolveInputs,
+  compareCols, setCompareCols, scenarioOptions, resolveInputs, siblings,
   onSaveCompare, compareSaving }: CompareTabProps) {
 
   const allIds = [compareA, compareB, ...compareCols]
 
   const allCols = allIds.map((id, i) => {
     const r = resolveInputs(id)
-    return { id, label: r.label, style: COL_STYLES[i] ?? COL_STYLES[3], inputs: r.inputs, data: calculate(r.inputs, r.method === 'om') }
+    const isDefault = siblings.find(x => x.id === id)?.is_default
+    return { id, label: r.label, style: COL_STYLES[i] ?? COL_STYLES[3], inputs: r.inputs, data: calculate(r.inputs, !(r.inputs.ou > 0 && r.inputs.ou < r.inputs.tu) || !!isDefault) }
   })
 
   const setCol = (i: number, val: string) => {
@@ -530,7 +532,7 @@ function computeFlags(inputs: ModelInputs, d: ReturnType<typeof calculate>, year
       flags.push({
         severity: 'red',
         title: 'Physical vacancy exceeds stated vacancy rate',
-        detail: `Rent roll shows ${inputs.tu - inputs.ou} of ${inputs.tu} units vacant (${physicalVacPct.toFixed(1)}% physical vacancy). OM applies only ${inputs.vp}% vacancy to a full ${inputs.tu}-unit GSR, overstating effective income.`,
+        detail: `Rent roll shows ${inputs.tu - inputs.ou} of ${inputs.tu} units vacant (${physicalVacPct.toFixed(1)}% physical vacancy). Broker applies only ${inputs.vp}% vacancy to a full ${inputs.tu}-unit GSR, overstating effective income.`,
         omVal: `${inputs.vp}% vacancy on ${inputs.tu}-unit GSR`,
         benchmark: `${physicalVacPct.toFixed(1)}% physical vacancy (${inputs.tu - inputs.ou} unit${inputs.tu - inputs.ou > 1 ? 's' : ''} vacant)`,
         noImpact: `($${Math.round(understatedVacancy).toLocaleString()}) EGI vs. in-place`,
@@ -666,7 +668,7 @@ function FlagsTab({ inputs, d, propertyYearBuilt, onUpdateInputs }: {
         <>
           <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-xs font-semibold text-red-800">{flags.filter(f => f.severity === 'red').length} high-risk · {flags.filter(f => f.severity === 'amber').length} watch items</p>
-            <p className="text-[10px] text-red-600 mt-0.5">Figures below are based on OM inputs — verify each before proceeding</p>
+            <p className="text-[10px] text-red-600 mt-0.5">Figures below are based on broker inputs — verify each before proceeding</p>
           </div>
 
           <div className="space-y-3 mb-4">
@@ -681,7 +683,7 @@ function FlagsTab({ inputs, d, propertyYearBuilt, onUpdateInputs }: {
                 <p className="text-[10px] text-gray-600 leading-relaxed mb-2">{flag.detail}</p>
                 <div className="grid grid-cols-2 gap-1.5 text-[10px]">
                   <div className="bg-white/70 rounded px-2 py-1">
-                    <div className="text-gray-400 mb-0.5">OM figure</div>
+                    <div className="text-gray-400 mb-0.5">Broker figure</div>
                     <div className="font-semibold text-gray-700">{flag.omVal}</div>
                   </div>
                   <div className="bg-white/70 rounded px-2 py-1">
@@ -707,22 +709,22 @@ function FlagsTab({ inputs, d, propertyYearBuilt, onUpdateInputs }: {
               <div className="bg-white rounded p-2 text-center">
                 <div className="text-[10px] text-gray-500">Stressed NOI</div>
                 <div className="text-base font-semibold text-gray-900">{fmtDollar(ds.NOI)}</div>
-                <div className="text-[9px] text-red-600">{fmtDelta(ds.NOI - d.NOI)} vs OM</div>
+                <div className="text-[9px] text-red-600">{fmtDelta(ds.NOI - d.NOI)} vs Broker</div>
               </div>
               <div className="bg-white rounded p-2 text-center">
                 <div className="text-[10px] text-gray-500">Stressed Cap Rate</div>
                 <div className="text-base font-semibold text-gray-900">{fmtPct(ds.cap)}</div>
-                <div className="text-[9px] text-red-600">{fmtDeltaPct(ds.cap - d.cap)} vs OM</div>
+                <div className="text-[9px] text-red-600">{fmtDeltaPct(ds.cap - d.cap)} vs Broker</div>
               </div>
               <div className="bg-white rounded p-2 text-center">
                 <div className="text-[10px] text-gray-500">Stressed DCR</div>
                 <div className={`text-base font-semibold ${ds.dcr < 1.2 ? 'text-red-600' : 'text-green-700'}`}>{fmtX(ds.dcr)}</div>
-                <div className="text-[9px] text-red-600">{((ds.dcr - d.dcr) >= 0 ? '+' : '') + (ds.dcr - d.dcr).toFixed(2)}× vs OM</div>
+                <div className="text-[9px] text-red-600">{((ds.dcr - d.dcr) >= 0 ? '+' : '') + (ds.dcr - d.dcr).toFixed(2)}× vs Broker</div>
               </div>
               <div className="bg-white rounded p-2 text-center">
                 <div className="text-[10px] text-gray-500">Stressed CoC</div>
                 <div className="text-base font-semibold text-gray-900">{fmtPct(ds.coc)}</div>
-                <div className="text-[9px] text-red-600">{fmtDeltaPct(ds.coc - d.coc)} vs OM</div>
+                <div className="text-[9px] text-red-600">{fmtDeltaPct(ds.coc - d.coc)} vs Broker</div>
               </div>
             </div>
           </div>
@@ -734,13 +736,12 @@ function FlagsTab({ inputs, d, propertyYearBuilt, onUpdateInputs }: {
 
 interface ModelProps {
   initialInputs?: Partial<ModelInputs>
-  initialMethod?: Method
   scenarioName?: string
-  onSave?: (name: string, method: Method, inputs: ModelInputs) => Promise<void>
+  onSave?: (name: string, inputs: ModelInputs) => Promise<void>
   saving?: boolean
   siblings?: Scenario[]
   currentScenarioId?: string
-  omScenario?: Scenario | null
+  brokerScenario?: Scenario | null
   propertyName?: string
   propertyAddress?: string
   propertyUnits?: number
@@ -750,14 +751,14 @@ interface ModelProps {
 }
 
 export function ModelCalculator({
-  initialInputs, initialMethod = 'om', scenarioName = 'New Scenario',
-  onSave, saving, siblings = [], currentScenarioId, omScenario,
+  initialInputs, scenarioName = 'New Scenario',
+  onSave, saving, siblings = [], currentScenarioId, brokerScenario,
   propertyName = 'Investment Property', propertyAddress = '',
   propertyUnits, propertyYearBuilt, propertyId, propertyImageUrl,
 }: ModelProps) {
   const navigate = useNavigate()
   const [inputs, setInputs] = useState<ModelInputs>({
-    ...OM_DEFAULTS,
+    ...DEFAULT_INPUTS,
     ...initialInputs,
     cc: (initialInputs as any)?.cc ?? 0,
     expCollapse: (initialInputs as any)?.expCollapse ?? false,
@@ -772,11 +773,10 @@ export function ModelCalculator({
     pmMode: (initialInputs as any)?.pmMode ?? 'pct',
     pmPerUnit: (initialInputs as any)?.pmPerUnit ?? 0,
   })
-  const [method, setMethod] = useState<Method>(initialMethod)
   const [name, setName] = useState(scenarioName)
-  const [activeTab, setActiveTab] = useState<'inputs'|'pl'|'tax'|'om'|'flags'|'compare'>('inputs')
-  const [omLocked, setOmLocked] = useState(true)
-  const [omSnapshot, setOmSnapshot] = useState<ModelInputs | null>(null)
+  const [activeTab, setActiveTab] = useState<'inputs'|'pl'|'tax'|'broker'|'flags'|'compare'>('inputs')
+  const [brokerLocked, setBrokerLocked] = useState(true)
+  const [brokerSnapshot, setBrokerSnapshot] = useState<ModelInputs | null>(null)
   const targetCap = inputs.targetCapRate ?? 0
   const setTargetCap = (v: number) => setInputs(prev => ({ ...prev, targetCapRate: v }))
   const [applyConfirm, setApplyConfirm] = useState(false)
@@ -871,39 +871,37 @@ export function ModelCalculator({
     setInputs(prev => ({ ...prev, otherExpenses: (prev.otherExpenses ?? []).filter((_, idx) => idx !== i) }))
 
   // Returns 'changed' badge label if value differs from OM scenario, else undefined
-  const omBadge = (key: keyof ModelInputs): { badge: string; badgeColor: 'amber' } | {} => {
-    if (!omScenario || omScenario.id === currentScenarioId) return {}
-    const omVal = (omScenario.inputs as any)[key]
+  const brokerBadge = (key: keyof ModelInputs): { badge: string; badgeColor: 'amber' } | {} => {
+    if (!brokerScenario || brokerScenario.id === currentScenarioId) return {}
+    const omVal = (brokerScenario.inputs as any)[key]
     const curVal = (inputs as any)[key]
     if (omVal === undefined || omVal === curVal) return {}
     return { badge: 'changed', badgeColor: 'amber' as const }
   }
 
-  // Auto-derive method from inputs — ou < tu means physical occupancy
-  // OM As-Presented (is_default) always forced to 'om' regardless of ou/tu
-  const isDefaultOM = omScenario?.id === currentScenarioId
-  const effectiveMethod = isDefaultOM ? 'om' : (inputs.ou > 0 && inputs.ou < inputs.tu) ? 'physical' : 'om'
+  // Derive vacancy mode: physical when ou < tu, otherwise gross vacancy
+  const isBrokerScenario = brokerScenario?.id === currentScenarioId
+  const useOM = (inp: ModelInputs, isDefault?: boolean) => isDefault || !(inp.ou > 0 && inp.ou < inp.tu)
+  const isPhysical = !useOM(inputs, isBrokerScenario)
   // Current scenario outputs
-  const d   = calculate(inputs, effectiveMethod === 'om')
+  const d   = calculate(inputs, useOM(inputs, isBrokerScenario))
 
-  // OM tab always uses the is_default scenario inputs, forced to OM method
-  const omInputs = omScenario ? omScenario.inputs : inputs
-  const omTabD = calculate(omInputs, true)
+  // Broker tab always uses the is_default scenario inputs, forced to gross vacancy
+  const brokerInputs = brokerScenario ? brokerScenario.inputs : inputs
+  const brokerTabD = calculate(brokerInputs, true)
 
   // Resolve scenario inputs for compare
-  const resolveInputs = (sid: string): { inputs: ModelInputs; method: Method; label: string } => {
-    if (sid === 'current') return { inputs, method: effectiveMethod, label: name }
+  const resolveInputs = (sid: string): { inputs: ModelInputs; label: string } => {
+    if (sid === 'current') return { inputs, label: name }
     const s = siblings.find(x => x.id === sid)
-    if (!s) return { inputs, method: effectiveMethod, label: name }
-    const sIsOM = s.is_default === true
-    const sEffective = sIsOM ? 'om' : (s.inputs.ou > 0 && s.inputs.ou < s.inputs.tu) ? 'physical' : 'om'
-    return { inputs: s.inputs, method: sEffective as Method, label: s.name }
+    if (!s) return { inputs, label: name }
+    return { inputs: s.inputs, label: s.name }
   }
 
   const compA = resolveInputs(compareA)
   const compB = resolveInputs(compareB)
-  const dA = calculate(compA.inputs, compA.method === 'om')
-  const dB = calculate(compB.inputs, compB.method === 'om')
+  const dA = calculate(compA.inputs, useOM(compA.inputs, siblings.find(x => x.id === compareA)?.is_default))
+  const dB = calculate(compB.inputs, useOM(compB.inputs, siblings.find(x => x.id === compareB)?.is_default))
 
   const resetSection = (section: 'income'|'financing'|'expenses') => {
     const keys: Record<string, (keyof ModelInputs)[]> = {
@@ -913,7 +911,7 @@ export function ModelCalculator({
     }
     setInputs(prev => {
       const next = { ...prev }
-      keys[section].forEach(k => { (next as any)[k] = (OM_DEFAULTS as any)[k] })
+      keys[section].forEach(k => { (next as any)[k] = (DEFAULT_INPUTS as any)[k] })
       if (section === 'income') { next.rentRoll = []; next.useRentRoll = false }
       return next
     })
@@ -925,18 +923,16 @@ export function ModelCalculator({
     ? { type: 'yellow' as const, msg: `DCR CAUTION: ${fmtX(d.dcr)} — Below 1.20× lender minimum. NOI must reach ${fmtDollar(d.ds * 1.2)}.` }
     : { type: 'green' as const, msg: `DCR OK: ${fmtX(d.dcr)} — Clears 1.20× minimum. Cushion: ${fmtDollar(d.NOI - d.ds)}/yr.` }
 
-  const handleSave = async () => { if (onSave) await onSave(name, method, inputs) }
+  const handleSave = async () => { if (onSave) await onSave(name, inputs) }
   const handleExcelExport = () => exportToExcel(inputs, name, propertyName)
   const handlePDF = async (tab: ExportTab = 'full') => {
-    // Build cols in Compare tab order: A, B, then any extra C/D cols
     const compareOrder = [compareA, compareB, ...compareCols]
     const cols: ScenarioCol[] = compareOrder
       .map(sid => {
         const r = resolveInputs(sid)
-        return { label: r.label, inputs: r.inputs, method: r.method as Method }
+        return { label: r.label, inputs: r.inputs }
       })
-      .filter((col, i, arr) => arr.findIndex(c => c.label === col.label) === i) // dedupe
-    // Pre-fetch image for preview
+      .filter((col, i, arr) => arr.findIndex(c => c.label === col.label) === i)
     let imageData: string | undefined
     if (propertyImageUrl) {
       const b64 = await fetchImageAsBase64(propertyImageUrl)
@@ -945,7 +941,6 @@ export function ModelCalculator({
     setExportTab(tab)
     setPdfPreviewProps({
       inputs,
-      method: effectiveMethod,
       propertyName,
       address: propertyAddress,
       units: propertyUnits ?? inputs.tu,
@@ -960,15 +955,15 @@ export function ModelCalculator({
   const handlePrintAll = async () => {
     const compareOrder = [compareA, compareB, ...compareCols]
     const cols: ScenarioCol[] = compareOrder
-      .map(sid => { const r = resolveInputs(sid); return { label: r.label, inputs: r.inputs, method: r.method as Method } })
+      .map(sid => { const r = resolveInputs(sid); return { label: r.label, inputs: r.inputs } })
       .filter((col, i, arr) => arr.findIndex(c => c.label === col.label) === i)
     let imageData: string | undefined
     if (propertyImageUrl) { const b64 = await fetchImageAsBase64(propertyImageUrl); if (b64) imageData = b64 }
     const safeProp = (propertyName || 'Property').replace(/[^a-zA-Z0-9]/g, '_')
-    const tabs: [ExportTab, string][] = [['full', 'Full_Report'], ['pl', 'PL'], ['tax', 'Tax'], ['flags', 'Flags'], ['om', 'OM'], ['inputs', 'Inputs']]
+    const tabs: [ExportTab, string][] = [['full', 'Full_Report'], ['pl', 'PL'], ['tax', 'Tax'], ['flags', 'Flags'], ['broker', 'Broker'], ['inputs', 'Inputs']]
     for (const [tab, suffix] of tabs) {
       const blob = await pdf(
-        <ReportDocument inputs={inputs} method={effectiveMethod} propertyName={propertyName}
+        <ReportDocument inputs={inputs} propertyName={propertyName}
           address={propertyAddress} units={propertyUnits ?? inputs.tu} yearBuilt={propertyYearBuilt ?? 0}
           scenarioName={name} scenarioCols={cols} propertyImageUrl={imageData} exportTab={tab} />
       ).toBlob()
@@ -978,8 +973,8 @@ export function ModelCalculator({
       URL.revokeObjectURL(url)
     }
   }
-  type PrintTab = 'pl' | 'tax' | 'flags' | 'om' | 'inputs'
-  const printTabLabels: Record<PrintTab, string> = { pl: 'P&L', tax: 'Tax', flags: 'Flags', om: 'OM', inputs: 'Inputs' }
+  type PrintTab = 'pl' | 'tax' | 'flags' | 'broker' | 'inputs'
+  const printTabLabels: Record<PrintTab, string> = { pl: 'P&L', tax: 'Tax', flags: 'Flags', broker: 'Broker', inputs: 'Inputs' }
 
   const handleCanvasPrint = async (tab: PrintTab) => {
     const prevTab = activeTab
@@ -1085,7 +1080,7 @@ export function ModelCalculator({
   }
 
   const handleCanvasPrintAll = async () => {
-    const tabs: PrintTab[] = ['pl', 'tax', 'flags', 'om', 'inputs']
+    const tabs: PrintTab[] = ['pl', 'tax', 'flags', 'broker', 'inputs']
     for (const tab of tabs) {
       await handleCanvasPrint(tab)
     }
@@ -1149,7 +1144,7 @@ export function ModelCalculator({
   }
 
   const tabs: { id: typeof activeTab; label: string; dot?: boolean }[] = [
-    { id: 'om',      label: 'OM'       },
+    { id: 'broker',  label: 'Broker'   },
     { id: 'flags',   label: 'Flags',   dot: computeFlags(inputs, d, propertyYearBuilt).some(f => f.severity === 'red') },
     { id: 'inputs',  label: 'Inputs'   },
     { id: 'pl',      label: 'P&L'      },
@@ -1202,7 +1197,7 @@ export function ModelCalculator({
                 ['pl', 'P&L'],
                 ['tax', 'Tax'],
                 ['flags', 'Flags'],
-                ['om', 'OM As-Presented'],
+                ['broker', 'Broker As-Presented'],
                 ['inputs', 'Inputs'],
               ] as [ExportTab, string][]).map(([tab, label]) => (
                 <button key={tab} onClick={() => { setShowPdfMenu(false); handlePDF(tab) }}
@@ -1229,7 +1224,7 @@ export function ModelCalculator({
           </button>
           {showPrintMenu && (
             <div className="absolute top-full left-0 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1 overflow-hidden">
-              {(['pl', 'tax', 'flags', 'om', 'inputs'] as PrintTab[]).map(tab => (
+              {(['pl', 'tax', 'flags', 'broker', 'inputs'] as PrintTab[]).map(tab => (
                 <button key={tab} onClick={() => { setShowPrintMenu(false); handleCanvasPrint(tab) }}
                   className="w-full text-left px-3 py-1.5 text-xs text-[#1a1a2e] hover:bg-[#c9a84c]/15 hover:text-[#1a1a2e] transition-colors">
                   {printTabLabels[tab]}
@@ -1243,7 +1238,7 @@ export function ModelCalculator({
             </div>
           )}
         </div>
-        {!isDefaultOM && (
+        {!isBrokerScenario && (
           <button onClick={openLOI}
             className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-500 border border-gray-200 rounded-lg hover:border-blue-400 hover:text-blue-500 whitespace-nowrap">
             <FileText size={12} /> LOI
@@ -1259,7 +1254,7 @@ export function ModelCalculator({
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`flex-1 py-2.5 text-xs font-medium transition-colors relative
               ${activeTab === tab.id
-                ? tab.id === 'om'
+                ? tab.id === 'broker'
                   ? 'text-blue-700 border-b-2 border-blue-600 bg-blue-50'
                   : tab.id === 'flags'
                   ? 'text-red-700 border-b-2 border-red-500 bg-red-50'
@@ -1304,11 +1299,11 @@ export function ModelCalculator({
             <div className="grid grid-cols-2 gap-2 mb-1">
               <InputField label="Total units" type="number" value={inputs.tu} min={1} max={100} step={1}
                 tooltip="Total number of rentable units in the property"
-                badge="OM" onChange={e => { const v = +e.target.value; set('tu', v); if (inputs.useRentRoll) syncRentRoll(v) }} />
+                badge="Broker" onChange={e => { const v = +e.target.value; set('tu', v); if (inputs.useRentRoll) syncRentRoll(v) }} />
               {!inputs.useRentRoll && (
                 <InputField label="Units occupied" type="number" value={inputs.ou} min={0} max={inputs.tu} step={1}
-                  tooltip="Units currently occupied. If less than total units, physical vacancy method is used instead of OM method"
-                  badge="OM" onChange={e => set('ou', +e.target.value)} />
+                  tooltip="Units currently occupied. If less than total units, physical vacancy is used instead of gross vacancy"
+                  badge="Broker" onChange={e => set('ou', +e.target.value)} />
               )}
             </div>
             {/* Rent roll toggle */}
@@ -1328,21 +1323,21 @@ export function ModelCalculator({
               <div className="grid grid-cols-2 gap-2">
                 <InputField label="Avg rent / unit / mo ($)" type="number" dollar value={inputs.rent} min={500} step={25}
                   tooltip="Blended average monthly rent across all units"
-                  badge="OM" onChange={e => set('rent', +e.target.value)} />
+                  badge="Broker" onChange={e => set('rent', +e.target.value)} />
                 <InputField
-                  label={method === 'om' ? 'Vacancy % (of GSR)' : 'Turnover buffer %'}
+                  label={!isPhysical ?'Vacancy % (of GSR)' : 'Turnover buffer %'}
                   type="number" value={inputs.vp} min={0} max={50} step={0.5}
-                  tooltip="Economic vacancy allowance - used in OM method only. Typically 4-5% for stabilized properties"
-                  badge="OM" onChange={e => set('vp', +e.target.value)} />
+                  tooltip="Economic vacancy allowance — applied as % of GSR. Typically 4-5% for stabilized properties"
+                  badge="Broker" onChange={e => set('vp', +e.target.value)} />
               </div>
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <InputField
-                    label={method === 'om' ? 'Vacancy % (of GSR)' : 'Turnover buffer %'}
+                    label={!isPhysical ?'Vacancy % (of GSR)' : 'Turnover buffer %'}
                     type="number" value={inputs.vp} min={0} max={50} step={0.5}
                     tooltip="Economic vacancy allowance"
-                    badge="OM" onChange={e => set('vp', +e.target.value)} />
+                    badge="Broker" onChange={e => set('vp', +e.target.value)} />
                 </div>
                 {/* Rent roll table */}
                 <div className="border border-gray-200 rounded-lg overflow-hidden mb-2">
@@ -1454,22 +1449,22 @@ export function ModelCalculator({
               </button>
             </SectionHeader>
             <div className="grid grid-cols-2 gap-2">
-              <InputField {...omBadge('price')} label="Purchase price ($)" type="number" dollar value={inputs.price} step={10000}
+              <InputField {...brokerBadge('price')} label="Purchase price ($)" type="number" dollar value={inputs.price} step={10000}
                 tooltip="Total acquisition price. Drives loan amount, depreciation basis, and all return metrics"
-                badge="OM" onChange={e => set('price', +e.target.value)} />
-              <InputField {...omBadge('ir')} label="Interest rate (%)" type="number" value={inputs.ir} step={0.125}
+                badge="Broker" onChange={e => set('price', +e.target.value)} />
+              <InputField {...brokerBadge('ir')} label="Interest rate (%)" type="number" value={inputs.ir} step={0.125}
                 tooltip="Annual mortgage interest rate"
-                badge="OM" onChange={e => set('ir', +e.target.value)} />
-              <InputField {...omBadge('lev')} label="Leverage / LTV (%)" type="number" value={inputs.lev} min={0} max={100} step={1}
+                badge="Broker" onChange={e => set('ir', +e.target.value)} />
+              <InputField {...brokerBadge('lev')} label="Leverage / LTV (%)" type="number" value={inputs.lev} min={0} max={100} step={1}
                 tooltip="Loan-to-value ratio. e.g. 70 = 70% LTV, 30% down"
-                badge="OM" onChange={e => set('lev', +e.target.value)} />
-              <InputField {...omBadge('am')} label="Amortization (years)" type="number" value={inputs.am} step={5}
+                badge="Broker" onChange={e => set('lev', +e.target.value)} />
+              <InputField {...brokerBadge('am')} label="Amortization (years)" type="number" value={inputs.am} step={5}
                 tooltip="Loan term in years for payment calculation"
-                badge="OM" onChange={e => set('am', +e.target.value)} />
-              <InputField {...omBadge('lf')} label="Lender fee (%)" type="number" value={inputs.lf} step={0.125}
+                badge="Broker" onChange={e => set('am', +e.target.value)} />
+              <InputField {...brokerBadge('lf')} label="Lender fee (%)" type="number" value={inputs.lf} step={0.125}
                 tooltip="Origination fee as % of loan amount - added to cash to close"
                 onChange={e => set('lf', +e.target.value)} />
-              <InputField {...omBadge('cc')} label="Closing costs (% of price)" type="number" value={inputs.cc} step={0.25}
+              <InputField {...brokerBadge('cc')} label="Closing costs (% of price)" type="number" value={inputs.cc} step={0.25}
                 tooltip="Additional closing costs as % of purchase price"
                 onChange={e => set('cc', +e.target.value)} />
             </div>
@@ -1505,15 +1500,15 @@ export function ModelCalculator({
             ) : (
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <InputField {...omBadge('tax')} label="Real Estate Taxes (annual $)" type="number" dollar value={inputs.tax} step={500}
+                  <InputField {...brokerBadge('tax')} label="Real Estate Taxes (annual $)" type="number" dollar value={inputs.tax} step={500}
                     tooltip="Annual property tax bill. Should reflect post-sale reassessment - Florida reassesses at purchase price on sale"
-                    badge="OM" onChange={e => set('tax', +e.target.value)} />
+                    badge="Broker" onChange={e => set('tax', +e.target.value)} />
                   <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.tax > 0 && <>${Math.round(inputs.tax / 12).toLocaleString()}/mo{inputs.tu > 0 ? ` · $${Math.round(inputs.tax / inputs.tu).toLocaleString()}/unit` : ''}</>}</div>
                 </div>
                 <div>
-                  <InputField {...omBadge('ins')} label="Insurance ($/unit/yr)" type="number" dollar value={inputs.ins} step={100}
+                  <InputField {...brokerBadge('ins')} label="Insurance ($/unit/yr)" type="number" dollar value={inputs.ins} step={100}
                     tooltip="Insurance cost per unit per year. Calc multiplies by total units for annual total. Benchmark: $2,000-$3,000+/unit depending on building age"
-                    badge="OM" onChange={e => set('ins', +e.target.value)} />
+                    badge="Broker" onChange={e => set('ins', +e.target.value)} />
                   <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.ins > 0 && inputs.tu > 0 && <>${Math.round(inputs.ins * inputs.tu / 12).toLocaleString()}/mo total · ${(inputs.ins * inputs.tu).toLocaleString()}/yr</>}</div>
                 </div>
                 <div className="col-span-2 border-l-2 border-gray-200 pl-2 space-y-1.5">
@@ -1562,7 +1557,7 @@ export function ModelCalculator({
                     </div>
                   </div>
                   <div>
-                    <InputField {...omBadge('util')} label="Total Utilities (annual $)" type="number" dollar value={inputs.util} step={500}
+                    <InputField {...brokerBadge('util')} label="Total Utilities (annual $)" type="number" dollar value={inputs.util} step={500}
                       tooltip="Landlord-paid utilities - water, trash, common area electric"
                       badge={inputs.util === ((inputs.utilElec ?? 0) + (inputs.utilWater ?? 0) + (inputs.utilTrash ?? 0)) ? 'auto' : undefined}
                       badgeColor="blue"
@@ -1571,27 +1566,27 @@ export function ModelCalculator({
                   </div>
                 </div>
                 <div>
-                  <InputField {...omBadge('rm')} label="R&M ($/unit/yr)" type="number" dollar value={inputs.rm} step={50}
+                  <InputField {...brokerBadge('rm')} label="R&M ($/unit/yr)" type="number" dollar value={inputs.rm} step={50}
                     tooltip="Repairs and maintenance per unit per year. Calc multiplies by total units. Benchmark: $400-$900/unit/yr depending on building age"
-                    badge="OM" onChange={e => set('rm', +e.target.value)} />
+                    badge="Broker" onChange={e => set('rm', +e.target.value)} />
                   <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.rm > 0 && inputs.tu > 0 && <>${Math.round(inputs.rm * inputs.tu / 12).toLocaleString()}/mo total · ${(inputs.rm * inputs.tu).toLocaleString()}/yr</>}</div>
                 </div>
                 <div>
-                  <InputField {...omBadge('cs')} label="Contract Services (annual)" type="number" dollar value={inputs.cs} step={100}
+                  <InputField {...brokerBadge('cs')} label="Contract Services (annual)" type="number" dollar value={inputs.cs} step={100}
                     tooltip="Annual contract services total — landscaping, pest control, elevator, pool service etc."
-                    badge="OM" onChange={e => set('cs', +e.target.value)} />
+                    badge="Broker" onChange={e => set('cs', +e.target.value)} />
                   <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.cs > 0 && <>${Math.round(inputs.cs / 12).toLocaleString()}/mo{inputs.tu > 0 ? ` · $${Math.round(inputs.cs / inputs.tu).toLocaleString()}/unit` : ''}</>}</div>
                 </div>
                 <div>
-                  <InputField {...omBadge('ga')} label="General & Admin (annual)" type="number" dollar value={inputs.ga} step={100}
+                  <InputField {...brokerBadge('ga')} label="General & Admin (annual)" type="number" dollar value={inputs.ga} step={100}
                     tooltip="Annual G&A total — office, phone, misc. Typically $75-100/unit/yr"
-                    badge="OM" onChange={e => set('ga', +e.target.value)} />
+                    badge="Broker" onChange={e => set('ga', +e.target.value)} />
                   <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.ga > 0 && <>${Math.round(inputs.ga / 12).toLocaleString()}/mo{inputs.tu > 0 ? ` · $${Math.round(inputs.ga / inputs.tu).toLocaleString()}/unit` : ''}</>}</div>
                 </div>
                 <div>
-                  <InputField {...omBadge('res')} label="Reserves ($/unit/yr)" type="number" dollar value={inputs.res} step={50}
+                  <InputField {...brokerBadge('res')} label="Reserves ($/unit/yr)" type="number" dollar value={inputs.res} step={50}
                     tooltip="Capital reserve per unit per year. Calc multiplies by total units. Benchmark: $250-$700/unit/yr depending on building age"
-                    badge="OM" onChange={e => set('res', +e.target.value)} />
+                    badge="Broker" onChange={e => set('res', +e.target.value)} />
                   <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.res > 0 && inputs.tu > 0 && <>${Math.round(inputs.res * inputs.tu / 12).toLocaleString()}/mo total · ${(inputs.res * inputs.tu).toLocaleString()}/yr</>}</div>
                 </div>
                 <div>
@@ -1604,9 +1599,9 @@ export function ModelCalculator({
                     </button>
                   </div>
                   {inputs.pmMode === 'pct' ? (
-                    <InputField {...omBadge('pm')} label="Fee (%)" type="number" value={inputs.pm} step={0.5}
+                    <InputField {...brokerBadge('pm')} label="Fee (%)" type="number" value={inputs.pm} step={0.5}
                       tooltip="Property management fee as % of effective gross income. Typically 8-10% for small multifamily"
-                      badge="OM" onChange={e => set('pm', +e.target.value)} />
+                      badge="Broker" onChange={e => set('pm', +e.target.value)} />
                   ) : (
                     <InputField label="Fee ($/unit/mo)" type="number" dollar value={inputs.pmPerUnit} step={25}
                       tooltip="Property management fee per unit per month. Typically $75-$150/unit for small multifamily"
@@ -1641,18 +1636,18 @@ export function ModelCalculator({
         {/* ── P&L TAB ───────────────────────────────────────────────────── */}
         {activeTab === 'pl' && (
           <div>
-            <SectionHeader title={`Key metrics — ${method === 'om' ? 'OM method' : 'Physical occupancy'}`} />
+            <SectionHeader title="Key metrics" />
             <div className="grid grid-cols-2 gap-2 mb-3">
               <MetricCard label="NOI" value={fmtDollar(d.NOI)}
-                sub={omScenario && omScenario.id !== currentScenarioId ? `OM: ${fmtDollar(calculate(omScenario.inputs, true).NOI)}` : undefined}
+                sub={brokerScenario && brokerScenario.id !== currentScenarioId ? `Broker: ${fmtDollar(calculate(brokerScenario.inputs, true).NOI)}` : undefined}
                 valueColor={d.NOI < 80000 ? 'text-amber-600' : 'text-blue-700'} />
               <MetricCard label="Cap rate" value={fmtPct(d.cap)}
-                sub={omScenario && omScenario.id !== currentScenarioId ? `OM: ${fmtPct(calculate(omScenario.inputs, true).cap)}` : undefined}
+                sub={brokerScenario && brokerScenario.id !== currentScenarioId ? `Broker: ${fmtPct(calculate(brokerScenario.inputs, true).cap)}` : undefined}
                 valueColor={d.cap < 5 ? 'text-red-600' : d.cap < 6 ? 'text-amber-600' : ''} />
               <MetricCard label="DCR" value={fmtX(d.dcr)} sub="lender min 1.20×"
                 valueColor={d.dcr < 1 ? 'text-red-600' : d.dcr < 1.2 ? 'text-amber-600' : 'text-green-700'} />
               <MetricCard label="Pre-tax cash flow" value={fmtNeg(d.CF)}
-                sub={omScenario && omScenario.id !== currentScenarioId ? `OM: ${fmtNeg(calculate(omScenario.inputs, true).CF)}` : undefined}
+                sub={brokerScenario && brokerScenario.id !== currentScenarioId ? `Broker: ${fmtNeg(calculate(brokerScenario.inputs, true).CF)}` : undefined}
                 valueColor={d.CF < 0 ? 'text-red-600' : d.CF < 1000 ? 'text-amber-600' : 'text-green-700'} />
             </div>
             <DCRBar dcr={d.dcr} />
@@ -1730,11 +1725,11 @@ export function ModelCalculator({
             })()}
             <SectionHeader title="Income & expense statement" />
             <div className="border border-gray-100 rounded-lg p-3 mb-3">
-              <PLRow label={method === 'om' ? 'Gross scheduled rent (GSR)' : 'Gross potential rent (GPR)'}
+              <PLRow label={!isPhysical ?'Gross scheduled rent (GSR)' : 'Gross potential rent (GPR)'}
                 value={fmtDollar(d.GSR)} variant="pos" />
-              <PLRow label={method === 'om' ? `Less: vacancy (${d.vp}% of GSR)` : `Less: physical vacancy (${d.tu - d.ou} unit${d.tu - d.ou !== 1 ? 's' : ''} empty)`}
+              <PLRow label={!isPhysical ?`Less: vacancy (${d.vp}% of GSR)` : `Less: physical vacancy (${d.tu - d.ou} unit${d.tu - d.ou !== 1 ? 's' : ''} empty)`}
                 value={`(${fmtDollar(d.pv)})`} variant="neg" indent />
-              {method === 'physical' && d.av > 0 && (
+              {isPhysical && d.av > 0 && (
                 <PLRow label={`Less: turnover buffer (${d.vp}%)`} value={`(${fmtDollar(d.av)})`} variant="neg" indent />
               )}
               <PLRow label="Collected rental income" value={fmtDollar(d.col)} indent />
@@ -1783,7 +1778,7 @@ export function ModelCalculator({
             </div>
 
             {/* Offer calculator */}
-            {omScenario?.id !== currentScenarioId && d.NOI > 0 && (() => {
+            {brokerScenario?.id !== currentScenarioId && d.NOI > 0 && (() => {
               const mode = inputs.offerCalcMode ?? 'cap'
               const setMode = (m: 'cap' | 'price') => setInputs(prev => ({ ...prev, offerCalcMode: m }))
               const targetPrice = inputs.targetOfferPrice ?? 0
@@ -2236,29 +2231,29 @@ export function ModelCalculator({
           </div>
         )}
 
-        {/* ── OM TAB ───────────────────────────────────────────────────────── */}
-        {activeTab === 'om' && (
+        {/* ── BROKER TAB ──────────────────────────────────────────────────── */}
+        {activeTab === 'broker' && (
           <div>
             <div className="mt-3 mb-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold text-blue-800">OM as-presented</p>
-                <p className="text-[10px] text-blue-500">{omLocked ? 'Read-only — broker figures' : 'Unlocked for editing'}</p>
+                <p className="text-xs font-semibold text-blue-800">Broker as-presented</p>
+                <p className="text-[10px] text-blue-500">{brokerLocked ? 'Read-only — broker figures' : 'Unlocked for editing'}</p>
               </div>
               <button
                 onClick={() => {
-                  if (omLocked) { setOmSnapshot({ ...inputs }); setOmLocked(false) }
-                  else { setOmLocked(true); setOmSnapshot(null) }
+                  if (brokerLocked) { setBrokerSnapshot({ ...inputs }); setBrokerLocked(false) }
+                  else { setBrokerLocked(true); setBrokerSnapshot(null) }
                 }}
-                className={`text-[10px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors ${omLocked ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}>
-                {omLocked ? '✏️ Edit' : '🔒 Lock'}
+                className={`text-[10px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors ${brokerLocked ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}>
+                {brokerLocked ? '✏️ Edit' : '🔒 Lock'}
               </button>
             </div>
-            {!omLocked && (
+            {!brokerLocked && (
               <div className="mb-3">
                 <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3 text-[10px] text-amber-700">
-                  ⚠️ Editing OM figures. Press 🔒 Lock when done, then Save.
-                  {omSnapshot && (
-                    <button onClick={() => { setInputs({ ...OM_DEFAULTS }); setOmLocked(true); setOmSnapshot(null) }}
+                  ⚠️ Editing Broker figures. Press 🔒 Lock when done, then Save.
+                  {brokerSnapshot && (
+                    <button onClick={() => { setInputs({ ...DEFAULT_INPUTS }); setBrokerLocked(true); setBrokerSnapshot(null) }}
                       className="ml-2 underline font-semibold">
                       Revert changes
                     </button>
@@ -2290,20 +2285,20 @@ export function ModelCalculator({
                 </div>
               </div>
             )}
-            <SectionHeader title="Key metrics — OM method" />
+            <SectionHeader title="Key metrics — broker figures" />
             <div className="grid grid-cols-2 gap-2 mb-3">
-              <MetricCard label="NOI" value={fmtDollar(omTabD.NOI)} valueColor="text-blue-700" />
-              <MetricCard label="Cap rate" value={fmtPct(omTabD.cap)} />
-              <MetricCard label="DCR" value={fmtX(omTabD.dcr)} sub="lender min 1.20×" valueColor={omTabD.dcr < 1.2 ? 'text-amber-600' : 'text-green-700'} />
-              <MetricCard label="Pre-tax cash flow" value={fmtNeg(omTabD.CF)} valueColor={omTabD.CF < 0 ? 'text-red-600' : 'text-green-700'} />
+              <MetricCard label="NOI" value={fmtDollar(brokerTabD.NOI)} valueColor="text-blue-700" />
+              <MetricCard label="Cap rate" value={fmtPct(brokerTabD.cap)} />
+              <MetricCard label="DCR" value={fmtX(brokerTabD.dcr)} sub="lender min 1.20×" valueColor={brokerTabD.dcr < 1.2 ? 'text-amber-600' : 'text-green-700'} />
+              <MetricCard label="Pre-tax cash flow" value={fmtNeg(brokerTabD.CF)} valueColor={brokerTabD.CF < 0 ? 'text-red-600' : 'text-green-700'} />
             </div>
             <div className="grid grid-cols-2 gap-2 mb-4">
-              <MetricCard label="Loan amount" value={fmtDollar(omTabD.loan)} sub={`${omTabD.lev.toFixed(0)}% LTV`} />
-              <MetricCard label="Annual debt service" value={fmtDollar(omTabD.ds)} sub={`${fmtDollar(omTabD.mp)}/mo`} />
-              <MetricCard label="Equity required" value={fmtDollar(omTabD.eq)} sub="down + lender fee" />
-              <MetricCard label="Cash to close" value={fmtDollar(Math.max(0, omTabD.eq + omTabD.ccAmt - (omInputs.equity1031 ?? 0)))} sub={omInputs.is1031 && (omInputs.equity1031 ?? 0) > 0 ? `after $${Math.round(omInputs.equity1031).toLocaleString()} 1031 equity` : omInputs.cc > 0 ? `incl. ${omInputs.cc}% closing costs` : "closing costs not set"} />
+              <MetricCard label="Loan amount" value={fmtDollar(brokerTabD.loan)} sub={`${brokerTabD.lev.toFixed(0)}% LTV`} />
+              <MetricCard label="Annual debt service" value={fmtDollar(brokerTabD.ds)} sub={`${fmtDollar(brokerTabD.mp)}/mo`} />
+              <MetricCard label="Equity required" value={fmtDollar(brokerTabD.eq)} sub="down + lender fee" />
+              <MetricCard label="Cash to close" value={fmtDollar(Math.max(0, brokerTabD.eq + brokerTabD.ccAmt - (brokerInputs.equity1031 ?? 0)))} sub={brokerInputs.is1031 && (brokerInputs.equity1031 ?? 0) > 0 ? `after $${Math.round(brokerInputs.equity1031).toLocaleString()} 1031 equity` : brokerInputs.cc > 0 ? `incl. ${brokerInputs.cc}% closing costs` : "closing costs not set"} />
             </div>
-            <SectionHeader title="OM income & expense statement" />
+            <SectionHeader title="Broker income & expense statement" />
             <div className="border border-blue-100 rounded-lg p-3 mb-3 bg-blue-50/30">
               <PLRow label="Gross scheduled rent (GSR)" value={fmtDollar(d.GSR)} variant="pos" />
               <PLRow label={`Less: vacancy (${d.vp}% of GSR)`} value={`(${fmtDollar(d.pv)})`} variant="neg" indent />
@@ -2325,7 +2320,7 @@ export function ModelCalculator({
               <PLRow label={`Annual debt service (${d.lev.toFixed(0)}% LTV)`} value={`(${fmtDollar(d.ds)})`} variant="neg" indent />
               <PLRow label="Pre-tax cash flow" value={fmtNeg(d.CF)} variant="cf" />
             </div>
-            <SectionHeader title="OM inputs reference" />
+            <SectionHeader title="Broker inputs reference" />
             <div className="rounded-lg border border-gray-100 overflow-hidden mb-3">
               {[
                 ['Purchase price', `$${inputs.price.toLocaleString()}`],
@@ -2363,6 +2358,7 @@ export function ModelCalculator({
             compareCols={compareCols} setCompareCols={setCompareCols}
             scenarioOptions={scenarioOptions}
             resolveInputs={resolveInputs}
+            siblings={siblings}
             deltaRows={deltaRows}
             onSaveCompare={propertyId ? async () => {
               setCompareSaving(true)
@@ -2382,13 +2378,13 @@ export function ModelCalculator({
       )}
       {showPdfPreview && pdfPreviewProps && ReactDOM.createPortal((() => {
         const safeProp = (pdfPreviewProps.propertyName || 'Property').replace(/[^a-zA-Z0-9]/g, '_')
-        const tabSuffix: Record<ExportTab, string> = { full: 'Full_Report', pl: 'PL', tax: 'Tax', flags: 'Flags', om: 'OM', inputs: 'Inputs' }
+        const tabSuffix: Record<ExportTab, string> = { full: 'Full_Report', pl: 'PL', tax: 'Tax', flags: 'Flags', broker: 'Broker', inputs: 'Inputs' }
         const fileName = `${safeProp}_${tabSuffix[exportTab]}.pdf`
         return (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center" style={{ zIndex: 9999 }}>
             <div className="bg-white w-full max-w-4xl mx-4 rounded-xl shadow-2xl flex flex-col" style={{ height: '90vh' }}>
               <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 flex-shrink-0">
-                <h2 className="text-sm font-semibold text-gray-800">Report Preview{exportTab !== 'full' && <span className="ml-2 text-xs font-normal text-[#c9a84c]">— {({ pl: 'P&L', tax: 'Tax', flags: 'Flags', om: 'OM As-Presented', inputs: 'Inputs', full: '' } as Record<ExportTab, string>)[exportTab]}</span>}</h2>
+                <h2 className="text-sm font-semibold text-gray-800">Report Preview{exportTab !== 'full' && <span className="ml-2 text-xs font-normal text-[#c9a84c]">— {({ pl: 'P&L', tax: 'Tax', flags: 'Flags', broker: 'Broker As-Presented', inputs: 'Inputs', full: '' } as Record<ExportTab, string>)[exportTab]}</span>}</h2>
                 <div className="flex items-center gap-3">
                   <BlobProvider document={<ReportDocument {...pdfPreviewProps} />}>
                     {({ url, loading: pdfLoading }) => (

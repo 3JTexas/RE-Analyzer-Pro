@@ -4,9 +4,9 @@ import { Building2, Plus, Trash2, ChevronRight, GripVertical, Camera, Loader2 } 
 import { useProperties, useScenario } from '../hooks/useScenario'
 import { supabase } from '../lib/supabase'
 import { Spinner } from '../components/ui'
-import { OmSetupFlow } from '../components/OMSetupFlow'
+import { SetupFlow } from '../components/OMSetupFlow'
 import type { ModelInputs } from '../types'
-import type { OmConfirmMeta } from '../components/OMSetupFlow'
+import type { SetupConfirmMeta } from '../components/OMSetupFlow'
 
 export function PropertiesPage() {
   const { properties, loading, createProperty, deleteProperty, reorderProperties, refresh } = useProperties()
@@ -35,7 +35,7 @@ export function PropertiesPage() {
     setUploadingPhotoId(null)
   }
 
-  const handleConfirm = async (inputs: ModelInputs, meta: OmConfirmMeta) => {
+  const handleConfirm = async (inputs: ModelInputs, meta: SetupConfirmMeta) => {
     setShowSetup(false)
     const prop = await createProperty(
       meta.propertyName || 'New Property',
@@ -44,7 +44,7 @@ export function PropertiesPage() {
       meta.propertyImageUrl || undefined
     )
     if (!prop) return
-    const scenario = await createScenario(prop.id, meta.scenarioName, 'om', inputs, true)
+    const scenario = await createScenario(prop.id, meta.scenarioName, inputs, true)
     if (scenario) navigate(`/scenario/${scenario.id}`)
   }
 
@@ -66,7 +66,7 @@ export function PropertiesPage() {
 
       {showSetup && (
         <div className="flex-1 overflow-y-auto">
-          <OmSetupFlow
+          <SetupFlow
             showPropertyFields
             onConfirm={handleConfirm}
             onCancel={() => setShowSetup(false)}

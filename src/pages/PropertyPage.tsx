@@ -5,8 +5,8 @@ import { supabase } from '../lib/supabase'
 import { getScenariosForProperty, useScenario } from '../hooks/useScenario'
 import type { Property, Scenario, ModelInputs } from '../types'
 import { Spinner, EmptyState } from '../components/ui'
-import { OmSetupFlow } from '../components/OMSetupFlow'
-import type { OmConfirmMeta } from '../components/OMSetupFlow'
+import { SetupFlow } from '../components/OMSetupFlow'
+import type { SetupConfirmMeta } from '../components/OMSetupFlow'
 
 export function PropertyPage() {
   const { id } = useParams<{ id: string }>()
@@ -38,10 +38,10 @@ export function PropertyPage() {
 
   useEffect(() => { loadData() }, [id])
 
-  const handleCreate = async (inputs: ModelInputs, meta: OmConfirmMeta) => {
+  const handleCreate = async (inputs: ModelInputs, meta: SetupConfirmMeta) => {
     if (!id) return
     setShowSetup(false)
-    const s = await createScenario(id, meta.scenarioName, 'om', inputs, true)
+    const s = await createScenario(id, meta.scenarioName, inputs, true)
     if (s) { await loadData(); navigate(`/scenario/${s.id}`) }
   }
 
@@ -66,7 +66,7 @@ export function PropertyPage() {
 
   const handleDuplicate = async () => {
     if (!id || !duplicating || !dupName.trim()) return
-    const s = await createScenario(id, dupName.trim(), duplicating.method, duplicating.inputs)
+    const s = await createScenario(id, dupName.trim(), duplicating.inputs)
     setDuplicating(null)
     setDupName('')
     if (s) { await loadData(); navigate(`/scenario/${s.id}`) }
@@ -162,10 +162,10 @@ export function PropertyPage() {
 
       {showSetup && (
         <div className="flex-1 overflow-y-auto">
-          <OmSetupFlow
+          <SetupFlow
             onConfirm={handleCreate}
             onCancel={() => setShowSetup(false)}
-            defaultScenarioName="OM As-Presented"
+            defaultScenarioName="As-Presented"
           />
         </div>
       )}
@@ -189,10 +189,10 @@ export function PropertyPage() {
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <BarChart3 size={40} className="text-gray-200 mb-4" />
               <h3 className="text-base font-light text-gray-500">No scenarios yet</h3>
-              <p className="text-xs text-gray-400 mt-1">Import or enter the OM to start underwriting</p>
+              <p className="text-xs text-gray-400 mt-1">Import broker data or enter figures manually to start underwriting</p>
               <button onClick={() => setShowSetup(true)}
                 className="flex items-center gap-2 mt-6 px-5 py-2 text-xs font-medium border border-[#c9a84c] text-[#c9a84c] rounded-sm hover:bg-[#c9a84c] hover:text-white transition-colors">
-                <Plus size={14} /> Add OM data
+                <Plus size={14} /> Add scenario
               </button>
             </div>
           ) : (
@@ -202,8 +202,8 @@ export function PropertyPage() {
                   <Link to={`/scenario/${s.id}`}
                     className="flex items-center px-4 py-3.5">
                     <div className={`w-9 h-9 rounded-sm flex items-center justify-center mr-3 flex-shrink-0 border border-gray-200
-                      ${s.method === 'om' ? 'bg-blue-50' : 'bg-amber-50'}`}>
-                      <BarChart3 size={18} className={s.method === 'om' ? 'text-blue-600' : 'text-amber-600'} />
+                      ${s.is_default ? 'bg-blue-50' : 'bg-amber-50'}`}>
+                      <BarChart3 size={18} className={s.is_default ? 'text-blue-600' : 'text-amber-600'} />
                     </div>
                     <div className="flex-1 min-w-0">
                       {renamingId === s.id ? (
@@ -219,7 +219,7 @@ export function PropertyPage() {
                         <div className="text-sm font-medium text-gray-900 truncate">{s.name}</div>
                       )}
                       <div className="text-[10px] text-gray-400 mt-0.5">
-                        {s.method === 'om' ? 'OM method' : 'Physical occupancy'} · {new Date(s.updated_at).toLocaleDateString()}
+                        {s.is_default ? 'Broker figures' : 'Scenario'} · {new Date(s.updated_at).toLocaleDateString()}
                       </div>
                     </div>
                   </Link>

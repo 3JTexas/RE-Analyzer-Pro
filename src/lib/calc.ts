@@ -1,7 +1,7 @@
 import type { ModelInputs, ModelOutputs } from '../types'
 
 // ── Blank template ────────────────────────────────────────────────────────
-export const OM_DEFAULTS: ModelInputs = {
+export const DEFAULT_INPUTS: ModelInputs = {
   tu: 0, ou: 0, rent: 0, vp: 0,
   price: 0, ir: 0, lev: 0, am: 0, lf: 0, cc: 0,
   tax: 0, ins: 0, utilElec: 0, utilElecSubmetered: false, utilWater: 0, utilWaterSubmetered: false, utilTrash: 0, util: 0, rm: 0, cs: 0,

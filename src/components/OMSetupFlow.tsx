@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Upload, FileText, X, Loader2, CheckCircle, AlertCircle, Camera } from 'lucide-react'
-import { OM_DEFAULTS } from '../lib/calc'
+import { DEFAULT_INPUTS } from '../lib/calc'
+
 import { supabase } from '../lib/supabase'
 import { useUserDefaults } from '../hooks/useUserDefaults'
 import type { ModelInputs, RentRollUnit } from '../types'
@@ -44,7 +45,7 @@ const isFilled = (inp: ModelInputs, key: string) => {
   return v !== null && v !== undefined && v !== 0 && v !== ''
 }
 
-export interface OmConfirmMeta {
+export interface SetupConfirmMeta {
   scenarioName: string
   propertyName?: string
   propertyAddress?: string
@@ -56,15 +57,15 @@ type Mode = 'choose' | 'manual' | 'pdf'
 type PdfStatus = 'idle' | 'reading' | 'extracting' | 'done' | 'error'
 
 interface Props {
-  onConfirm: (inputs: ModelInputs, meta: OmConfirmMeta) => void
+  onConfirm: (inputs: ModelInputs, meta: SetupConfirmMeta) => void
   onCancel: () => void
   showPropertyFields?: boolean  // true when creating a new property
   defaultScenarioName?: string
 }
 
-export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, defaultScenarioName = 'OM As-Presented' }: Props) {
+export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, defaultScenarioName = 'As-Presented' }: Props) {
   const [mode, setMode] = useState<Mode>('choose')
-  const [inputs, setInputs] = useState<ModelInputs>({ ...OM_DEFAULTS })
+  const [inputs, setInputs] = useState<ModelInputs>({ ...DEFAULT_INPUTS })
   const { loadDefaults } = useUserDefaults()
 
   const [pdfStatus, setPdfStatus] = useState<PdfStatus>('idle')
@@ -80,7 +81,7 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
   // Reset all form state on mount — prevents stale data when component is reused
   useEffect(() => {
     setMode('choose')
-    setInputs({ ...OM_DEFAULTS })
+    setInputs({ ...DEFAULT_INPUTS })
     setPdfStatus('idle')
     setPdfError('')
     setPdfFiles([])
@@ -155,7 +156,7 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
       console.log('EXTRACTION RESULT:', JSON.stringify(parsed, null, 2))
       if (parsed.error) throw new Error(parsed.error)
 
-      const merged: ModelInputs = { ...OM_DEFAULTS }
+      const merged: ModelInputs = { ...DEFAULT_INPUTS }
       const numericKeys = new Set(['price','tu','ou','rent','vp','lev','ir','am','tax','ins','utilElec','utilWater','utilTrash','util','rm','cs','ga','res','pm','yearBuilt'])
       for (const [k, v] of Object.entries(parsed)) {
         if (v !== null && v !== undefined) {
@@ -307,7 +308,7 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
       <div>
         <label className="block text-[9px] text-gray-500 mb-0.5 font-medium uppercase tracking-wide">Scenario name</label>
         <input value={scenarioName} onChange={e => setScenarioName(e.target.value)}
-          placeholder="e.g. OM As-Presented"
+          placeholder="e.g. As-Presented"
           className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-navy" />
       </div>
     </div>
@@ -320,7 +321,7 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
         {showPropertyFields ? 'Add new property' : 'Add scenario'}
       </p>
       <p className="text-[10px] text-gray-400 mb-3">
-        {showPropertyFields ? 'Import the OM or enter figures manually' : 'How do you want to enter the broker\'s figures?'}
+        {showPropertyFields ? 'Import the broker PDF or enter figures manually' : 'How do you want to enter the broker\'s figures?'}
       </p>
       <div className="grid grid-cols-2 gap-2 mb-3">
         <button onClick={() => setMode('pdf')}
@@ -333,7 +334,7 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
           className="flex flex-col items-center gap-2 p-3 border-2 border-gray-200 rounded-xl hover:border-navy hover:bg-blue-50 transition-colors">
           <FileText size={22} className="text-navy" />
           <span className="text-[11px] font-semibold text-gray-700">Enter manually</span>
-          <span className="text-[9px] text-gray-400 text-center">Type figures from the OM</span>
+          <span className="text-[9px] text-gray-400 text-center">Type broker's figures</span>
         </button>
       </div>
       <button onClick={onCancel} className="w-full bg-gray-100 text-gray-600 text-xs font-medium py-2 rounded-lg">
@@ -357,7 +358,7 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
         className="w-full border-2 border-dashed border-amber-300 rounded-lg p-4 text-center hover:border-amber-500 hover:bg-amber-100 transition-colors mb-3">
         <Upload size={20} className="mx-auto mb-1 text-amber-500" />
         <p className="text-xs font-medium text-amber-700">
-          {pdfFiles.length ? `${pdfFiles.length} PDF${pdfFiles.length > 1 ? 's' : ''} selected` : 'Click to select OM PDF(s)'}
+          {pdfFiles.length ? `${pdfFiles.length} PDF${pdfFiles.length > 1 ? 's' : ''} selected` : 'Click to select broker PDF(s)'}
         </p>
         {pdfFiles.length > 0 && <p className="text-[9px] text-amber-500 mt-1">{pdfFiles.map(f => f.name).join(', ')}</p>}
       </button>
@@ -415,7 +416,7 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
                   <ul className="text-[9px] text-amber-600 space-y-0.5 mb-1">
                     {missingExpected.map(f => <li key={f.key}>• {f.label}</li>)}
                   </ul>
-                  <p className="text-[8px] text-amber-400">Commonly in OMs — enter estimates if not shown</p>
+                  <p className="text-[8px] text-amber-400">Commonly missing — enter estimates if not shown</p>
                 </div>
               )}
             </div>
@@ -435,7 +436,7 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
             <button onClick={confirm}
               disabled={(showPropertyFields && !propertyName.trim()) || criticalBlocked}
               className="w-full bg-navy text-white text-xs font-semibold py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
-              {showPropertyFields ? 'Create property + OM scenario' : 'Create OM scenario'}
+              {showPropertyFields ? 'Create property + scenario' : 'Create scenario'}
             </button>
             {criticalBlocked && (
               <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-52 px-2.5 py-2 text-[9px] leading-snug text-white bg-gray-800 rounded-lg shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 text-center">
@@ -457,7 +458,7 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
     <div className="mx-4 mt-3 p-4 border border-gray-200 rounded-xl bg-white shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <p className="text-xs font-semibold text-gray-700">
-          {showPropertyFields ? 'New property — OM figures' : 'Enter OM figures'}
+          {showPropertyFields ? 'New property — broker figures' : 'Enter broker figures'}
         </p>
         <button onClick={() => setMode('choose')}><X size={14} className="text-gray-400" /></button>
       </div>
@@ -494,7 +495,7 @@ export function OmSetupFlow({ onConfirm, onCancel, showPropertyFields = false, d
         <button onClick={confirm}
           disabled={showPropertyFields && !propertyName.trim()}
           className="flex-1 bg-navy text-white text-xs font-semibold py-2.5 rounded-lg disabled:opacity-40">
-          {showPropertyFields ? 'Create property + OM scenario' : 'Create OM scenario'}
+          {showPropertyFields ? 'Create property + scenario' : 'Create scenario'}
         </button>
         <button onClick={onCancel} className="flex-1 bg-gray-100 text-gray-600 text-xs font-medium py-2 rounded-lg">
           Cancel
