@@ -35,6 +35,7 @@ A multifamily real estate investment underwriting app for Andrew Schildcrout (an
 src/
   lib/
     calc.ts          ← Pure calculation engine — all model math, no React
+    excelExport.ts   ← Excel workbook generator (exceljs) — live formulas
     supabase.ts      ← Supabase client init
     uiState.ts       ← loadCompareState / saveCompareState helpers
   types/
@@ -93,7 +94,7 @@ price, ir, lev, am, lf, cc
 
 // Expenses
 tax, ins, utilElec, utilElecSubmetered, utilWater, utilWaterSubmetered, utilTrash, util
-rm, cs, ga, res, pm
+rm, cs, ga, res, pm, pmMode ('pct'|'unit'), pmPerUnit
 expCollapse: boolean
 expPct: number
 otherExpenses: { label, amount }[]
@@ -121,36 +122,38 @@ offerCalcMode?: 'cap' | 'price'
 - Income: rent roll path (sum non-vacant unit rents) OR blended avg (rent × tu × 12)
 - EGI = collected + sum(otherIncome)
 - Expenses: itemized OR EGI × expPct% + otherExpenses
+- **Prop mgmt**: `pmMode === 'unit'` → `pmPerUnit * 12 * tu`; else `EGI * pm / 100`
 - Depreciation: is1031 + basis1031 > 0 → carryover basis; else price × (1 - land%)
 - Cost seg: costSeg% of deprBase → 100% bonus; remainder → 27.5yr SL
 - 1031: calc1031() computes adjusted basis, capital gain, recapture tax, cap gains tax, total tax deferred, net proceeds, excess capital
 - applyExcessToDown overrides loan = price - netProceeds (improves DCR)
 - equity1031 auto-set from calc1031 netProceeds when priorSalePrice > 0
-- All defaults zero
+- **Vacancy mode**: derived from inputs — `ou > 0 && ou < tu` = physical; else gross vacancy. No stored `method` field.
+- All defaults zero (`DEFAULT_INPUTS` in calc.ts)
 
 ---
 
-## Method Auto-Derivation
+## Vacancy Mode Derivation
 
-The stored `method` field in the DB is legacy and should NOT be trusted for calculations. Instead:
+The `method` DB column is legacy and ignored at runtime. Vacancy mode is derived purely from inputs:
 
 ```ts
-const effectiveMethod = (inputs.ou > 0 && inputs.ou < inputs.tu) ? 'physical' : 'om'
+const useOM = (inp: ModelInputs, isDefault?: boolean) => isDefault || !(inp.ou > 0 && inp.ou < inp.tu)
 ```
 
-- OM As-Presented (is_default=true) is always forced to 'om' in resolveInputs
-- All other scenarios auto-derive from ou vs tu
-- **Pending refactor:** Remove `method` field from DB and types entirely
+- Broker scenario (is_default=true): always uses gross vacancy
+- All other scenarios: `ou < tu` → physical vacancy; else gross vacancy
+- No `Method` type exists in the codebase — removed April 2, 2026
 
 ---
 
 ## Tabs (6 total)
 
-1. **OM** — broker's as-presented figures, read-only, unlock to edit
-2. **Flags** — auto-computed OM discrepancy flags + stressed scenario metrics. Red dot when high-risk flags exist.
+1. **Broker** — broker's as-presented figures, read-only, unlock to edit
+2. **Flags** — auto-computed broker discrepancy flags + stressed scenario metrics. Red dot when high-risk flags exist.
 3. **Inputs** — buyer's underwriting inputs (Income, Financing, Expenses only — no tax fields)
-4. **P&L** — income statement + offer calculator + 1031 equity applied banner
-5. **Tax** — Tax Strategy inputs (brk, land%, costSeg%, 1031 toggle) + 1031 Exchange Analysis + Bonus Depreciation + 27.5yr Depreciation Schedule + REP analysis + Return on equity (hidden on OM scenario)
+4. **P&L** — income statement + offer calculator + 1031 equity applied banner + Cash-on-Cash return
+5. **Tax** — Tax Strategy inputs (brk, land%, costSeg%, 1031 toggle) + 1031 Exchange Analysis + Bonus Depreciation + 27.5yr Depreciation Schedule + REP analysis + Return on equity (hidden on broker scenario)
 6. **Compare** — multi-scenario side-by-side (A baseline + B/C/D vs A)
 
 ---
@@ -524,14 +527,76 @@ Note: `node_modules/`, `dist/`, and `ios/` are gitignored — `npm install` recr
 
 ---
 
-## Pending Features / Known Issues (updated)
+## Session — March 31 / April 2, 2026
 
-1. **Method refactor** — remove `method` field from DB/types; derive purely from inputs. Currently auto-derived at runtime as workaround.
-2. **Responsive layout** — desktop breakpoint-aware design
-3. **Verify rent roll extraction** — test end-to-end with Bay Drive OM
-4. **Tax assessor PDF import** — extract-tax-record edge function + TaxRecordImport component (built Mar 25, needs testing)
-5. **PDF tab pages QA** — verify Flags, OM, and Inputs PDF pages render clean data after Mar 30 build
+**Loan label fix:**
+- "Loan (after excess 1031)" label now only shows when BOTH `applyExcessToDown === true` AND computed excess > 0
+- Affects MetricCard sub-label (line ~1632) and Cash Flow breakdown row (line ~1656)
+
+**Cash-on-Cash return added to P&L:**
+- `d.coc` was already computed in calc.ts — added PLRow after "Pre-tax cash flow" in main UI and PDF
+
+**Property management fee — $/unit toggle:**
+- New `ModelInputs` fields: `pmMode: 'pct' | 'unit'`, `pmPerUnit: number`
+- Input field now has a toggle button switching between "% EGI" and "$/unit" modes
+- calc.ts: `pmAmt = pmMode === 'unit' ? pmPerUnit * 12 * tu : EGI * pm / 100`
+- `pmPct` output now always computed as effective %: `(pmAmt / EGI) * 100`
+- P&L label adapts to show mode context
+- Helper line below input shows annual total + effective % regardless of mode
+
+**Interactive Excel workbook export:**
+- New `src/lib/excelExport.ts` — generates `.xlsx` with live Excel formulas via `exceljs` + `file-saver`
+- 4 sheets: **Inputs** (editable yellow cells), **P&L** (annual + monthly columns), **Financing** (loan, cash to close, prepayment), **Tax Analysis** (depreciation, paper loss, tax savings, returns)
+- All formula cells reference Inputs sheet — change any input, everything recalculates
+- "Excel" button added to scenario toolbar between Save and PDF
+- Downloads as `{PropertyName}_Model.xlsx`
+
+**Method refactor — COMPLETED:**
+- Removed `Method` type export from `src/types/index.ts`
+- `Scenario.method` marked optional/legacy — still in DB column but ignored at runtime
+- Removed `method` parameter from `createScenario()`, `save()`, `onSave()` callbacks
+- Vacancy mode now derived purely from inputs: `!(ou > 0 && ou < tu)` = gross vacancy, else physical
+- `useOM()` helper function in ModelCalculator derives this inline
+
+**All "OM" terminology replaced with "Broker":**
+- `OM_DEFAULTS` → `DEFAULT_INPUTS` (calc.ts)
+- `OmSetupFlow` → `SetupFlow`, `OmConfirmMeta` → `SetupConfirmMeta` (OMSetupFlow.tsx — file not renamed)
+- `omScenario` → `brokerScenario`, `omBadge` → `brokerBadge`, `isDefaultOM` → `isBrokerScenario`
+- `omLocked/omSnapshot` → `brokerLocked/brokerSnapshot`
+- `omInputs/omTabD` → `brokerInputs/brokerTabD`
+- Tab ID: `'om'` → `'broker'` (activeTab, ExportTab, PrintTab types)
+- Tab label: "OM" → "Broker"
+- Default scenario name: "OM As-Presented" → "As-Presented"
+- Badge text on all input fields: "OM" → "Broker"
+- All user-facing strings: "OM method" → removed, "OM figures" → "Broker figures", "vs OM" → "vs Broker"
+- PDF: removed `method` prop from `ReportDocument` and `generatePDF`, `deriveMethodLabel()` → `deriveVacancyLabel()`
+- PDF: `isOM` → `isPhysical` (inverted), "OM As-Presented" → "Broker As-Presented", "OM Value" → "Broker Value"
+- PropertyPage: scenario cards show `is_default ? 'Broker figures' : 'Scenario'` instead of method
+- SetupFlow: "Import the OM" → "Import the broker PDF", "Create OM scenario" → "Create scenario"
+
+**Files changed in refactor (10 files):**
+- `src/types/index.ts` — removed Method type, Scenario.method optional
+- `src/lib/calc.ts` — OM_DEFAULTS → DEFAULT_INPUTS
+- `src/hooks/useScenario.ts` — removed method param from save/create
+- `src/components/OMSetupFlow.tsx` — renamed exports + all OM text
+- `src/components/model/ModelCalculator.tsx` — bulk rename + method removal
+- `src/components/pdf/PdfReport.tsx` — removed method prop + all OM text
+- `src/pages/PropertyPage.tsx` — updated imports, removed method usage
+- `src/pages/PropertiesPage.tsx` — updated imports
+- `src/pages/ScenarioPage.tsx` — removed method from save/props
+- `src/components/TaxRecordImport.tsx` — "OM" → "Current" in tax comparison label
 
 ---
 
-*Last updated: March 30, 2026*
+## Pending Features / Known Issues (updated)
+
+1. ~~**Method refactor**~~ — DONE (April 2, 2026)
+2. **Responsive layout** — desktop breakpoint-aware design
+3. **Verify rent roll extraction** — test end-to-end with Bay Drive broker PDF
+4. **Tax assessor PDF import** — extract-tax-record edge function + TaxRecordImport component (built Mar 25, needs testing)
+5. **PDF tab pages QA** — verify Flags, Broker, and Inputs PDF pages render clean data
+6. **QA the OM→Broker refactor** — walk through existing properties to confirm labels, saves, and calculations all work post-refactor
+
+---
+
+*Last updated: April 2, 2026*
