@@ -9,11 +9,13 @@ create table if not exists properties (
   user_id     uuid references auth.users(id) on delete cascade not null,
   name        text not null,
   address     text,
-  units       int default 8,
+  units       int,
   year_built  int,
   notes         text,
+  compare_state jsonb default '{}'::jsonb,
   display_order int default 0,
   crexi_url     text,
+  property_image_url text,
   created_at    timestamptz default now(),
   updated_at    timestamptz default now()
 );
@@ -24,7 +26,7 @@ create table if not exists scenarios (
   property_id  uuid references properties(id) on delete cascade not null,
   user_id      uuid references auth.users(id) on delete cascade not null,
   name         text not null default 'New Scenario',
-  method       text not null default 'om' check (method in ('om', 'physical')),
+  method       text default 'om',  -- legacy field, ignored at runtime; vacancy mode derived from inputs
   inputs       jsonb not null default '{}',
   is_default   boolean default false,
   created_at   timestamptz default now(),

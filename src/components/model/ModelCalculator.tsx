@@ -763,8 +763,8 @@ export function ModelCalculator({
     cc: (initialInputs as any)?.cc ?? 0,
     expCollapse: (initialInputs as any)?.expCollapse ?? false,
     expPct: (initialInputs as any)?.expPct ?? 0,
-    land: (initialInputs as any)?.land ?? 20,
-    costSeg: (initialInputs as any)?.costSeg ?? 23,
+    land: (initialInputs as any)?.land ?? 0,
+    costSeg: (initialInputs as any)?.costSeg ?? 0,
     is1031: (initialInputs as any)?.is1031 ?? false,
     basis1031: (initialInputs as any)?.basis1031 ?? 0,
     equity1031: (initialInputs as any)?.equity1031 ?? 0,
@@ -870,13 +870,13 @@ export function ModelCalculator({
   const removeOtherExpense = (i: number) =>
     setInputs(prev => ({ ...prev, otherExpenses: (prev.otherExpenses ?? []).filter((_, idx) => idx !== i) }))
 
-  // Returns 'changed' badge label if value differs from OM scenario, else undefined
-  const brokerBadge = (key: keyof ModelInputs): { badge: string; badgeColor: 'amber' } | {} => {
-    if (!brokerScenario || brokerScenario.id === currentScenarioId) return {}
+  // Returns 'changed' amber badge if value differs from broker scenario, else 'Broker' blue badge
+  const brokerBadge = (key: keyof ModelInputs): { badge: string; badgeColor: 'blue' | 'amber' } => {
+    if (!brokerScenario || brokerScenario.id === currentScenarioId) return { badge: 'Broker', badgeColor: 'blue' }
     const omVal = (brokerScenario.inputs as any)[key]
     const curVal = (inputs as any)[key]
-    if (omVal === undefined || omVal === curVal) return {}
-    return { badge: 'changed', badgeColor: 'amber' as const }
+    if (omVal === undefined || omVal === curVal) return { badge: 'Broker', badgeColor: 'blue' }
+    return { badge: 'changed', badgeColor: 'amber' }
   }
 
   // Derive vacancy mode: physical when ou < tu, otherwise gross vacancy
@@ -1297,13 +1297,13 @@ export function ModelCalculator({
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 mb-1">
-              <InputField label="Total units" type="number" value={inputs.tu} min={1} max={100} step={1}
+              <InputField {...brokerBadge('tu')} label="Total units" type="number" value={inputs.tu} min={1} max={100} step={1}
                 tooltip="Total number of rentable units in the property"
-                badge="Broker" onChange={e => { const v = +e.target.value; set('tu', v); if (inputs.useRentRoll) syncRentRoll(v) }} />
+                onChange={e => { const v = +e.target.value; set('tu', v); if (inputs.useRentRoll) syncRentRoll(v) }} />
               {!inputs.useRentRoll && (
-                <InputField label="Units occupied" type="number" value={inputs.ou} min={0} max={inputs.tu} step={1}
+                <InputField {...brokerBadge('ou')} label="Units occupied" type="number" value={inputs.ou} min={0} max={inputs.tu} step={1}
                   tooltip="Units currently occupied. If less than total units, physical vacancy is used instead of gross vacancy"
-                  badge="Broker" onChange={e => set('ou', +e.target.value)} />
+                  onChange={e => set('ou', +e.target.value)} />
               )}
             </div>
             {/* Rent roll toggle */}
@@ -1321,14 +1321,14 @@ export function ModelCalculator({
             </div>
             {!inputs.useRentRoll ? (
               <div className="grid grid-cols-2 gap-2">
-                <InputField label="Avg rent / unit / mo ($)" type="number" dollar value={inputs.rent} min={500} step={25}
+                <InputField {...brokerBadge('rent')} label="Avg rent / unit / mo ($)" type="number" dollar value={inputs.rent} min={500} step={25}
                   tooltip="Blended average monthly rent across all units"
-                  badge="Broker" onChange={e => set('rent', +e.target.value)} />
+                  onChange={e => set('rent', +e.target.value)} />
                 <InputField
                   label={!isPhysical ?'Vacancy % (of GSR)' : 'Turnover buffer %'}
                   type="number" value={inputs.vp} min={0} max={50} step={0.5}
                   tooltip="Economic vacancy allowance — applied as % of GSR. Typically 4-5% for stabilized properties"
-                  badge="Broker" onChange={e => set('vp', +e.target.value)} />
+                  {...brokerBadge('vp')} onChange={e => set('vp', +e.target.value)} />
               </div>
             ) : (
               <>
@@ -1337,7 +1337,7 @@ export function ModelCalculator({
                     label={!isPhysical ?'Vacancy % (of GSR)' : 'Turnover buffer %'}
                     type="number" value={inputs.vp} min={0} max={50} step={0.5}
                     tooltip="Economic vacancy allowance"
-                    badge="Broker" onChange={e => set('vp', +e.target.value)} />
+                    {...brokerBadge('vp')} onChange={e => set('vp', +e.target.value)} />
                 </div>
                 {/* Rent roll table */}
                 <div className="border border-gray-200 rounded-lg overflow-hidden mb-2">
@@ -1451,16 +1451,16 @@ export function ModelCalculator({
             <div className="grid grid-cols-2 gap-2">
               <InputField {...brokerBadge('price')} label="Purchase price ($)" type="number" dollar value={inputs.price} step={10000}
                 tooltip="Total acquisition price. Drives loan amount, depreciation basis, and all return metrics"
-                badge="Broker" onChange={e => set('price', +e.target.value)} />
+                onChange={e => set('price', +e.target.value)} />
               <InputField {...brokerBadge('ir')} label="Interest rate (%)" type="number" value={inputs.ir} step={0.125}
                 tooltip="Annual mortgage interest rate"
-                badge="Broker" onChange={e => set('ir', +e.target.value)} />
+                onChange={e => set('ir', +e.target.value)} />
               <InputField {...brokerBadge('lev')} label="Leverage / LTV (%)" type="number" value={inputs.lev} min={0} max={100} step={1}
                 tooltip="Loan-to-value ratio. e.g. 70 = 70% LTV, 30% down"
-                badge="Broker" onChange={e => set('lev', +e.target.value)} />
+                onChange={e => set('lev', +e.target.value)} />
               <InputField {...brokerBadge('am')} label="Amortization (years)" type="number" value={inputs.am} step={5}
                 tooltip="Loan term in years for payment calculation"
-                badge="Broker" onChange={e => set('am', +e.target.value)} />
+                onChange={e => set('am', +e.target.value)} />
               <InputField {...brokerBadge('lf')} label="Lender fee (%)" type="number" value={inputs.lf} step={0.125}
                 tooltip="Origination fee as % of loan amount - added to cash to close"
                 onChange={e => set('lf', +e.target.value)} />
@@ -1502,13 +1502,13 @@ export function ModelCalculator({
                 <div>
                   <InputField {...brokerBadge('tax')} label="Real Estate Taxes (annual $)" type="number" dollar value={inputs.tax} step={500}
                     tooltip="Annual property tax bill. Should reflect post-sale reassessment - Florida reassesses at purchase price on sale"
-                    badge="Broker" onChange={e => set('tax', +e.target.value)} />
+                    onChange={e => set('tax', +e.target.value)} />
                   <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.tax > 0 && <>${Math.round(inputs.tax / 12).toLocaleString()}/mo{inputs.tu > 0 ? ` · $${Math.round(inputs.tax / inputs.tu).toLocaleString()}/unit` : ''}</>}</div>
                 </div>
                 <div>
                   <InputField {...brokerBadge('ins')} label="Insurance ($/unit/yr)" type="number" dollar value={inputs.ins} step={100}
                     tooltip="Insurance cost per unit per year. Calc multiplies by total units for annual total. Benchmark: $2,000-$3,000+/unit depending on building age"
-                    badge="Broker" onChange={e => set('ins', +e.target.value)} />
+                    onChange={e => set('ins', +e.target.value)} />
                   <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.ins > 0 && inputs.tu > 0 && <>${Math.round(inputs.ins * inputs.tu / 12).toLocaleString()}/mo total · ${(inputs.ins * inputs.tu).toLocaleString()}/yr</>}</div>
                 </div>
                 <div className="col-span-2 border-l-2 border-gray-200 pl-2 space-y-1.5">
@@ -1568,25 +1568,25 @@ export function ModelCalculator({
                 <div>
                   <InputField {...brokerBadge('rm')} label="R&M ($/unit/yr)" type="number" dollar value={inputs.rm} step={50}
                     tooltip="Repairs and maintenance per unit per year. Calc multiplies by total units. Benchmark: $400-$900/unit/yr depending on building age"
-                    badge="Broker" onChange={e => set('rm', +e.target.value)} />
+                    onChange={e => set('rm', +e.target.value)} />
                   <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.rm > 0 && inputs.tu > 0 && <>${Math.round(inputs.rm * inputs.tu / 12).toLocaleString()}/mo total · ${(inputs.rm * inputs.tu).toLocaleString()}/yr</>}</div>
                 </div>
                 <div>
                   <InputField {...brokerBadge('cs')} label="Contract Services (annual)" type="number" dollar value={inputs.cs} step={100}
                     tooltip="Annual contract services total — landscaping, pest control, elevator, pool service etc."
-                    badge="Broker" onChange={e => set('cs', +e.target.value)} />
+                    onChange={e => set('cs', +e.target.value)} />
                   <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.cs > 0 && <>${Math.round(inputs.cs / 12).toLocaleString()}/mo{inputs.tu > 0 ? ` · $${Math.round(inputs.cs / inputs.tu).toLocaleString()}/unit` : ''}</>}</div>
                 </div>
                 <div>
                   <InputField {...brokerBadge('ga')} label="General & Admin (annual)" type="number" dollar value={inputs.ga} step={100}
                     tooltip="Annual G&A total — office, phone, misc. Typically $75-100/unit/yr"
-                    badge="Broker" onChange={e => set('ga', +e.target.value)} />
+                    onChange={e => set('ga', +e.target.value)} />
                   <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.ga > 0 && <>${Math.round(inputs.ga / 12).toLocaleString()}/mo{inputs.tu > 0 ? ` · $${Math.round(inputs.ga / inputs.tu).toLocaleString()}/unit` : ''}</>}</div>
                 </div>
                 <div>
                   <InputField {...brokerBadge('res')} label="Reserves ($/unit/yr)" type="number" dollar value={inputs.res} step={50}
                     tooltip="Capital reserve per unit per year. Calc multiplies by total units. Benchmark: $250-$700/unit/yr depending on building age"
-                    badge="Broker" onChange={e => set('res', +e.target.value)} />
+                    onChange={e => set('res', +e.target.value)} />
                   <div className="text-[10px] text-gray-400 mt-0.5 h-3">{inputs.res > 0 && inputs.tu > 0 && <>${Math.round(inputs.res * inputs.tu / 12).toLocaleString()}/mo total · ${(inputs.res * inputs.tu).toLocaleString()}/yr</>}</div>
                 </div>
                 <div>
@@ -1601,7 +1601,7 @@ export function ModelCalculator({
                   {inputs.pmMode === 'pct' ? (
                     <InputField {...brokerBadge('pm')} label="Fee (%)" type="number" value={inputs.pm} step={0.5}
                       tooltip="Property management fee as % of effective gross income. Typically 8-10% for small multifamily"
-                      badge="Broker" onChange={e => set('pm', +e.target.value)} />
+                      onChange={e => set('pm', +e.target.value)} />
                   ) : (
                     <InputField label="Fee ($/unit/mo)" type="number" dollar value={inputs.pmPerUnit} step={25}
                       tooltip="Property management fee per unit per month. Typically $75-$150/unit for small multifamily"
@@ -1997,9 +1997,9 @@ export function ModelCalculator({
                         const v = +e.target.value
                         setInputs(prev => {
                           const next = { ...prev, priorSalePrice: v }
-                          // Auto-set equity1031 from net proceeds
                           const ex2 = calc1031(next)
                           if (ex2 && ex2.netProceeds > 0) next.equity1031 = Math.round(ex2.netProceeds)
+                          if (ex2) next.basis1031 = Math.round(ex2.adjustedBasis)
                           return next
                         })
                       }} />
@@ -2016,6 +2016,7 @@ export function ModelCalculator({
                           const next = { ...prev, priorMortgagePayoff: v }
                           const ex2 = calc1031(next)
                           if (ex2 && ex2.netProceeds > 0) next.equity1031 = Math.round(ex2.netProceeds)
+                          if (ex2) next.basis1031 = Math.round(ex2.adjustedBasis)
                           return next
                         })
                       }} />
@@ -2026,15 +2027,39 @@ export function ModelCalculator({
                   <div className="grid grid-cols-2 gap-2 mb-1">
                     <InputField label="Original purchase price" type="number" dollar value={inputs.priorPurchasePrice ?? 0}
                       tooltip="What you originally paid for the relinquished property. Combined with capital improvements and reduced by depreciation taken, this determines your adjusted basis and the size of your capital gain."
-                      onChange={e => set('priorPurchasePrice' as keyof ModelInputs, +e.target.value)} />
+                      onChange={e => {
+                        const v = +e.target.value
+                        setInputs(prev => {
+                          const next = { ...prev, priorPurchasePrice: v }
+                          const ex2 = calc1031(next)
+                          if (ex2) { next.basis1031 = Math.round(ex2.adjustedBasis); if (ex2.netProceeds > 0) next.equity1031 = Math.round(ex2.netProceeds) }
+                          return next
+                        })
+                      }} />
                     <InputField label="Capital improvements" type="number" dollar value={inputs.priorImprovements ?? 0}
                       tooltip="Money spent on permanent improvements to the relinquished property during your ownership (renovations, additions, major repairs). These add to your basis and reduce your taxable gain."
-                      onChange={e => set('priorImprovements' as keyof ModelInputs, +e.target.value)} />
+                      onChange={e => {
+                        const v = +e.target.value
+                        setInputs(prev => {
+                          const next = { ...prev, priorImprovements: v }
+                          const ex2 = calc1031(next)
+                          if (ex2) { next.basis1031 = Math.round(ex2.adjustedBasis); if (ex2.netProceeds > 0) next.equity1031 = Math.round(ex2.netProceeds) }
+                          return next
+                        })
+                      }} />
                   </div>
                   <div className="grid grid-cols-2 gap-2 mb-3">
                     <InputField label="Depreciation taken" type="number" dollar value={inputs.priorDepreciation ?? 0}
                       tooltip="Total cumulative depreciation deductions claimed on the relinquished property across all years of ownership. This reduces your adjusted basis and is subject to 25% depreciation recapture tax upon sale — separate from capital gains tax."
-                      onChange={e => set('priorDepreciation' as keyof ModelInputs, +e.target.value)} />
+                      onChange={e => {
+                        const v = +e.target.value
+                        setInputs(prev => {
+                          const next = { ...prev, priorDepreciation: v }
+                          const ex2 = calc1031(next)
+                          if (ex2) { next.basis1031 = Math.round(ex2.adjustedBasis); if (ex2.netProceeds > 0) next.equity1031 = Math.round(ex2.netProceeds) }
+                          return next
+                        })
+                      }} />
                     <InputField label="Recapture rate %" type="number" value={reclaimRateVal} step={1}
                       tooltip="The IRS taxes depreciation recapture (the depreciation you previously deducted) at a maximum rate of 25% — separate from and in addition to capital gains tax. Default 25%."
                       onChange={e => set('reclaimRate' as keyof ModelInputs, +e.target.value)} />

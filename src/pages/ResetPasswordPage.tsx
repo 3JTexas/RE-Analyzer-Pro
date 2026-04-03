@@ -90,7 +90,7 @@ export function ResetPasswordPage() {
         )}
       </div>
 
-      <div className="fixed bottom-5 text-center text-[10px] text-gray-300 w-full">Chai Holdings 2025</div>
+      <div className="fixed bottom-5 text-center text-[10px] text-gray-300 w-full">Chai Holdings 2026</div>
     </div>
   )
 }

@@ -1,8 +1,8 @@
-# Deal Analyzer
+# RE Analyzer Pro
 
-Multifamily investment underwriting app — OM vs physical occupancy, REP tax analysis, 100% bonus depreciation (OBBBA), 1031 exchange.
+Multifamily investment underwriting app — broker vs corrected analysis, REP tax strategy, 100% bonus depreciation (OBBBA), 1031 exchange, LOI generation.
 
-Built with: React + TypeScript + Tailwind CSS + Supabase + Vite + Capacitor
+Built with: React 18 + TypeScript + Tailwind CSS + Supabase + Vite + Capacitor (iOS)
 
 ---
 
@@ -11,18 +11,19 @@ Built with: React + TypeScript + Tailwind CSS + Supabase + Vite + Capacitor
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/RE-Analyzer-Pro.git
+git clone https://github.com/3JTexas/RE-Analyzer-Pro.git
 cd RE-Analyzer-Pro
 npm install
 ```
 
 ### 2. Set up Supabase
 
-1. Go to https://supabase.com → create a new project
+1. Go to https://supabase.com — create a new project
 2. In your project → **SQL Editor** → paste the contents of `supabase/schema.sql` → Run
 3. Go to **Settings → API** → copy your Project URL and anon key
 4. In Supabase → **Authentication → Providers** → make sure Email is enabled
 5. (Optional) Turn off email confirmation for personal use: **Auth → Settings → uncheck "Enable email confirmations"**
+6. Create a Storage bucket named `property-images` with public access
 
 ### 3. Configure environment
 
@@ -34,7 +35,6 @@ Edit `.env.local`:
 ```
 VITE_SUPABASE_URL=https://your-project-id.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key-here
-VITE_BASE_URL=/
 ```
 
 ### 4. Run locally
@@ -57,87 +57,45 @@ Open http://localhost:5173 — create an account and start analyzing deals.
 
 Your app will be live at `https://YOUR_USERNAME.github.io/RE-Analyzer-Pro`
 
-**Important:** `VITE_BASE_URL` is set automatically by the GitHub Action to `/RE-Analyzer-Pro/` from your repo name. No action needed on your part.
-
 ---
 
-## Add to iPhone (PWA)
+## Features
 
-1. Open your GitHub Pages URL in Safari on iPhone
-2. Tap the **Share** button → **Add to Home Screen**
-3. Done — it works like a native app, including offline
+### 6-Tab Underwriting UI
+1. **Broker** — read-only broker as-presented figures, unlock to edit
+2. **Flags** — auto-computed age-adjusted benchmarks (tax reassessment, vacancy, insurance, R&M, reserves) + stressed scenario card + county tax PDF import
+3. **Inputs** — buyer's underwriting (income with per-unit rent roll, financing, itemized or collapsed expenses, sub-metering toggles, $/unit property management)
+4. **P&L** — full income statement, Cash-on-Cash return, bidirectional offer calculator
+5. **Tax** — tax strategy inputs, 1031 exchange analysis with apply-excess-to-down, bonus depreciation, 27.5yr SL schedule, 5-year benefit bank, ROE metrics
+6. **Compare** — up to 4-column side-by-side scenario comparison with save/load layout
+
+### Exports
+- **PDF report** — per-tab export dropdown (Full Report, P&L, Tax, Flags, Broker, Inputs) with preview modal
+- **Excel workbook** — 4 sheets with live formulas (Inputs, P&L, Financing, Tax Analysis)
+- **LOI generator** — Simple and Buyer-Friendly templates, auto-populated from scenario
+
+### Other
+- AI broker PDF extraction via Supabase Edge Function (Claude Sonnet 4)
+- County tax assessor PDF import
+- Property photo upload
+- Drag-to-reorder properties
+- User defaults (Settings modal)
+- Crexi listing URL
+- Password reset flow
 
 ---
 
 ## iOS App via Capacitor + TestFlight
 
 ```bash
-# One-time setup
-npx cap add ios
-
-# Every time you update
 npm run cap:ios
-# This builds, syncs, and opens Xcode
-```
-
-In Xcode:
-1. Select your team (your Apple Developer account)
-2. Set Bundle ID to match `capacitor.config.ts` (e.g. `com.yourname.dealanalyzer`)
-3. **Product → Archive**
-4. **Distribute App → TestFlight**
-
----
-
-## Project structure
-
-```
-src/
-  lib/
-    calc.ts         ← pure calculation engine (no React, just math)
-    supabase.ts     ← Supabase client
-  types/
-    index.ts        ← TypeScript types for inputs, outputs, DB models
-  hooks/
-    useAuth.ts      ← auth state
-    useScenario.ts  ← property/scenario CRUD
-  components/
-    model/
-      ModelCalculator.tsx  ← main underwriting UI (inputs + 4 tabs)
-    pdf/
-      PdfReport.tsx        ← @react-pdf/renderer PDF export
-    layout/
-      AppShell.tsx         ← nav shell
-    ui/
-      index.tsx            ← shared primitives (inputs, cards, alerts)
-  pages/
-    LoginPage.tsx
-    PropertiesPage.tsx
-    PropertyPage.tsx       ← scenarios list for one property
-    ScenarioPage.tsx       ← loads and saves a scenario
-    DemoPage.tsx           ← no-auth quick model
-supabase/
-  schema.sql         ← run this once in Supabase SQL editor
-.github/workflows/
-  deploy.yml         ← auto-deploys to GitHub Pages on push to main
+# Builds, syncs, and opens Xcode — then Archive → Distribute → TestFlight
 ```
 
 ---
 
-## Expanding to multi-user (when ready)
+## Multi-tenant ready
 
 The data model is already multi-tenant:
 - Every row has a `user_id` enforced by Supabase RLS
 - Adding new users requires zero schema changes
-- Add Stripe billing and a landing page — nothing else changes
-
----
-
-## Key defaults (OM as-presented)
-
-All inputs default to the Marcus & Millichap OM figures:
-- 8 units, 7 occupied, $1,957/mo avg rent, 4% vacancy
-- $1,950,000 price, 6% IR, 67% LTV, 30yr amort
-- $20,726 taxes, $1,800/door insurance, 5% prop mgmt
-- 37% tax bracket, 20% land, 0% lender fee
-
-To stress-test: adjust taxes to $39,000 (post-FL-reassessment), insurance to $2,500/door, PM to 6.5%, LTV to 80%.

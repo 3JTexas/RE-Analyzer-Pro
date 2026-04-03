@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { FileSearch, X, Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
+import { supabase } from '../lib/supabase'
 import type { TaxRecordExtraction } from '../types'
 
 interface Props {
@@ -33,18 +34,10 @@ export function TaxRecordImport({ currentTax, currentLand, units, purchasePrice,
     setError('')
     try {
       const b64 = await toBase64(file)
-      const resp = await fetch(
-        'https://mrraacrijhzlchskuzru.supabase.co/functions/v1/extract-tax-record',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({ pdf: b64 }),
-        }
-      )
-      const parsed = await resp.json()
+      const { data: parsed, error: invokeError } = await supabase.functions.invoke('extract-tax-record', {
+        body: { pdf: b64 },
+      })
+      if (invokeError) throw invokeError
       if (parsed.error) throw new Error(parsed.error)
       setData(parsed as TaxRecordExtraction)
       setStatus('done')

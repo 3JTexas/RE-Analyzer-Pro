@@ -86,7 +86,7 @@ export function useScenario(scenarioId?: string) {
         if (!user) return null
         const { data } = await supabase
           .from('scenarios')
-          .insert({ name, method: 'om', inputs, property_id: propertyId, user_id: user.id })
+          .insert({ name, inputs, property_id: propertyId, user_id: user.id })
           .select().single()
         setScenario(data as Scenario)
         return data as Scenario
@@ -107,7 +107,7 @@ export function useScenario(scenarioId?: string) {
     if (!user) return null
     const { data } = await supabase
       .from('scenarios')
-      .insert({ name, method: 'om', inputs, property_id: propertyId, user_id: user.id, is_default: isDefault })
+      .insert({ name, inputs, property_id: propertyId, user_id: user.id, is_default: isDefault })
       .select().single()
     return data as Scenario
   }

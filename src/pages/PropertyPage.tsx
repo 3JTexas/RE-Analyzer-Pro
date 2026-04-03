@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ChevronLeft, Plus, BarChart3, Trash2, Copy, Camera, Loader2, ExternalLink, Pencil, Check, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getScenariosForProperty, useScenario } from '../hooks/useScenario'
+import { useUserDefaults } from '../hooks/useUserDefaults'
 import type { Property, Scenario, ModelInputs } from '../types'
 import { Spinner, EmptyState } from '../components/ui'
 import { SetupFlow } from '../components/OMSetupFlow'
@@ -12,6 +13,7 @@ export function PropertyPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { createScenario, deleteScenario } = useScenario()
+  const { loadDefaults } = useUserDefaults()
   const [property, setProperty] = useState<Property | null>(null)
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [loading, setLoading] = useState(true)
@@ -66,7 +68,16 @@ export function PropertyPage() {
 
   const handleDuplicate = async () => {
     if (!id || !duplicating || !dupName.trim()) return
-    const s = await createScenario(id, dupName.trim(), duplicating.inputs)
+    // Merge user defaults (tax strategy fields) into duplicated inputs
+    const defaults = await loadDefaults()
+    const mergedInputs: ModelInputs = { ...duplicating.inputs }
+    // Only apply defaults for fields that are 0/unset in the source scenario
+    for (const [k, v] of Object.entries(defaults)) {
+      if (v !== undefined && v !== 0 && ((mergedInputs as any)[k] === 0 || (mergedInputs as any)[k] === undefined)) {
+        (mergedInputs as any)[k] = v
+      }
+    }
+    const s = await createScenario(id, dupName.trim(), mergedInputs)
     setDuplicating(null)
     setDupName('')
     if (s) { await loadData(); navigate(`/scenario/${s.id}`) }
