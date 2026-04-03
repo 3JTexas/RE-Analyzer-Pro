@@ -591,12 +591,54 @@ Note: `node_modules/`, `dist/`, and `ios/` are gitignored — `npm install` recr
 ## Pending Features / Known Issues (updated)
 
 1. ~~**Method refactor**~~ — DONE (April 2, 2026)
-2. **Responsive layout** — desktop breakpoint-aware design
-3. **Verify rent roll extraction** — test end-to-end with Bay Drive broker PDF
-4. **Tax assessor PDF import** — extract-tax-record edge function + TaxRecordImport component (built Mar 25, needs testing)
-5. **PDF tab pages QA** — verify Flags, Broker, and Inputs PDF pages render clean data
-6. **QA the OM→Broker refactor** — walk through existing properties to confirm labels, saves, and calculations all work post-refactor
+2. ~~**QA the OM→Broker refactor**~~ — DONE (April 3, 2026) — all 6 tabs verified, no "OM" text remaining
+3. **Responsive layout** — desktop breakpoint-aware design
+4. **Verify rent roll extraction** — test end-to-end with Bay Drive broker PDF
+5. **Tax assessor PDF import** — extract-tax-record edge function + TaxRecordImport component (built Mar 25, needs testing)
+6. **PDF tab pages QA** — verify Flags, Broker, and Inputs PDF pages render clean data
 
 ---
 
-*Last updated: April 2, 2026*
+## Session — April 3, 2026
+
+**Full codebase review (Claude Code):**
+- Read every source file in the project (40+ files) from scratch
+- Documented complete architecture, all features, DB schema, known issues
+- Updated all memory files for future session continuity
+
+**9 Bug fixes:**
+- TaxRecordImport: switched from raw `fetch()` to `supabase.functions.invoke()` (prevents 401s)
+- Removed unused `zustand` dependency from package.json
+- Fixed capacitor.config.ts bundle ID: `com.yourname.dealanalyzer` → `com.ChaiHoldings.dealanalyzer`
+- Removed legacy `method: 'om'` hardcoded inserts from useScenario.ts (lines 89, 110)
+- Updated schema.sql: added compare_state + property_image_url columns, fixed `units default 8`, relaxed method constraint
+- Added React ErrorBoundary wrapping entire App with reload button
+- Fixed ModelCalculator land/costSeg defaults: 20/23 → 0/0 (user defaults system handles non-zero preferences)
+- Updated copyright footers from 2025 → 2026 on LoginPage + ResetPasswordPage
+- Rewrote README.md to reflect current 6-tab UI and all features
+
+**Broker badge bug fix:**
+- `brokerBadge()` function was returning `{ badge: 'changed' }` correctly, but explicit `badge="Broker"` props on InputField components were overriding the spread
+- Fixed by making `brokerBadge()` always return a badge (either "Broker"/blue or "changed"/amber)
+- Removed all hardcoded `badge="Broker"` from fields that use `{...brokerBadge()}`
+- Added `brokerBadge()` to income fields (tu, ou, rent, vp) that previously only had hardcoded badge
+
+**Basis1031 auto-calculation:**
+- When priorPurchasePrice, priorImprovements, or priorDepreciation change, basis1031 is now auto-calculated as `adjustedBasis` from `calc1031()`
+- All five 1031 input fields (priorSalePrice, priorMortgagePayoff, priorPurchasePrice, priorImprovements, priorDepreciation) now recalculate both equity1031 and basis1031
+- basis1031 field remains manually editable when no prior sale data is entered
+
+**Duplicate scenario merges user defaults:**
+- When duplicating a scenario from PropertyPage, user defaults (from Settings) are now merged into the copy
+- Only fills fields that are 0/unset in the source scenario — preserves existing values
+- Imported useUserDefaults hook into PropertyPage
+
+**Broker refactor QA — PASSED:**
+- Walked through all 6 tabs on broker and non-broker scenarios
+- Verified: no "OM" text anywhere, badges correct, LOI hidden on broker, offer calc hidden on broker
+- Compare tab: deltas calculating correctly across scenarios
+- 1031 section, flags, stressed scenario all working
+
+---
+
+*Last updated: April 3, 2026*
