@@ -33,8 +33,10 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
 
-      - name: Sync Capacitor
-        run: npx cap sync ios
+      - name: Add & Sync Capacitor iOS
+        run: |
+          npx cap add ios
+          npx cap sync ios
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
