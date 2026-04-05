@@ -42,6 +42,10 @@ jobs:
           npx cap add ios
           npx cap sync ios
 
+      - name: Set encryption compliance flag
+        run: |
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" ios/App/App/Info.plist
+
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
