@@ -639,6 +639,18 @@ Note: `node_modules/`, `dist/`, and `ios/` are gitignored — `npm install` recr
 - Compare tab: deltas calculating correctly across scenarios
 - 1031 section, flags, stressed scenario all working
 
+**Automated TestFlight CI/CD:**
+- New workflow: `.github/workflows/testflight.yml`
+- Triggers: manual dispatch (`workflow_dispatch`) or version tags (`v*`) — NOT every push
+- Uses cloud-managed signing via App Store Connect API key (Admin role required)
+- API key stored as base64 in GitHub Secret (GitHub strips newlines from PEM files)
+- macOS runner: builds web → cap add/sync → pod install → xcodebuild archive → export → upload
+- Build number auto-increments from timestamp
+- After upload: answer "No" to encryption compliance in App Store Connect
+- GitHub Secrets: `APP_STORE_CONNECT_ISSUER_ID`, `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_API_KEY` (base64), `APPLE_TEAM_ID`
+- To trigger: `gh workflow run testflight.yml` or `git tag v1.1 && git push --tags`
+- Apple login: andrew@3jtexas.com (not chaiholdings)
+
 ---
 
-*Last updated: April 3, 2026*
+*Last updated: April 4, 2026*

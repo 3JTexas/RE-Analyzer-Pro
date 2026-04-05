@@ -1,9 +1,12 @@
 name: Build & Upload to TestFlight
 
 on:
-  push:
-    branches: [main]
+  # Manual trigger from GitHub Actions UI or gh CLI
   workflow_dispatch:
+  # Auto-trigger on version tags (e.g. git tag v1.1 && git push --tags)
+  push:
+    tags:
+      - 'v*'
 
 concurrency:
   group: testflight
