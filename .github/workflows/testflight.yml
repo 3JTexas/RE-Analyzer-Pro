@@ -106,13 +106,7 @@ jobs:
             -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
             -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
 
-      - name: Upload to TestFlight
-        run: |
-          xcrun altool --upload-app \
-            --type ios \
-            --file $RUNNER_TEMP/export/App.ipa \
-            --apiKey ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
-            --apiIssuer ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      # Upload happens during exportArchive with destination=upload — no separate step needed
 
       - name: Cleanup API key
         if: always()
