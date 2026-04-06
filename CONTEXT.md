@@ -685,10 +685,80 @@ Once a property moves from underwriting to active deal, a new "Pipeline" workflo
 7. Multi-property — master pipeline view across all active deals, or always property-by-property?
 
 ### Current Status
-- Feature scoped in chat on April 6, 2026
-- No code written yet — awaiting answers to open questions before starting
-- First milestone: answer open questions, finalize data model, build Pipeline route scaffold
+- Feature scoped and FULLY BUILT on April 6, 2026
+
+### What's Built
+- 4 property statuses: Research → Pending → Active → Closed (pill toggle on PropertyPage)
+- Mini-pipeline (Pending): Deal Terms + LOI status tracker, Documents, Contacts (attorney + broker)
+- Full pipeline (Active): Timeline milestones, Documents, Deal Team (8 roles + sub-contacts), Expenses (budget vs actual), Repairs (+ re-trade PDF)
+- Deals dashboard on home page with Properties | Deals pill toggle, metrics cards, deal summary cards
+- AI extraction edge function (extract-deal-doc) for LOI, PSA, and inspection reports
+- Scenario selector: "Which scenario is your offer?" — links deal terms to a specific scenario
+- Wide layout (1280px) on pipeline pages, responsive grid on properties/scenarios
+
+### New Database Tables
+- `deal_pipelines` — JSONB for loi_tracking, milestones, deal_team, repair_estimates, expense_budgets + deal_scenario_id
+- `deal_documents` — file uploads with AI extraction results
+- `deal_expenses` — budget vs actual by category
+
+### New Files
+- `src/types/pipeline.ts` — all pipeline types
+- `src/hooks/usePipeline.ts` — pipeline, document, expense hooks
+- `src/pages/PipelinePage.tsx` — main pipeline page with conditional tabs
+- `src/components/pipeline/TimelineSection.tsx` — milestone tracker
+- `src/components/pipeline/DocumentsSection.tsx` — document upload + AI extraction
+- `src/components/pipeline/DealTeamSection.tsx` — vendor management with sub-contacts
+- `src/components/pipeline/ExpensesSection.tsx` — budget vs actual
+- `src/components/pipeline/RepairsSection.tsx` — repair estimates
+- `src/components/pipeline/RepairsPdf.tsx` — re-trade PDF via @react-pdf/renderer
+- `supabase/functions/extract-deal-doc/` — edge function for document AI extraction
+
+### Pending for Pipeline
+- Deploy extract-deal-doc edge function to Supabase
+- Adobe Acrobat Sign integration for e-signatures (future)
+- Import inspection findings into repair estimates
+- LOI diff: compare uploaded executed LOI against generated version
 
 ---
+
+## Session — April 6, 2026
+
+**Responsive desktop layout:**
+- Removed 768px #root constraint — full viewport width on desktop
+- AppShell: desktop nav links inline in header, backdrop-blur, no bottom tabs on desktop
+- Properties page: 2-3 column grid for property cards
+- PropertyPage: 2-column scenario grid
+- ModelCalculator: max-w-5xl centered with more padding
+- Building watermark at 8% opacity covers full viewport
+- Mobile unchanged
+
+**Deal Pipeline — full build:**
+- Property status system: Research → Pending → Active → Closed
+- Status pills on PropertyPage (dropdown replaced with clear pill buttons)
+- Track Deal → button navigates to pipeline page
+- PipelinePage: wide layout (1280px), conditional tabs based on status
+- Mini-pipeline for Pending: Deal Terms (LOI status tracker with 5 states, scenario selector, locked deal terms from scenario), Documents, Contacts
+- Full pipeline for Active: Timeline (milestones with progress bar, expandable editors), Documents (upload + AI extraction), Deal Team (8 roles with sub-contacts), Expenses (budget vs actual by 9 categories with progress bars), Repairs (severity, status, contractor, re-trade PDF)
+- Deals dashboard: Properties | Deals pill toggle, metrics cards (Active, Pending, Pipeline Value, Closed), deal summary cards linking to pipeline
+- AI extraction edge function: doc-type-specific prompts for LOI, PSA, inspection reports
+
+**Bug fixes earlier in session:**
+- 9 cleanup bugs (TaxRecordImport, zustand, capacitor ID, method inserts, schema.sql, error boundary, defaults, copyright, README)
+- Badge bug: brokerBadge now correctly shows "changed" vs "Broker"
+- Basis1031 auto-calculation from prior sale fields
+- Duplicate scenario merges user defaults
+- Broker refactor QA passed all checks
+
+**TestFlight CI/CD:**
+- Automated TestFlight workflow via GitHub Actions
+- Cloud-managed signing with App Store Connect API key (Admin role)
+- Base64-encoded .p8 key in GitHub Secrets
+- Encryption compliance auto-set via Info.plist injection
+- Triggers: manual dispatch or version tags only (not every push)
+- Base path fix: VITE_BASE_URL=/ for Capacitor builds
+
+---
+
+*Last updated: April 6, 2026*
 
 *Last updated: April 6, 2026*
