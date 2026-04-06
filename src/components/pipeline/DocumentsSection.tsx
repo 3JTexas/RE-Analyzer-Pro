@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react'
-import { Upload, FileText, Trash2, Loader2, Download } from 'lucide-react'
+import { Upload, FileText, Trash2, Loader2, Download, Sparkles } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
 import { useDealDocuments } from '../../hooks/usePipeline'
-import type { DealDocType } from '../../types/pipeline'
+import type { DealDocType, DealDocument } from '../../types/pipeline'
 import { DOC_TYPE_LABELS } from '../../types/pipeline'
 
 interface Props {
@@ -17,8 +18,9 @@ const DOC_TYPE_COLORS: Record<DealDocType, string> = {
 }
 
 export function DocumentsSection({ pipelineId }: Props) {
-  const { documents, loading, uploadDocument, deleteDocument } = useDealDocuments(pipelineId)
+  const { documents, loading, uploadDocument, deleteDocument, updateExtracted } = useDealDocuments(pipelineId)
   const [uploading, setUploading] = useState(false)
+  const [extractingId, setExtractingId] = useState<string | null>(null)
   const [selectedType, setSelectedType] = useState<DealDocType>('other')
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -27,6 +29,28 @@ export function DocumentsSection({ pipelineId }: Props) {
     await uploadDocument(file, selectedType)
     setUploading(false)
     setSelectedType('other')
+  }
+
+  const handleExtract = async (doc: DealDocument) => {
+    if (!doc.file_url || doc.doc_type === 'other') return
+    setExtractingId(doc.id)
+    try {
+      const resp = await fetch(doc.file_url)
+      const blob = await resp.blob()
+      const b64 = await new Promise<string>((res) => {
+        const reader = new FileReader()
+        reader.onload = () => res((reader.result as string).split(',')[1])
+        reader.readAsDataURL(blob)
+      })
+      const { data, error } = await supabase.functions.invoke('extract-deal-doc', {
+        body: { pdf: b64, docType: doc.doc_type },
+      })
+      if (error) throw error
+      if (data) await updateExtracted(doc.id, data)
+    } catch (e: any) {
+      console.error('Extraction failed:', e.message)
+    }
+    setExtractingId(null)
   }
 
   const fmtSize = (bytes: number | null) => {
@@ -81,7 +105,8 @@ export function DocumentsSection({ pipelineId }: Props) {
       ) : (
         <div className="space-y-2">
           {documents.map(doc => (
-            <div key={doc.id} className="bg-white border border-gray-200 rounded-lg p-3 flex items-center gap-3 hover:border-gray-300 transition-colors">
+            <div key={doc.id}>
+            <div className="bg-white border border-gray-200 rounded-lg p-3 flex items-center gap-3 hover:border-gray-300 transition-colors">
               <div className="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center flex-shrink-0">
                 <FileText size={18} className="text-gray-400" />
               </div>
@@ -98,6 +123,20 @@ export function DocumentsSection({ pipelineId }: Props) {
                 </div>
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0">
+                {doc.doc_type !== 'other' && !doc.extracted && (
+                  <button onClick={() => handleExtract(doc)}
+                    disabled={extractingId === doc.id}
+                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-[#c9a84c] border border-[#c9a84c] rounded-lg hover:bg-[#c9a84c] hover:text-white transition-colors disabled:opacity-50"
+                    title="Extract data with AI">
+                    {extractingId === doc.id ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+                    {extractingId === doc.id ? 'Extracting...' : 'Extract'}
+                  </button>
+                )}
+                {doc.extracted && (
+                  <span className="text-[9px] font-semibold text-green-600 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded-full">
+                    Extracted
+                  </span>
+                )}
                 <a href={doc.file_url} target="_blank" rel="noopener noreferrer"
                   className="p-1.5 text-gray-400 hover:text-[#c9a84c] transition-colors" title="Download">
                   <Download size={14} />
@@ -107,6 +146,27 @@ export function DocumentsSection({ pipelineId }: Props) {
                   <Trash2 size={14} />
                 </button>
               </div>
+            </div>
+            {/* Extracted data preview */}
+            {doc.extracted && (
+              <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Extracted Data</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {Object.entries(doc.extracted).filter(([_, v]) => v !== null && v !== '' && v !== undefined).slice(0, 12).map(([key, val]) => (
+                    <div key={key} className="text-[10px]">
+                      <span className="text-gray-400">{key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}: </span>
+                      <span className="text-gray-700 font-medium">
+                        {typeof val === 'number' ? (val > 1000 ? `$${val.toLocaleString()}` : String(val))
+                          : typeof val === 'boolean' ? (val ? 'Yes' : 'No')
+                          : typeof val === 'string' ? (val.length > 60 ? val.slice(0, 60) + '...' : val)
+                          : Array.isArray(val) ? `${val.length} items`
+                          : String(val)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             </div>
           ))}
         </div>
