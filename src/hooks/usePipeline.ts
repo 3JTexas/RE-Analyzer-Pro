@@ -64,11 +64,18 @@ export function usePipeline(propertyId?: string) {
   const updateDealTeam = (team: DealTeam) => updateField('deal_team', team)
   const updateRepairEstimates = (repairs: RepairEstimate[]) => updateField('repair_estimates', repairs)
   const updateExpenseBudgets = (budgets: ExpenseBudgets) => updateField('expense_budgets', budgets)
+  const updateActualInputs = (actuals: Record<string, any>) => updateField('actual_inputs', actuals)
+  const updateDealScenarioId = async (scenarioId: string | null) => {
+    if (!pipeline) return
+    await supabase.from('deal_pipelines').update({ deal_scenario_id: scenarioId }).eq('id', pipeline.id)
+    setPipeline(prev => prev ? { ...prev, deal_scenario_id: scenarioId } : prev)
+  }
 
   return {
     pipeline, loading, refresh: fetch,
     updateLOITracking, updateMilestones, updateDealTeam,
-    updateRepairEstimates, updateExpenseBudgets,
+    updateRepairEstimates, updateExpenseBudgets, updateActualInputs,
+    updateDealScenarioId,
   }
 }
 

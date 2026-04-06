@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ChevronLeft, Lock, Unlock, FileText, Home } from 'lucide-react'
+import { ChevronLeft, FileText, Home } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { usePipeline } from '../hooks/usePipeline'
 import { getScenariosForProperty } from '../hooks/useScenario'
 import { Spinner } from '../components/ui'
-import { fmtDollar, fmtPct } from '../lib/calc'
+import { fmtDollar } from '../lib/calc'
 import { TimelineSection } from '../components/pipeline/TimelineSection'
 import { DocumentsSection } from '../components/pipeline/DocumentsSection'
 import { DealTeamSection } from '../components/pipeline/DealTeamSection'
 import { ExpensesSection } from '../components/pipeline/ExpensesSection'
 import { RepairsSection } from '../components/pipeline/RepairsSection'
+import { DealTermsSection } from '../components/pipeline/DealTermsSection'
 import type { Scenario } from '../types'
 import type { MiniPipelineTab, FullPipelineTab, LOIStatus } from '../types/pipeline'
 
@@ -19,8 +20,7 @@ export function PipelinePage() {
   const [property, setProperty] = useState<{ name: string; address: string | null; status: string } | null>(null)
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [propLoading, setPropLoading] = useState(true)
-  const { pipeline, loading: pipelineLoading, updateLOITracking, updateMilestones, updateDealTeam, updateRepairEstimates, updateExpenseBudgets } = usePipeline(id)
-  const [termsLocked, setTermsLocked] = useState(true)
+  const { pipeline, loading: pipelineLoading, updateLOITracking, updateMilestones, updateDealTeam, updateRepairEstimates, updateExpenseBudgets, updateActualInputs, updateDealScenarioId } = usePipeline(id)
 
   // Wide layout on mount
   useEffect(() => {
@@ -78,11 +78,14 @@ export function PipelinePage() {
   const dealScenario = scenarios.find(s => s.id === pipeline?.deal_scenario_id)
   const nonBrokerScenarios = scenarios.filter(s => !s.is_default)
 
-  const selectDealScenario = async (scenarioId: string) => {
+  const selectDealScenario = async (scenarioId: string | null) => {
     if (!pipeline) return
-    await supabase.from('deal_pipelines').update({ deal_scenario_id: scenarioId }).eq('id', pipeline.id)
-    // Refresh by updating local state
-    window.location.reload() // simple refresh for now
+    await updateDealScenarioId(scenarioId)
+    if (scenarioId) {
+      // Refresh scenarios to get the selected one's data
+      const scens = await getScenariosForProperty(id!)
+      setScenarios(scens)
+    }
   }
 
   if (propLoading || pipelineLoading) return <Spinner />
@@ -148,7 +151,7 @@ export function PipelinePage() {
                     </div>
                     <div className="min-w-0">
                       <div className="text-xs font-semibold text-gray-900 truncate">{s.name}</div>
-                      <div className="text-[10px] text-gray-400">{fmtDollar(s.inputs.price)} · {fmtPct(s.inputs.lev)}% LTV</div>
+                      <div className="text-[10px] text-gray-400">{fmtDollar(s.inputs.price)} · {s.inputs.lev}% LTV</div>
                     </div>
                   </button>
                 ))}
@@ -157,7 +160,7 @@ export function PipelinePage() {
           </div>
         )}
 
-        {/* ── PENDING: Deal Terms ── */}
+        {/* ── Deal Terms ── */}
         {activeTab === 'terms' && pipeline && dealScenario && (
           <div>
             {/* LOI Status */}
@@ -187,8 +190,6 @@ export function PipelinePage() {
                   )
                 })}
               </div>
-
-              {/* Counter-offer notes */}
               {pipeline.loi_tracking.status === 'counter_offer' && (
                 <div className="mt-3">
                   <label className="block text-[10px] uppercase tracking-wide text-gray-500 font-medium mb-1">Counter-offer notes</label>
@@ -203,45 +204,17 @@ export function PipelinePage() {
               )}
             </div>
 
-            {/* Deal Terms from scenario */}
-            <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-900">Deal Terms — {dealScenario.name}</h3>
-                <button onClick={() => setTermsLocked(!termsLocked)}
-                  className={`flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors
-                    ${termsLocked ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}>
-                  {termsLocked ? <><Lock size={10} /> Locked</> : <><Unlock size={10} /> Editing</>}
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                {[
-                  { label: 'Purchase Price', value: fmtDollar(dealScenario.inputs.price) },
-                  { label: 'LTV', value: `${dealScenario.inputs.lev}%` },
-                  { label: 'Interest Rate', value: `${dealScenario.inputs.ir}%` },
-                  { label: 'Amortization', value: `${dealScenario.inputs.am} years` },
-                  { label: 'Down Payment', value: fmtDollar(dealScenario.inputs.price * (1 - dealScenario.inputs.lev / 100)) },
-                  { label: 'Loan Amount', value: fmtDollar(dealScenario.inputs.price * dealScenario.inputs.lev / 100) },
-                  { label: 'Total Units', value: String(dealScenario.inputs.tu) },
-                  { label: 'Price / Unit', value: dealScenario.inputs.tu > 0 ? fmtDollar(dealScenario.inputs.price / dealScenario.inputs.tu) : '—' },
-                ].map(term => (
-                  <div key={term.label} className="bg-gray-50 rounded-lg p-3">
-                    <div className="text-[10px] text-gray-500 mb-1">{term.label}</div>
-                    <div className="text-sm font-semibold text-gray-900">{term.value}</div>
-                  </div>
-                ))}
-              </div>
-
-              {!termsLocked && (
-                <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                  <p className="text-[10px] text-amber-700">Editing deal terms — changes here update the scenario. Press 🔒 Lock when done.</p>
-                </div>
-              )}
-            </div>
+            {/* Projected vs Actual deal terms */}
+            <DealTermsSection
+              dealScenario={{ name: dealScenario.name, inputs: dealScenario.inputs }}
+              actualInputs={pipeline.actual_inputs ?? {}}
+              onUpdateActuals={updateActualInputs}
+              onChangeScenario={() => selectDealScenario(null)}
+            />
           </div>
         )}
 
-        {/* ── PENDING: Deal Terms — no scenario selected ── */}
+        {/* ── Deal Terms — no scenario selected ── */}
         {activeTab === 'terms' && pipeline && !dealScenario && (
           <div className="text-center py-12">
             <p className="text-sm text-gray-400">Select a scenario above to see deal terms</p>

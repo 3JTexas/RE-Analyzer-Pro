@@ -162,6 +162,7 @@ export interface DealPipeline {
   deal_team: DealTeam
   repair_estimates: RepairEstimate[]
   expense_budgets: ExpenseBudgets
+  actual_inputs: Partial<import('../types').ModelInputs>  // actual quotes/terms as they come in
   created_at: string
   updated_at: string
 }
