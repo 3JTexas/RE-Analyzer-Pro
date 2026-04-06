@@ -1,15 +1,17 @@
 import { useState, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Building2, Plus, Trash2, ChevronRight, GripVertical, Camera, Loader2 } from 'lucide-react'
+import { Building2, Plus, Trash2, ChevronRight, GripVertical, Camera, Loader2, ArrowRight, TrendingUp, Clock, DollarSign } from 'lucide-react'
 import { useProperties, useScenario } from '../hooks/useScenario'
 import { supabase } from '../lib/supabase'
 import { Spinner } from '../components/ui'
 import { SetupFlow } from '../components/OMSetupFlow'
-import type { ModelInputs } from '../types'
+import { fmtDollar } from '../lib/calc'
+import type { ModelInputs, Property } from '../types'
 import type { SetupConfirmMeta } from '../components/OMSetupFlow'
 
 export function PropertiesPage() {
   const { properties, loading, createProperty, deleteProperty, reorderProperties, refresh } = useProperties()
+  const [view, setView] = useState<'properties' | 'deals'>('properties')
   const dragIdx = useRef<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
   const { createScenario } = useScenario()
@@ -53,15 +55,36 @@ export function PropertiesPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div>
-          <h1 className="text-[11px] tracking-[0.2em] uppercase text-gray-400 font-medium">Properties</h1>
-          <p className="text-xs text-gray-400 mt-0.5">{properties.length} active deal{properties.length !== 1 ? 's' : ''}</p>
+      <div className="flex items-center justify-between px-6 md:px-8 py-4 bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="flex items-center gap-4">
+          {/* Pill toggle */}
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+            <button onClick={() => setView('properties')}
+              className={`px-3.5 py-1.5 text-xs font-semibold transition-colors
+                ${view === 'properties' ? 'bg-[#1a1a2e] text-white' : 'text-gray-400 hover:bg-gray-50'}`}>
+              Properties
+            </button>
+            <button onClick={() => setView('deals')}
+              className={`px-3.5 py-1.5 text-xs font-semibold transition-colors relative
+                ${view === 'deals' ? 'bg-[#c9a84c] text-white' : 'text-gray-400 hover:bg-gray-50'}`}>
+              Deals
+              {properties.filter(p => p.status === 'pending' || p.status === 'active').length > 0 && view !== 'deals' && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+                  {properties.filter(p => p.status === 'pending' || p.status === 'active').length}
+                </span>
+              )}
+            </button>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">{properties.length} propert{properties.length !== 1 ? 'ies' : 'y'}</p>
+          </div>
         </div>
-        <button onClick={() => setShowSetup(true)}
-          className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium tracking-wide border border-[#c9a84c] text-[#c9a84c] rounded-sm bg-transparent hover:bg-[#c9a84c] hover:text-white transition-colors">
-          <Plus size={13} /> New Property
-        </button>
+        {view === 'properties' && (
+          <button onClick={() => setShowSetup(true)}
+            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium tracking-wide border border-[#c9a84c] text-[#c9a84c] rounded-sm bg-transparent hover:bg-[#c9a84c] hover:text-white transition-colors">
+            <Plus size={13} /> New Property
+          </button>
+        )}
       </div>
 
       {showSetup && (
@@ -77,7 +100,115 @@ export function PropertiesPage() {
       <input ref={photoInputRef} type="file" accept="image/*" className="hidden"
         onChange={e => { const f = e.target.files?.[0]; if (f && photoTargetId.current) handlePhotoUpload(f, photoTargetId.current); e.target.value = '' }} />
 
-      {!showSetup && (
+      {/* ── DEALS VIEW ── */}
+      {!showSetup && view === 'deals' && (() => {
+        const deals = properties.filter(p => p.status === 'pending' || p.status === 'active' || p.status === 'closed')
+        const activeDeals = deals.filter(p => p.status === 'active')
+        const pendingDeals = deals.filter(p => p.status === 'pending')
+        const closedDeals = deals.filter(p => p.status === 'closed')
+        // Sum prices from first non-default scenario per property
+        const totalPipelineValue = deals.reduce((sum, p) => {
+          const dealScenario = p.scenarios?.find(s => !s.is_default) ?? p.scenarios?.[0]
+          return sum + (dealScenario?.inputs?.price ?? 0)
+        }, 0)
+
+        const statusBadge = (s: string) => {
+          const cfg: Record<string, string> = {
+            pending: 'bg-amber-50 text-amber-700 border-amber-200',
+            active: 'bg-green-50 text-green-700 border-green-200',
+            closed: 'bg-blue-50 text-blue-700 border-blue-200',
+          }
+          const labels: Record<string, string> = { pending: 'Pending', active: 'Active', closed: 'Closed' }
+          return <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${cfg[s] ?? ''}`}>{labels[s] ?? s}</span>
+        }
+
+        return (
+          <div className="flex-1 overflow-y-auto px-4 md:px-8 pt-5 pb-6 max-w-5xl mx-auto w-full">
+            {/* Metrics row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <TrendingUp size={14} className="text-[#c9a84c]" />
+                  <span className="text-[10px] text-gray-500">Active Deals</span>
+                </div>
+                <div className="text-2xl font-bold text-gray-900">{activeDeals.length}</div>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Clock size={14} className="text-amber-500" />
+                  <span className="text-[10px] text-gray-500">Pending</span>
+                </div>
+                <div className="text-2xl font-bold text-gray-900">{pendingDeals.length}</div>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <DollarSign size={14} className="text-green-600" />
+                  <span className="text-[10px] text-gray-500">Pipeline Value</span>
+                </div>
+                <div className="text-2xl font-bold text-gray-900">{fmtDollar(totalPipelineValue)}</div>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Building2 size={14} className="text-blue-500" />
+                  <span className="text-[10px] text-gray-500">Closed</span>
+                </div>
+                <div className="text-2xl font-bold text-gray-900">{closedDeals.length}</div>
+              </div>
+            </div>
+
+            {deals.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <TrendingUp size={40} className="text-gray-200 mb-4" />
+                <h3 className="text-base font-light text-gray-500">No active deals</h3>
+                <p className="text-xs text-gray-400 mt-1">Mark a property as Pending or Active to start tracking deals</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {deals.map(p => {
+                  const dealScenario = p.scenarios?.find(s => !s.is_default) ?? p.scenarios?.[0]
+                  const price = dealScenario?.inputs?.price ?? 0
+
+                  return (
+                    <Link key={p.id} to={`/property/${p.id}/pipeline`}
+                      className="flex items-center gap-4 bg-white border border-gray-200 rounded-lg p-4 hover:border-[#c9a84c] transition-colors group">
+                      {/* Photo */}
+                      <div className="w-14 h-14 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
+                        {p.property_image_url ? (
+                          <img src={p.property_image_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Building2 size={20} className="text-gray-300" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-sm font-semibold text-gray-900 truncate">{p.name}</span>
+                          {statusBadge(p.status)}
+                        </div>
+                        {p.address && <div className="text-xs text-gray-400 truncate">{p.address}</div>}
+                        <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-400">
+                          {p.units && <span>{p.units} units</span>}
+                          {price > 0 && <span className="font-medium text-gray-600">{fmtDollar(price)}</span>}
+                          {dealScenario && <span>{dealScenario.name}</span>}
+                        </div>
+                      </div>
+
+                      {/* Arrow */}
+                      <ArrowRight size={16} className="text-gray-300 group-hover:text-[#c9a84c] transition-colors flex-shrink-0" />
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* ── PROPERTIES VIEW ── */}
+      {!showSetup && view === 'properties' && (
         <div className="flex-1 overflow-y-auto px-4 md:px-8 pt-5 pb-6 max-w-5xl mx-auto w-full">
           {properties.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
