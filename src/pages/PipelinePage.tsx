@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ChevronLeft, Lock, Unlock, FileText } from 'lucide-react'
+import { ChevronLeft, Lock, Unlock, FileText, Home } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { usePipeline } from '../hooks/usePipeline'
 import { getScenariosForProperty } from '../hooks/useScenario'
@@ -91,6 +91,9 @@ export function PipelinePage() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 md:px-8 py-3 bg-white border-b border-gray-200 flex-shrink-0">
+        <Link to="/" className="p-1.5 text-gray-400 hover:text-[#c9a84c] transition-colors" title="Home">
+          <Home size={16} />
+        </Link>
         <Link to={`/property/${id}`} className="flex items-center gap-0.5 -ml-1 text-gray-400 hover:text-[#1a1a2e] transition-colors">
           <ChevronLeft size={20} />
           <span className="text-xs">Property</span>
