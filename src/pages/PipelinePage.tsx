@@ -9,6 +9,8 @@ import { fmtDollar, fmtPct } from '../lib/calc'
 import { TimelineSection } from '../components/pipeline/TimelineSection'
 import { DocumentsSection } from '../components/pipeline/DocumentsSection'
 import { DealTeamSection } from '../components/pipeline/DealTeamSection'
+import { ExpensesSection } from '../components/pipeline/ExpensesSection'
+import { RepairsSection } from '../components/pipeline/RepairsSection'
 import type { Scenario } from '../types'
 import type { MiniPipelineTab, FullPipelineTab, LOIStatus } from '../types/pipeline'
 
@@ -264,19 +266,19 @@ export function PipelinePage() {
         )}
 
         {/* ── ACTIVE: Expenses ── */}
-        {activeTab === 'expenses' && (
-          <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
-            <p className="text-sm text-gray-500 mb-1">Budget vs actual expenses</p>
-            <p className="text-xs text-gray-400">Track deal costs by category — coming next</p>
-          </div>
+        {activeTab === 'expenses' && pipeline && (
+          <ExpensesSection pipelineId={pipeline.id} expenseBudgets={pipeline.expense_budgets} onBudgetUpdate={updateExpenseBudgets} />
         )}
 
         {/* ── ACTIVE: Repairs ── */}
-        {activeTab === 'repairs' && (
-          <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
-            <p className="text-sm text-gray-500 mb-1">Repair estimates and re-trade PDF</p>
-            <p className="text-xs text-gray-400">Inspection findings and contractor quotes — coming next</p>
-          </div>
+        {activeTab === 'repairs' && pipeline && (
+          <RepairsSection
+            repairEstimates={pipeline.repair_estimates}
+            onUpdate={updateRepairEstimates}
+            propertyName={property?.name ?? ''}
+            propertyAddress={property?.address ?? null}
+            readOnly={isClosed}
+          />
         )}
       </div>
     </div>
