@@ -171,29 +171,19 @@ export function PropertyPage() {
             )}
           </div>
         </div>
-        {/* Status badge + actions */}
+        {/* Status dropdown + Track Deal */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border ${statusConfig[status].color}`}>
-            {statusConfig[status].label}
-          </span>
-          {status === 'research' && (
-            <button onClick={() => updateStatus('pending')}
-              className="text-[10px] font-medium text-amber-600 hover:text-amber-800 transition-colors whitespace-nowrap">
-              Mark Pending
-            </button>
-          )}
-          {status === 'pending' && (
-            <button onClick={() => updateStatus('active')}
-              className="text-[10px] font-medium text-green-600 hover:text-green-800 transition-colors whitespace-nowrap">
-              Mark Active
-            </button>
-          )}
-          {status === 'active' && (
-            <button onClick={() => updateStatus('closed')}
-              className="text-[10px] font-medium text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap">
-              Mark Closed
-            </button>
-          )}
+          <select
+            value={status}
+            onChange={e => updateStatus(e.target.value as typeof status)}
+            className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border appearance-none cursor-pointer focus:outline-none
+              ${statusConfig[status].color}`}
+          >
+            <option value="research">Research</option>
+            <option value="pending">Pending</option>
+            <option value="active">Active</option>
+            <option value="closed">Closed</option>
+          </select>
           {(status === 'pending' || status === 'active' || status === 'closed') && (
             <Link to={`/property/${id}/pipeline`}
               className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-[#c9a84c] text-white rounded-sm hover:bg-[#b8963f] transition-colors whitespace-nowrap">
