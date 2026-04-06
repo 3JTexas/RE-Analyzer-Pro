@@ -53,7 +53,7 @@ export function LoginPage() {
 
             {resetSent ? (
               <div className="bg-green-50 border border-green-200 rounded-sm p-4 text-green-700 text-sm text-center">
-                Check your email for a reset link
+                If an account exists for that email, a reset link has been sent. Check your inbox and spam folder.
               </div>
             ) : (
               <form onSubmit={async (e) => {
