@@ -1153,9 +1153,9 @@ export function ModelCalculator({
   ]
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-white max-w-5xl mx-auto w-full">
       {/* Scenario name + actions */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
+      <div className="flex items-center gap-2 px-4 md:px-6 py-3 border-b border-gray-100">
         <span className="flex-1 text-sm font-semibold text-gray-900 truncate min-w-0">{name}</span>
         {siblings.filter(s => s.id !== currentScenarioId).length > 0 && (
           <select
@@ -1267,7 +1267,7 @@ export function ModelCalculator({
       </div>
 
       {/* Tab content */}
-      <div ref={tabContentRef} className="flex-1 overflow-y-auto px-4 pb-6">
+      <div ref={tabContentRef} className="flex-1 overflow-y-auto px-4 md:px-6 pb-6">
 
         {/* ── INPUTS TAB ────────────────────────────────────────────────── */}
         {activeTab === 'inputs' && (

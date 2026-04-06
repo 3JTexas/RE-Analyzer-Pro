@@ -195,7 +195,7 @@ export function PropertyPage() {
       )}
 
       {!showSetup && !duplicating && (
-        <div className="flex-1 overflow-y-auto px-4 py-3">
+        <div className="flex-1 overflow-y-auto px-4 md:px-8 py-3 max-w-5xl mx-auto w-full">
           {scenarios.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <BarChart3 size={40} className="text-gray-200 mb-4" />
@@ -207,7 +207,7 @@ export function PropertyPage() {
               </button>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {scenarios.map(s => (
                 <div key={s.id} className="bg-white border border-gray-200 rounded-sm hover:border-[#c9a84c] transition-colors overflow-hidden group">
                   <Link to={`/scenario/${s.id}`}
