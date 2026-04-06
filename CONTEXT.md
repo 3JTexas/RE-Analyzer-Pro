@@ -653,4 +653,42 @@ Note: `node_modules/`, `dist/`, and `ios/` are gitignored — `npm install` recr
 
 ---
 
-*Last updated: April 4, 2026*
+## Upcoming Feature: Deal Pipeline / Transaction Tracker
+
+### Overview
+Once a property moves from underwriting to active deal, a new "Pipeline" workflow is needed — separate from the 6-tab underwriting shell. Accessed via a "Track Deal →" button on PropertyPage. This is a distinct full-screen interface, not crammed into the existing tab structure.
+
+### Proposed Sub-Sections
+1. **Timeline** — milestone tracker (LOI signed, PSA executed, inspection period, financing contingency, closing date)
+2. **Documents** — upload, tag, and AI-extract key terms from LOI, PSA, inspection reports, contracts
+3. **Deal Team** — vendors by role (attorney, inspector, PM, lender, title, broker, appraiser) with multiple candidates per role and a "selected" flag
+4. **Expenses** — categorized running log (travel, professional fees, inspections, earnest money, appraisal, etc.)
+5. **Repair Estimates** — itemized list with contractor, amount, status; supports re-trade negotiation; potential PDF output to send seller
+
+### Document Extraction Targets
+- **LOI:** purchase price, closing date, DD period, deposit amount, contingencies
+- **PSA:** all of above plus additional contract terms
+- Uses same Anthropic API extraction pattern as existing extract-om edge function
+
+### UI Direction
+- Mobile-first view (current 768px shell) for quick reference
+- Richer desktop-first layout for heavy data entry (wider than 768px)
+- Consider separate route: `/properties/:id/pipeline`
+
+### Open Questions (need answers before building)
+1. Trigger: always visible per property, or only after manually marking "Under Contract"?
+2. Document extraction fields — confirm full field list for LOI and PSA
+3. Deal team roles — confirm full list beyond attorney/inspector/PM
+4. Expenses — budget vs. actual, or just running log? Category list?
+5. Repair estimates — tied to inspection findings or free-form? Generate re-trade PDF?
+6. Closing — does property graduate to portfolio/asset management view after closing?
+7. Multi-property — master pipeline view across all active deals, or always property-by-property?
+
+### Current Status
+- Feature scoped in chat on April 6, 2026
+- No code written yet — awaiting answers to open questions before starting
+- First milestone: answer open questions, finalize data model, build Pipeline route scaffold
+
+---
+
+*Last updated: April 6, 2026*
