@@ -6,6 +6,9 @@ import { usePipeline } from '../hooks/usePipeline'
 import { getScenariosForProperty } from '../hooks/useScenario'
 import { Spinner } from '../components/ui'
 import { fmtDollar, fmtPct } from '../lib/calc'
+import { TimelineSection } from '../components/pipeline/TimelineSection'
+import { DocumentsSection } from '../components/pipeline/DocumentsSection'
+import { DealTeamSection } from '../components/pipeline/DealTeamSection'
 import type { Scenario } from '../types'
 import type { MiniPipelineTab, FullPipelineTab, LOIStatus } from '../types/pipeline'
 
@@ -241,35 +244,23 @@ export function PipelinePage() {
         )}
 
         {/* ── PENDING: Documents ── */}
-        {activeTab === 'documents' && (
-          <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
-            <p className="text-sm text-gray-500 mb-1">Document upload and AI extraction</p>
-            <p className="text-xs text-gray-400">Upload executed LOI, PSA, inspection reports — coming next</p>
-          </div>
+        {activeTab === 'documents' && pipeline && (
+          <DocumentsSection pipelineId={pipeline.id} />
         )}
 
-        {/* ── PENDING: Contacts ── */}
-        {activeTab === 'contacts' && (
-          <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
-            <p className="text-sm text-gray-500 mb-1">Attorney and broker contacts</p>
-            <p className="text-xs text-gray-400">Track your deal team — coming next</p>
-          </div>
+        {/* ── PENDING: Contacts (limited roles: attorney + broker) ── */}
+        {activeTab === 'contacts' && pipeline && (
+          <DealTeamSection dealTeam={pipeline.deal_team} onUpdate={updateDealTeam} limitedRoles={['attorney', 'broker']} />
         )}
 
         {/* ── ACTIVE: Timeline ── */}
-        {activeTab === 'timeline' && (isActive || isClosed) && (
-          <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
-            <p className="text-sm text-gray-500 mb-1">Milestone timeline</p>
-            <p className="text-xs text-gray-400">Track PSA execution through closing — coming next</p>
-          </div>
+        {activeTab === 'timeline' && pipeline && (isActive || isClosed) && (
+          <TimelineSection milestones={pipeline.milestones} onUpdate={updateMilestones} readOnly={isClosed} />
         )}
 
-        {/* ── ACTIVE: Deal Team ── */}
-        {activeTab === 'team' && (
-          <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
-            <p className="text-sm text-gray-500 mb-1">Full deal team management</p>
-            <p className="text-xs text-gray-400">All vendors and sub-contacts — coming next</p>
-          </div>
+        {/* ── ACTIVE: Deal Team (all roles) ── */}
+        {activeTab === 'team' && pipeline && (
+          <DealTeamSection dealTeam={pipeline.deal_team} onUpdate={updateDealTeam} />
         )}
 
         {/* ── ACTIVE: Expenses ── */}
