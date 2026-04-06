@@ -143,6 +143,7 @@ export interface Property {
   units: number | null
   year_built: number | null
   notes: string | null
+  status: 'research' | 'pending' | 'active' | 'closed'
   display_order: number
   crexi_url: string | null
   property_image_url: string | null
