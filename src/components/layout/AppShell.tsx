@@ -104,6 +104,9 @@ export function AppShell() {
           </nav>
         </div>
         <div className="flex items-center gap-4 min-w-0">
+          <Link to="/" className="p-1.5 text-gray-400 hover:text-[#c9a84c] transition-colors" title="Home">
+            <Home size={16} />
+          </Link>
           {user && (
             <AvatarMenu size="w-9 h-9" textSize="text-xs" onProfile={() => setShowProfile(true)} onSettings={() => setShowSettings(true)} onSignOut={signOut} />
           )}
