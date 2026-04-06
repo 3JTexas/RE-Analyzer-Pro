@@ -63,7 +63,7 @@ export function AppShell() {
   return (
     <div style={{ position: 'relative', height: '100vh', overflow: 'hidden', backgroundColor: '#f8f7f4', display: 'flex', flexDirection: 'column' }}>
 
-      {/* Full-bleed building backdrop — first child, paints immediately */}
+      {/* Full-bleed building backdrop */}
       <div
         aria-hidden="true"
         style={{
@@ -75,24 +75,35 @@ export function AppShell() {
           backgroundRepeat: 'no-repeat',
           backgroundPosition: 'center center',
           backgroundSize: 'cover',
-          opacity: 0.5,
+          opacity: 0.08,
           filter: 'grayscale(100%)',
         }}
       />
 
-      {/* Top nav — md+ */}
-      <header className="hidden md:flex items-center justify-between bg-white border-b border-gray-200 h-20 px-6 min-w-0" style={{ position: 'relative', zIndex: 10, flexShrink: 0 }}>
+      {/* Desktop header */}
+      <header className="hidden md:flex items-center justify-between bg-white/95 backdrop-blur-sm border-b border-gray-200 h-16 px-8" style={{ position: 'relative', zIndex: 10, flexShrink: 0 }}>
         <div className="flex items-center min-w-0">
           <Link to="/">
-            <img src={logoSrc} alt="Chai Holdings" className="h-14 w-auto" />
+            <img src={logoSrc} alt="Chai Holdings" className="h-10 w-auto" />
           </Link>
           <div className="w-px h-5 border-l border-gray-200 mx-4" />
           <span className="text-[11px] font-medium tracking-[0.12em] uppercase text-gray-400">RE Analyzer Pro</span>
+          {/* Desktop nav links */}
+          <nav className="flex items-center gap-1 ml-8">
+            {nav.map(({ to, icon: Icon, label }) => {
+              const active = loc.pathname === to || (to !== '/' && loc.pathname.startsWith(to))
+              return (
+                <Link key={to} to={to}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
+                    ${active ? 'bg-[#c9a84c]/10 text-[#c9a84c]' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}>
+                  <Icon size={14} strokeWidth={active ? 2.5 : 1.5} />
+                  {label}
+                </Link>
+              )
+            })}
+          </nav>
         </div>
         <div className="flex items-center gap-4 min-w-0">
-          <Link to="/" className="p-1.5 text-gray-400 hover:text-[#c9a84c] transition-colors" title="Dashboard">
-            <Home size={16} />
-          </Link>
           {user && (
             <AvatarMenu size="w-9 h-9" textSize="text-xs" onProfile={() => setShowProfile(true)} onSettings={() => setShowSettings(true)} onSignOut={signOut} />
           )}
@@ -110,12 +121,12 @@ export function AppShell() {
         )}
       </header>
 
-      {/* Scrollable content area — fills remaining height */}
+      {/* Scrollable content area */}
       <main style={{ position: 'relative', zIndex: 1, flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0, backgroundColor: 'transparent' }}>
         <Outlet />
       </main>
 
-      {/* Bottom nav — mobile */}
+      {/* Bottom nav — mobile only */}
       <nav className="flex md:hidden border-t border-gray-200 bg-white pb-safe" style={{ position: 'relative', zIndex: 10, flexShrink: 0 }}>
         {nav.map(({ to, icon: Icon, label }) => {
           const active = loc.pathname === to || (to !== '/' && loc.pathname.startsWith(to))

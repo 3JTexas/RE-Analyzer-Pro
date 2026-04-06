@@ -78,7 +78,7 @@ export function PropertiesPage() {
         onChange={e => { const f = e.target.files?.[0]; if (f && photoTargetId.current) handlePhotoUpload(f, photoTargetId.current); e.target.value = '' }} />
 
       {!showSetup && (
-        <div className="flex-1 overflow-y-auto px-4 pt-5 pb-6 max-w-3xl mx-auto w-full">
+        <div className="flex-1 overflow-y-auto px-4 md:px-8 pt-5 pb-6 max-w-5xl mx-auto w-full">
           {properties.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <Building2 size={40} className="text-gray-200 mb-4" />
@@ -90,7 +90,7 @@ export function PropertiesPage() {
               </button>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {properties.map((p, i) => (
                 <div key={p.id}
                   draggable

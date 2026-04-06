@@ -19,11 +19,16 @@
   }
 
   #root {
-    max-width: 768px;
+    max-width: 100%;
     margin: 0 auto;
     height: 100vh;
     overflow: hidden;
     position: relative;
+  }
+
+  /* Wide pipeline pages can set their own max-width */
+  #root.wide-layout {
+    max-width: 1280px;
     box-shadow: 0 0 60px rgba(0,0,0,0.10);
   }
 
