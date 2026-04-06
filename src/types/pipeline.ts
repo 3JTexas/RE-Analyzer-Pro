@@ -2,7 +2,7 @@
 export type PropertyStatus = 'research' | 'pending' | 'active' | 'closed'
 
 // ── LOI tracking (Pending status) ────────────────────────────────────────
-export type LOIStatus = 'submitted' | 'counter_offer' | 'accepted' | 'rejected'
+export type LOIStatus = 'none' | 'submitted' | 'counter_offer' | 'accepted' | 'rejected'
 
 export interface LOITracking {
   status: LOIStatus
@@ -144,7 +144,7 @@ export const DEFAULT_MILESTONES: Milestone[] = [
 ]
 
 export const DEFAULT_LOI_TRACKING: LOITracking = {
-  status: 'submitted',
+  status: 'none',
   submittedDate: null,
   counterOfferNotes: '',
   responseDate: null,
@@ -156,6 +156,7 @@ export interface DealPipeline {
   id: string
   property_id: string
   user_id: string
+  deal_scenario_id: string | null  // which scenario represents the offer/deal terms
   loi_tracking: LOITracking
   milestones: Milestone[]
   deal_team: DealTeam

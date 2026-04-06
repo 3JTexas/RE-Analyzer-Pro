@@ -34,6 +34,7 @@ export function usePipeline(propertyId?: string) {
       .insert({
         property_id: propertyId,
         user_id: user.id,
+        deal_scenario_id: null,
         loi_tracking: DEFAULT_LOI_TRACKING,
         milestones: DEFAULT_MILESTONES,
         deal_team: {},

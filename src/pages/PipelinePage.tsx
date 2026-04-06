@@ -1,26 +1,21 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ChevronLeft, Lock, Unlock } from 'lucide-react'
+import { ChevronLeft, Lock, Unlock, FileText } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { usePipeline } from '../hooks/usePipeline'
+import { getScenariosForProperty } from '../hooks/useScenario'
 import { Spinner } from '../components/ui'
-import type { Property } from '../types'
-import type { MiniPipelineTab, FullPipelineTab } from '../types/pipeline'
-
-interface PropertyMeta {
-  name: string
-  address: string | null
-  status: string
-  units: number | null
-  year_built: number | null
-  property_image_url: string | null
-}
+import { fmtDollar, fmtPct } from '../lib/calc'
+import type { Scenario } from '../types'
+import type { MiniPipelineTab, FullPipelineTab, LOIStatus } from '../types/pipeline'
 
 export function PipelinePage() {
   const { id } = useParams<{ id: string }>()
-  const [property, setProperty] = useState<PropertyMeta | null>(null)
+  const [property, setProperty] = useState<{ name: string; address: string | null; status: string } | null>(null)
+  const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [propLoading, setPropLoading] = useState(true)
   const { pipeline, loading: pipelineLoading, updateLOITracking, updateMilestones, updateDealTeam, updateRepairEstimates, updateExpenseBudgets } = usePipeline(id)
+  const [termsLocked, setTermsLocked] = useState(true)
 
   // Wide layout on mount
   useEffect(() => {
@@ -28,12 +23,17 @@ export function PipelinePage() {
     return () => { document.getElementById('root')?.classList.remove('wide-layout') }
   }, [])
 
-  // Load property meta
+  // Load property meta + scenarios
   useEffect(() => {
     if (!id) return
-    supabase.from('properties').select('name, address, status, units, year_built, property_image_url')
-      .eq('id', id).single()
-      .then(({ data }) => { if (data) setProperty(data as PropertyMeta); setPropLoading(false) })
+    Promise.all([
+      supabase.from('properties').select('name, address, status').eq('id', id).single(),
+      getScenariosForProperty(id),
+    ]).then(([{ data: prop }, scens]) => {
+      if (prop) setProperty(prop as any)
+      setScenarios(scens)
+      setPropLoading(false)
+    })
   }, [id])
 
   const status = property?.status ?? 'research'
@@ -41,14 +41,12 @@ export function PipelinePage() {
   const isActive = status === 'active'
   const isClosed = status === 'closed'
 
-  // Mini-pipeline tabs (Pending)
+  // Tabs
   const miniTabs: { id: MiniPipelineTab; label: string }[] = [
     { id: 'terms', label: 'Deal Terms' },
     { id: 'documents', label: 'Documents' },
     { id: 'contacts', label: 'Contacts' },
   ]
-
-  // Full pipeline tabs (Active / Closed)
   const fullTabs: { id: FullPipelineTab; label: string }[] = [
     { id: 'timeline', label: 'Timeline' },
     { id: 'documents', label: 'Documents' },
@@ -56,11 +54,9 @@ export function PipelinePage() {
     { id: 'expenses', label: 'Expenses' },
     { id: 'repairs', label: 'Repairs' },
   ]
-
   const tabs = isPending ? miniTabs : fullTabs
   const [activeTab, setActiveTab] = useState<string>(isPending ? 'terms' : 'timeline')
 
-  // Reset tab when status changes
   useEffect(() => {
     if (isPending) setActiveTab('terms')
     else if (isActive || isClosed) setActiveTab('timeline')
@@ -71,6 +67,17 @@ export function PipelinePage() {
     pending: { label: 'Pending', color: 'bg-amber-50 text-amber-700 border-amber-200' },
     active: { label: 'Active', color: 'bg-green-50 text-green-700 border-green-200' },
     closed: { label: 'Closed', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  }
+
+  // Deal scenario
+  const dealScenario = scenarios.find(s => s.id === pipeline?.deal_scenario_id)
+  const nonBrokerScenarios = scenarios.filter(s => !s.is_default)
+
+  const selectDealScenario = async (scenarioId: string) => {
+    if (!pipeline) return
+    await supabase.from('deal_pipelines').update({ deal_scenario_id: scenarioId }).eq('id', pipeline.id)
+    // Refresh by updating local state
+    window.location.reload() // simple refresh for now
   }
 
   if (propLoading || pipelineLoading) return <Spinner />
@@ -92,6 +99,12 @@ export function PipelinePage() {
           </div>
           {property?.address && <p className="text-xs text-gray-400 truncate">{property.address}</p>}
         </div>
+        {dealScenario && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg">
+            <FileText size={12} className="text-gray-400" />
+            <span className="text-xs font-medium text-gray-700">{dealScenario.name}</span>
+          </div>
+        )}
       </div>
 
       {/* Tab bar */}
@@ -109,31 +122,52 @@ export function PipelinePage() {
 
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 max-w-6xl mx-auto w-full">
-        {/* ── PENDING: Deal Terms ── */}
-        {activeTab === 'terms' && pipeline && (
-          <div>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
-              <p className="text-xs font-semibold text-amber-800">LOI Submitted — Awaiting Response</p>
-              <p className="text-[10px] text-amber-600 mt-0.5">Track deal terms and counter-offers here. Upload the executed LOI to check for changes.</p>
-            </div>
 
+        {/* ── Scenario selector (if no deal scenario picked yet) ── */}
+        {!dealScenario && pipeline && (
+          <div className="bg-white border-2 border-dashed border-[#c9a84c] rounded-lg p-5 mb-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Which scenario is your offer?</h3>
+            <p className="text-[10px] text-gray-400 mb-3">Select the scenario that represents the deal terms you're pursuing. Its price, financing, and key inputs will feed into the pipeline.</p>
+            {nonBrokerScenarios.length === 0 ? (
+              <p className="text-xs text-gray-400">No non-broker scenarios found. Go back and create an offer scenario first.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                {nonBrokerScenarios.map(s => (
+                  <button key={s.id} onClick={() => selectDealScenario(s.id)}
+                    className="flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:border-[#c9a84c] hover:bg-[#c9a84c]/5 transition-colors text-left">
+                    <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center flex-shrink-0">
+                      <FileText size={14} className="text-amber-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-gray-900 truncate">{s.name}</div>
+                      <div className="text-[10px] text-gray-400">{fmtDollar(s.inputs.price)} · {fmtPct(s.inputs.lev)}% LTV</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── PENDING: Deal Terms ── */}
+        {activeTab === 'terms' && pipeline && dealScenario && (
+          <div>
             {/* LOI Status */}
             <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-900">LOI Status</h3>
-              </div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">LOI Status</h3>
               <div className="flex gap-2 mb-3">
-                {(['submitted', 'counter_offer', 'accepted', 'rejected'] as const).map(s => {
+                {(['none', 'submitted', 'counter_offer', 'accepted', 'rejected'] as const).map(s => {
                   const loi = pipeline.loi_tracking
                   const active = loi.status === s
                   const colors: Record<string, string> = {
+                    none: 'border-gray-400 bg-gray-50 text-gray-600',
                     submitted: 'border-amber-400 bg-amber-50 text-amber-700',
                     counter_offer: 'border-orange-400 bg-orange-50 text-orange-700',
                     accepted: 'border-green-400 bg-green-50 text-green-700',
                     rejected: 'border-red-400 bg-red-50 text-red-700',
                   }
                   const labels: Record<string, string> = {
-                    submitted: 'Submitted', counter_offer: 'Counter-Offer', accepted: 'Accepted', rejected: 'Rejected',
+                    none: 'Not Sent', submitted: 'Submitted', counter_offer: 'Counter-Offer', accepted: 'Accepted', rejected: 'Rejected',
                   }
                   return (
                     <button key={s}
@@ -161,58 +195,96 @@ export function PipelinePage() {
               )}
             </div>
 
-            {/* Deal Terms placeholder — will be populated from scenario data */}
+            {/* Deal Terms from scenario */}
             <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-900">Deal Terms</h3>
-                <span className="text-[10px] text-gray-400 flex items-center gap-1">
-                  <Lock size={10} /> Locked — terms from scenario
-                </span>
+                <h3 className="text-sm font-semibold text-gray-900">Deal Terms — {dealScenario.name}</h3>
+                <button onClick={() => setTermsLocked(!termsLocked)}
+                  className={`flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors
+                    ${termsLocked ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}>
+                  {termsLocked ? <><Lock size={10} /> Locked</> : <><Unlock size={10} /> Editing</>}
+                </button>
               </div>
-              <p className="text-xs text-gray-400">Deal terms will be populated from the selected scenario's inputs (price, financing, key dates). Coming in next build.</p>
+
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {[
+                  { label: 'Purchase Price', value: fmtDollar(dealScenario.inputs.price) },
+                  { label: 'LTV', value: `${dealScenario.inputs.lev}%` },
+                  { label: 'Interest Rate', value: `${dealScenario.inputs.ir}%` },
+                  { label: 'Amortization', value: `${dealScenario.inputs.am} years` },
+                  { label: 'Down Payment', value: fmtDollar(dealScenario.inputs.price * (1 - dealScenario.inputs.lev / 100)) },
+                  { label: 'Loan Amount', value: fmtDollar(dealScenario.inputs.price * dealScenario.inputs.lev / 100) },
+                  { label: 'Total Units', value: String(dealScenario.inputs.tu) },
+                  { label: 'Price / Unit', value: dealScenario.inputs.tu > 0 ? fmtDollar(dealScenario.inputs.price / dealScenario.inputs.tu) : '—' },
+                ].map(term => (
+                  <div key={term.label} className="bg-gray-50 rounded-lg p-3">
+                    <div className="text-[10px] text-gray-500 mb-1">{term.label}</div>
+                    <div className="text-sm font-semibold text-gray-900">{term.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {!termsLocked && (
+                <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <p className="text-[10px] text-amber-700">Editing deal terms — changes here update the scenario. Press 🔒 Lock when done.</p>
+                </div>
+              )}
             </div>
+          </div>
+        )}
+
+        {/* ── PENDING: Deal Terms — no scenario selected ── */}
+        {activeTab === 'terms' && pipeline && !dealScenario && (
+          <div className="text-center py-12">
+            <p className="text-sm text-gray-400">Select a scenario above to see deal terms</p>
           </div>
         )}
 
         {/* ── PENDING: Documents ── */}
         {activeTab === 'documents' && (
-          <div>
-            <p className="text-xs text-gray-400">Document upload and AI extraction — coming in Phase 6.</p>
+          <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
+            <p className="text-sm text-gray-500 mb-1">Document upload and AI extraction</p>
+            <p className="text-xs text-gray-400">Upload executed LOI, PSA, inspection reports — coming next</p>
           </div>
         )}
 
         {/* ── PENDING: Contacts ── */}
         {activeTab === 'contacts' && (
-          <div>
-            <p className="text-xs text-gray-400">Attorney and broker contacts — coming in Phase 7.</p>
+          <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
+            <p className="text-sm text-gray-500 mb-1">Attorney and broker contacts</p>
+            <p className="text-xs text-gray-400">Track your deal team — coming next</p>
           </div>
         )}
 
         {/* ── ACTIVE: Timeline ── */}
-        {activeTab === 'timeline' && pipeline && (isActive || isClosed) && (
-          <div>
-            <p className="text-xs text-gray-400">Milestone timeline — coming in Phase 5.</p>
+        {activeTab === 'timeline' && (isActive || isClosed) && (
+          <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
+            <p className="text-sm text-gray-500 mb-1">Milestone timeline</p>
+            <p className="text-xs text-gray-400">Track PSA execution through closing — coming next</p>
           </div>
         )}
 
         {/* ── ACTIVE: Deal Team ── */}
         {activeTab === 'team' && (
-          <div>
-            <p className="text-xs text-gray-400">Full deal team management — coming in Phase 7.</p>
+          <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
+            <p className="text-sm text-gray-500 mb-1">Full deal team management</p>
+            <p className="text-xs text-gray-400">All vendors and sub-contacts — coming next</p>
           </div>
         )}
 
         {/* ── ACTIVE: Expenses ── */}
         {activeTab === 'expenses' && (
-          <div>
-            <p className="text-xs text-gray-400">Budget vs actual expenses — coming in Phase 8.</p>
+          <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
+            <p className="text-sm text-gray-500 mb-1">Budget vs actual expenses</p>
+            <p className="text-xs text-gray-400">Track deal costs by category — coming next</p>
           </div>
         )}
 
         {/* ── ACTIVE: Repairs ── */}
         {activeTab === 'repairs' && (
-          <div>
-            <p className="text-xs text-gray-400">Repair estimates and re-trade PDF — coming in Phase 9.</p>
+          <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
+            <p className="text-sm text-gray-500 mb-1">Repair estimates and re-trade PDF</p>
+            <p className="text-xs text-gray-400">Inspection findings and contractor quotes — coming next</p>
           </div>
         )}
       </div>
