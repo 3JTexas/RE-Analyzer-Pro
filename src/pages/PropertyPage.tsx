@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ChevronLeft, Plus, BarChart3, Trash2, Copy, Camera, Loader2, ExternalLink, Pencil, Check, X } from 'lucide-react'
+import { ChevronLeft, Plus, BarChart3, Trash2, Copy, Camera, Loader2, ExternalLink, Pencil, Check, X, ArrowRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getScenariosForProperty, useScenario } from '../hooks/useScenario'
 import { useUserDefaults } from '../hooks/useUserDefaults'
@@ -108,6 +108,20 @@ export function PropertyPage() {
     setEditingCrexi(false)
   }
 
+  const updateStatus = async (status: 'research' | 'pending' | 'active' | 'closed') => {
+    if (!id) return
+    await supabase.from('properties').update({ status }).eq('id', id)
+    setProperty(prev => prev ? { ...prev, status } : prev)
+  }
+
+  const status = property?.status ?? 'research'
+  const statusConfig = {
+    research: { label: 'Research', color: 'bg-gray-100 text-gray-600 border-gray-200' },
+    pending: { label: 'Pending', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+    active: { label: 'Active', color: 'bg-green-50 text-green-700 border-green-200' },
+    closed: { label: 'Closed', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  }
+
   if (loading) return <Spinner />
 
   return (
@@ -156,6 +170,36 @@ export function PropertyPage() {
               </button>
             )}
           </div>
+        </div>
+        {/* Status badge + actions */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border ${statusConfig[status].color}`}>
+            {statusConfig[status].label}
+          </span>
+          {status === 'research' && (
+            <button onClick={() => updateStatus('pending')}
+              className="text-[10px] font-medium text-amber-600 hover:text-amber-800 transition-colors whitespace-nowrap">
+              Mark Pending
+            </button>
+          )}
+          {status === 'pending' && (
+            <button onClick={() => updateStatus('active')}
+              className="text-[10px] font-medium text-green-600 hover:text-green-800 transition-colors whitespace-nowrap">
+              Mark Active
+            </button>
+          )}
+          {status === 'active' && (
+            <button onClick={() => updateStatus('closed')}
+              className="text-[10px] font-medium text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap">
+              Mark Closed
+            </button>
+          )}
+          {(status === 'pending' || status === 'active' || status === 'closed') && (
+            <Link to={`/property/${id}/pipeline`}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-[#c9a84c] text-white rounded-sm hover:bg-[#b8963f] transition-colors whitespace-nowrap">
+              Track Deal <ArrowRight size={12} />
+            </Link>
+          )}
         </div>
         <input ref={photoRef} type="file" accept="image/*" className="hidden"
           onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f) }} />

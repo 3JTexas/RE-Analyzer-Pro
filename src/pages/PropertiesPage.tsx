@@ -136,8 +136,16 @@ export function PropertiesPage() {
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-gray-900 truncate">{p.name}</div>
                         {p.address && <div className="text-xs text-gray-400 mt-0.5 truncate">{p.address}</div>}
-                        <div className="text-[11px] text-gray-300 mt-0.5">
-                          {p.units ? `${p.units} units` : ''}{p.units && p.year_built ? ' · ' : ''}{p.year_built ? `Built ${p.year_built}` : ''}
+                        <div className="text-[11px] text-gray-300 mt-0.5 flex items-center gap-1.5">
+                          <span>{p.units ? `${p.units} units` : ''}{p.units && p.year_built ? ' · ' : ''}{p.year_built ? `Built ${p.year_built}` : ''}</span>
+                          {p.status && p.status !== 'research' && (
+                            <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border
+                              ${p.status === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                p.status === 'active' ? 'bg-green-50 text-green-600 border-green-200' :
+                                'bg-blue-50 text-blue-600 border-blue-200'}`}>
+                              {p.status === 'pending' ? 'Pending' : p.status === 'active' ? 'Active' : 'Closed'}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-3 flex-shrink-0">
