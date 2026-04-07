@@ -59,44 +59,19 @@ const SECTIONS = ['Income', 'Financing', 'Expenses', 'Tax Strategy']
 function ActualInput({ value, field, onChange, onClear, hasActual }: {
   value: string | number; field: FieldDef; onChange: (v: string) => void; onClear: () => void; hasActual: boolean
 }) {
-  const [focused, setFocused] = useState(false)
-  const [rawText, setRawText] = useState('')
-  const numVal = hasActual ? Number(value) : null
-
-  const displayVal = !hasActual ? ''
-    : focused ? rawText
-    : field.dollar ? `$${Math.round(numVal!).toLocaleString()}`
-    : field.pct ? `${numVal}%`
-    : String(numVal)
-
   return (
     <div className="flex items-center justify-end gap-1">
       <input
-        type="text"
-        inputMode="decimal"
-        value={displayVal}
+        type="number"
+        step={field.step}
+        value={hasActual ? value : ''}
         placeholder="—"
-        onFocus={e => {
-          const num = hasActual ? String(value) : ''
-          setRawText(num === '0' ? '' : num)
-          setFocused(true)
-          setTimeout(() => e.target.select(), 0)
-        }}
-        onBlur={e => {
-          setFocused(false)
-          const cleaned = e.target.value.replace(/[^0-9.\-]/g, '')
-          const num = parseFloat(cleaned)
-          if (!isNaN(num)) onChange(String(num))
-        }}
-        onChange={e => {
-          if (focused) {
-            setRawText(e.target.value.replace(/[^0-9.\-]/g, ''))
-          }
-        }}
+        onChange={e => onChange(e.target.value)}
+        onFocus={e => setTimeout(() => e.target.select(), 0)}
         className={`w-28 text-xs text-right border rounded px-2 py-1 focus:outline-none transition-colors
           ${hasActual
             ? 'border-[#c9a84c] bg-amber-50 font-semibold text-gray-900 focus:border-[#c9a84c]'
-            : 'border-transparent bg-transparent text-gray-400 hover:border-gray-200 focus:border-[#c9a84c]'}`}
+            : 'border-gray-200 bg-white text-gray-400 hover:border-gray-300 focus:border-[#c9a84c]'}`}
       />
       {hasActual && (
         <button onClick={onClear}
