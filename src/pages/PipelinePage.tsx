@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ChevronLeft, FileText, Home } from 'lucide-react'
+import { ChevronLeft, FileText, Home, ExternalLink } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { usePipeline } from '../hooks/usePipeline'
 import { getScenariosForProperty } from '../hooks/useScenario'
@@ -112,10 +112,10 @@ export function PipelinePage() {
           {property?.address && <p className="text-xs text-gray-400 truncate">{property.address}</p>}
         </div>
         {dealScenario && (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg">
+          <Link to={`/property/${id}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg hover:border-[#c9a84c] transition-colors" title="Open in Model">
             <FileText size={12} className="text-gray-400" />
             <span className="text-xs font-medium text-gray-700">{dealScenario.name}</span>
-          </div>
+          </Link>
         )}
       </div>
 
@@ -164,6 +164,12 @@ export function PipelinePage() {
         {/* ── Deal Terms ── */}
         {activeTab === 'terms' && pipeline && dealScenario && (
           <div>
+            <div className="flex items-center justify-end mb-3">
+              <Link to={`/property/${id}`}
+                className="flex items-center gap-1.5 text-xs font-medium text-[#c9a84c] hover:text-[#b8963f] transition-colors">
+                <ExternalLink size={12} /> Open in Model
+              </Link>
+            </div>
             {/* Projected vs Actual deal terms */}
             <DealTermsSection
               dealScenario={{ name: dealScenario.name, inputs: dealScenario.inputs }}
