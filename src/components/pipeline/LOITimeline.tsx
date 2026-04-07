@@ -111,10 +111,17 @@ export function LOITimeline({ loiTracking, onUpdate, dealPrice, pipelineId }: Pr
         console.log('[LOI Extract] Skipped — not a PDF. type:', uploadFile.type, 'name:', uploadFile.name)
       }
 
+      // Use document date from extraction if available, otherwise today
+      let eventDate = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]
+      if (extracted?.loiDate) {
+        const parsed = new Date(extracted.loiDate as any)
+        if (!isNaN(parsed.getTime())) eventDate = parsed.toISOString().split('T')[0]
+      }
+
       const event: LOIEvent = {
         id: eventId,
         type: uploadType,
-        date: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
+        date: eventDate,
         notes: '',
         documentUrl: urlData.publicUrl,
         price: extracted?.purchasePrice ?? null,

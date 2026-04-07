@@ -34,6 +34,13 @@ export interface LOIExtractedTerms {
   contingencies: string | null
   buyerName: string | null
   sellerName: string | null
+  loiDate: string | null
+  loanApprovalDays: number | null
+  expirationDays: number | null
+  ddDeliveryDays: number | null
+  financingContingency: boolean | null
+  propertyAddress: string | null
+  notes: string | null
 }
 
 // ── Deal Pipeline (Active status) ────────────────────────────────────────
