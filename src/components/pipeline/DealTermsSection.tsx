@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { calculate, fmtDollar, fmtPct, fmtX, fmtNeg } from '../../lib/calc'
 import type { ModelInputs } from '../../types'
@@ -51,6 +51,55 @@ const FIELDS: FieldDef[] = [
 ]
 
 const SECTIONS = ['Income', 'Financing', 'Expenses', 'Tax Strategy']
+
+function ActualInput({ value, field, onChange, onClear, hasActual }: {
+  value: string | number; field: FieldDef; onChange: (v: string) => void; onClear: () => void; hasActual: boolean
+}) {
+  const [editing, setEditing] = useState(false)
+  const [raw, setRaw] = useState('')
+  const numVal = hasActual ? Number(value) : null
+
+  const displayVal = !hasActual ? ''
+    : editing ? raw
+    : field.dollar ? `$${Math.round(numVal!).toLocaleString()}`
+    : field.pct ? `${numVal}%`
+    : String(numVal)
+
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <input
+        type={editing ? 'number' : 'text'}
+        value={editing ? raw : displayVal}
+        step={field.step}
+        placeholder="—"
+        onFocus={() => {
+          setRaw(hasActual ? String(value) : '')
+          setEditing(true)
+        }}
+        onBlur={e => {
+          setEditing(false)
+          const v = e.target.value
+          if (v === '' || v === undefined) return
+          onChange(v)
+        }}
+        onChange={e => {
+          if (editing) setRaw(e.target.value)
+          else onChange(e.target.value)
+        }}
+        className={`w-28 text-xs text-right border rounded px-2 py-1 focus:outline-none transition-colors
+          ${hasActual
+            ? 'border-[#c9a84c] bg-amber-50 font-semibold text-gray-900 focus:border-[#c9a84c]'
+            : 'border-transparent bg-transparent text-gray-400 hover:border-gray-200 focus:border-[#c9a84c]'}`}
+      />
+      {hasActual && (
+        <button onClick={onClear}
+          className="text-gray-300 hover:text-red-400 text-[10px] font-bold" title="Clear actual">
+          ×
+        </button>
+      )}
+    </div>
+  )
+}
 
 function fmtFieldVal(val: number | undefined, field: FieldDef): string {
   if (val === undefined || val === null) return '—'
@@ -170,25 +219,13 @@ export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, 
                           {fmtFieldVal(projVal, field)}
                         </td>
                         <td className="px-4 py-2 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <input
-                              type="number"
-                              value={hasActual ? actVal : ''}
-                              step={field.step}
-                              placeholder="—"
-                              onChange={e => setActual(field.key, e.target.value)}
-                              className={`w-24 text-xs text-right border rounded px-2 py-1 focus:outline-none transition-colors
-                                ${hasActual
-                                  ? 'border-[#c9a84c] bg-amber-50 font-semibold text-gray-900 focus:border-[#c9a84c]'
-                                  : 'border-transparent bg-transparent text-gray-400 hover:border-gray-200 focus:border-[#c9a84c]'}`}
-                            />
-                            {hasActual && (
-                              <button onClick={() => clearActual(field.key)}
-                                className="text-gray-300 hover:text-red-400 text-[10px] font-bold" title="Clear actual">
-                                ×
-                              </button>
-                            )}
-                          </div>
+                          <ActualInput
+                            value={hasActual ? actVal : ''}
+                            field={field}
+                            onChange={v => setActual(field.key, v)}
+                            onClear={() => clearActual(field.key)}
+                            hasActual={hasActual}
+                          />
                         </td>
                         <td className={`px-4 py-2 text-right font-medium
                           ${!hasActual ? 'text-gray-300' :
