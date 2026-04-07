@@ -91,18 +91,24 @@ export function LOITimeline({ loiTracking, onUpdate, dealPrice, pipelineId }: Pr
       if (upErr) throw upErr
       const { data: urlData } = supabase.storage.from('deal-documents').getPublicUrl(path)
 
-      // Extract terms via AI
+      // Extract terms via AI — always attempt for PDFs
       let extracted: LOIExtractedTerms | null = null
-      if (uploadFile.type === 'application/pdf') {
+      const isPdf = uploadFile.type === 'application/pdf' || uploadFile.name.toLowerCase().endsWith('.pdf')
+      if (isPdf) {
         try {
           const b64 = await toBase64(uploadFile)
+          console.log('[LOI Extract] Sending PDF, base64 length:', b64.length)
           const { data, error } = await supabase.functions.invoke('extract-deal-doc', {
             body: { pdf: b64, docType: 'loi' },
           })
+          console.log('[LOI Extract] Response:', { data, error })
+          if (error) console.error('[LOI Extract] Error:', error)
           if (!error && data) extracted = data as LOIExtractedTerms
-        } catch (e) {
-          console.error('Extraction failed:', e)
+        } catch (e: any) {
+          console.error('[LOI Extract] Exception:', e.message)
         }
+      } else {
+        console.log('[LOI Extract] Skipped — not a PDF. type:', uploadFile.type, 'name:', uploadFile.name)
       }
 
       const event: LOIEvent = {
@@ -162,16 +168,19 @@ export function LOITimeline({ loiTracking, onUpdate, dealPrice, pipelineId }: Pr
       const { data } = supabase.storage.from('deal-documents').getPublicUrl(path)
 
       let extracted: LOIExtractedTerms | null = null
-      if (file.type === 'application/pdf') {
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+      if (isPdf) {
         setExtracting(eventId)
         try {
           const b64 = await toBase64(file)
+          console.log('[LOI Attach Extract] Sending PDF, base64 length:', b64.length)
           const { data: extData, error: extErr } = await supabase.functions.invoke('extract-deal-doc', {
             body: { pdf: b64, docType: 'loi' },
           })
+          console.log('[LOI Attach Extract] Response:', { data: extData, error: extErr })
           if (!extErr && extData) extracted = extData as LOIExtractedTerms
-        } catch (e) {
-          console.error('Extraction failed:', e)
+        } catch (e: any) {
+          console.error('[LOI Attach Extract] Exception:', e.message)
         }
         setExtracting(null)
       }
