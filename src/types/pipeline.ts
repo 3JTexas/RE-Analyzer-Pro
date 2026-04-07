@@ -6,6 +6,22 @@ export type LOIStatus = 'none' | 'submitted' | 'counter_offer' | 'accepted' | 'r
 
 export type LOIEventType = 'sent' | 'counter_offer' | 'revised' | 'accepted' | 'rejected'
 
+// PSA iteration tracking (same pattern as LOI)
+export type PSAEventType = 'draft_sent' | 'seller_redlines' | 'revised' | 'executed'
+
+export interface PSAEvent {
+  id: string
+  type: PSAEventType
+  date: string
+  notes: string
+  documentUrl: string | null
+  extractedTerms: Record<string, any> | null
+}
+
+export interface PSATracking {
+  events: PSAEvent[]
+}
+
 export interface LOIEvent {
   id: string
   type: LOIEventType
@@ -180,6 +196,7 @@ export interface DealPipeline {
   user_id: string
   deal_scenario_id: string | null  // which scenario represents the offer/deal terms
   loi_tracking: LOITracking
+  psa_tracking: PSATracking
   milestones: Milestone[]
   deal_team: DealTeam
   repair_estimates: RepairEstimate[]

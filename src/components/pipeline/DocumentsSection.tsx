@@ -1,12 +1,17 @@
 import { useState, useRef } from 'react'
-import { Upload, FileText, Trash2, Loader2, Download, Sparkles } from 'lucide-react'
+import { Upload, FileText, Trash2, Loader2, Download, Sparkles, Send, MessageSquare, RefreshCw, FileCheck, XCircle, Edit3 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useDealDocuments } from '../../hooks/usePipeline'
-import type { DealDocType, DealDocument } from '../../types/pipeline'
+import { DocIterationTimeline } from './DocIterationTimeline'
+import type { DealDocType, LOITracking, PSATracking, LOIEvent, PSAEvent } from '../../types/pipeline'
 import { DOC_TYPE_LABELS } from '../../types/pipeline'
 
 interface Props {
   pipelineId: string
+  loiTracking: LOITracking
+  psaTracking: PSATracking
+  onUpdateLOI: (loi: LOITracking) => void
+  onUpdatePSA: (psa: PSATracking) => void
 }
 
 const DOC_TYPE_COLORS: Record<DealDocType, string> = {
@@ -17,21 +22,59 @@ const DOC_TYPE_COLORS: Record<DealDocType, string> = {
   other: 'bg-gray-50 text-gray-600 border-gray-200',
 }
 
-export function DocumentsSection({ pipelineId }: Props) {
+// LOI event type configs
+const LOI_EVENT_TYPES = [
+  { id: 'sent', label: 'LOI Sent', config: { icon: Send, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-300', label: 'LOI Sent' } },
+  { id: 'counter_offer', label: 'Counter-Offer Received', config: { icon: MessageSquare, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-300', label: 'Counter-Offer' } },
+  { id: 'revised', label: 'Revised LOI Sent', config: { icon: RefreshCw, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-300', label: 'Revised LOI' } },
+  { id: 'accepted', label: 'LOI Accepted', config: { icon: FileCheck, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-300', label: 'Accepted' } },
+  { id: 'rejected', label: 'LOI Rejected', config: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-300', label: 'Rejected' } },
+]
+
+// PSA event type configs
+const PSA_EVENT_TYPES = [
+  { id: 'draft_sent', label: 'PSA Draft Sent', config: { icon: Send, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-300', label: 'Draft Sent' } },
+  { id: 'seller_redlines', label: 'Seller Redlines', config: { icon: Edit3, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-300', label: 'Seller Redlines' } },
+  { id: 'revised', label: 'Revised PSA', config: { icon: RefreshCw, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-300', label: 'Revised PSA' } },
+  { id: 'executed', label: 'PSA Executed', config: { icon: FileCheck, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-300', label: 'Executed' } },
+]
+
+const loiSuggestNext = (events: any[]) => {
+  if (events.length === 0) return 'sent'
+  const last = events[events.length - 1].type
+  if (last === 'sent' || last === 'revised') return 'counter_offer'
+  if (last === 'counter_offer') return 'revised'
+  return 'sent'
+}
+
+const psaSuggestNext = (events: any[]) => {
+  if (events.length === 0) return 'draft_sent'
+  const last = events[events.length - 1].type
+  if (last === 'draft_sent' || last === 'revised') return 'seller_redlines'
+  if (last === 'seller_redlines') return 'revised'
+  return 'draft_sent'
+}
+
+export function DocumentsSection({ pipelineId, loiTracking, psaTracking, onUpdateLOI, onUpdatePSA }: Props) {
   const { documents, loading, uploadDocument, deleteDocument, updateExtracted } = useDealDocuments(pipelineId)
   const [uploading, setUploading] = useState(false)
   const [extractingId, setExtractingId] = useState<string | null>(null)
-  const [selectedType, setSelectedType] = useState<DealDocType>('other')
+  const [selectedType, setSelectedType] = useState<DealDocType>('inspection_report')
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const loiEvents = loiTracking?.events ?? []
+  const psaEvents = psaTracking?.events ?? []
+
+  // Other documents (not LOI or PSA — those are in iteration timelines)
+  const otherDocs = documents.filter(d => d.doc_type !== 'loi' && d.doc_type !== 'psa')
 
   const handleUpload = async (file: File) => {
     setUploading(true)
     await uploadDocument(file, selectedType)
     setUploading(false)
-    setSelectedType('other')
   }
 
-  const handleExtract = async (doc: DealDocument) => {
+  const handleExtract = async (doc: any) => {
     if (!doc.file_url || doc.doc_type === 'other') return
     setExtractingId(doc.id)
     try {
@@ -45,8 +88,7 @@ export function DocumentsSection({ pipelineId }: Props) {
       const { data, error } = await supabase.functions.invoke('extract-deal-doc', {
         body: { pdf: b64, docType: doc.doc_type },
       })
-      if (error) throw error
-      if (data) await updateExtracted(doc.id, data)
+      if (!error && data) await updateExtracted(doc.id, data)
     } catch (e: any) {
       console.error('Extraction failed:', e.message)
     }
@@ -62,115 +104,95 @@ export function DocumentsSection({ pipelineId }: Props) {
 
   return (
     <div>
-      {/* Upload area */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Upload Document</h3>
-        <div className="flex items-end gap-3">
-          <div className="flex-1">
-            <label className="block text-[10px] uppercase tracking-wide text-gray-500 font-medium mb-1.5">Document type</label>
-            <select
-              value={selectedType}
-              onChange={e => setSelectedType(e.target.value as DealDocType)}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-[#c9a84c] bg-white text-gray-800"
-            >
-              {(Object.keys(DOC_TYPE_LABELS) as DealDocType[]).map(t => (
-                <option key={t} value={t}>{DOC_TYPE_LABELS[t]}</option>
-              ))}
-            </select>
-          </div>
-          <input ref={fileRef} type="file" accept="application/pdf,.doc,.docx,.jpg,.jpeg,.png" className="hidden"
-            onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = '' }} />
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-[#1a1a2e] text-white rounded-lg hover:bg-[#c9a84c] hover:text-[#1a1a2e] transition-colors disabled:opacity-50"
-          >
-            {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
-            {uploading ? 'Uploading...' : 'Upload'}
-          </button>
-        </div>
-      </div>
+      {/* LOI Iteration Timeline */}
+      <DocIterationTimeline
+        title="Letter of Intent (LOI)"
+        events={loiEvents as any[]}
+        onUpdate={events => {
+          const lastEvt = events[events.length - 1]
+          const newStatus = !lastEvt ? 'none'
+            : lastEvt.type === 'sent' || lastEvt.type === 'revised' ? 'submitted'
+            : lastEvt.type === 'counter_offer' ? 'counter_offer'
+            : lastEvt.type === 'accepted' ? 'accepted' : 'rejected'
+          onUpdateLOI({ ...loiTracking, events: events as LOIEvent[], status: newStatus as any })
+        }}
+        eventTypes={LOI_EVENT_TYPES}
+        extractDocType="loi"
+        pipelineId={pipelineId}
+        showPrice
+        suggestNextType={loiSuggestNext}
+      />
 
-      {/* Document list */}
-      {loading ? (
-        <div className="text-center py-8">
-          <Loader2 size={20} className="animate-spin text-gray-400 mx-auto" />
+      {/* PSA Iteration Timeline */}
+      <DocIterationTimeline
+        title="Purchase & Sale Agreement (PSA)"
+        events={psaEvents as any[]}
+        onUpdate={events => onUpdatePSA({ events: events as PSAEvent[] })}
+        eventTypes={PSA_EVENT_TYPES}
+        extractDocType="psa"
+        pipelineId={pipelineId}
+        suggestNextType={psaSuggestNext}
+      />
+
+      {/* Other Documents — inspection reports, contracts, etc. */}
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden mb-4">
+        <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
+          <h3 className="text-sm font-semibold text-gray-900">Other Documents</h3>
+          <div className="flex items-end gap-2">
+            <select value={selectedType} onChange={e => setSelectedType(e.target.value as DealDocType)}
+              className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-[#c9a84c] bg-white">
+              <option value="inspection_report">Inspection Report</option>
+              <option value="contract">Contract</option>
+              <option value="other">Other</option>
+            </select>
+            <input ref={fileRef} type="file" accept="application/pdf,.doc,.docx,.jpg,.jpeg,.png" className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = '' }} />
+            <button onClick={() => fileRef.current?.click()} disabled={uploading}
+              className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold bg-[#1a1a2e] text-white rounded-lg hover:bg-[#c9a84c] hover:text-[#1a1a2e] transition-colors disabled:opacity-50">
+              {uploading ? <Loader2 size={10} className="animate-spin" /> : <Upload size={10} />}
+              Upload
+            </button>
+          </div>
         </div>
-      ) : documents.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
-          <FileText size={32} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-sm text-gray-500">No documents uploaded yet</p>
-          <p className="text-xs text-gray-400 mt-1">Upload LOIs, PSAs, inspection reports, and contracts</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {documents.map(doc => (
-            <div key={doc.id}>
-            <div className="bg-white border border-gray-200 rounded-lg p-3 flex items-center gap-3 hover:border-gray-300 transition-colors">
-              <div className="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                <FileText size={18} className="text-gray-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-900 truncate">{doc.file_name}</span>
-                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${DOC_TYPE_COLORS[doc.doc_type as DealDocType] ?? DOC_TYPE_COLORS.other}`}>
-                    {DOC_TYPE_LABELS[doc.doc_type as DealDocType] ?? 'Other'}
-                  </span>
+
+        {otherDocs.length === 0 ? (
+          <div className="px-4 py-6 text-center">
+            <FileText size={24} className="text-gray-200 mx-auto mb-2" />
+            <p className="text-xs text-gray-400">No other documents uploaded yet</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {otherDocs.map(doc => (
+              <div key={doc.id} className="px-4 py-3 flex items-center gap-3">
+                <FileText size={16} className="text-gray-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-gray-900 truncate">{doc.file_name}</span>
+                    <span className={`text-[8px] font-semibold px-1.5 py-0.5 rounded-full border ${DOC_TYPE_COLORS[doc.doc_type as DealDocType] ?? DOC_TYPE_COLORS.other}`}>
+                      {DOC_TYPE_LABELS[doc.doc_type as DealDocType] ?? 'Other'}
+                    </span>
+                    {doc.extracted && <span className="text-[8px] font-medium text-green-600 bg-green-50 border border-green-200 px-1 py-0.5 rounded-full">Extracted</span>}
+                  </div>
+                  <div className="text-[10px] text-gray-400 mt-0.5">
+                    {new Date(doc.uploaded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {doc.file_size ? ` · ${fmtSize(doc.file_size)}` : ''}
+                  </div>
                 </div>
-                <div className="text-[10px] text-gray-400 mt-0.5">
-                  {new Date(doc.uploaded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  {doc.file_size ? ` · ${fmtSize(doc.file_size)}` : ''}
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                {doc.doc_type !== 'other' && !doc.extracted && (
-                  <button onClick={() => handleExtract(doc)}
-                    disabled={extractingId === doc.id}
-                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-[#c9a84c] border border-[#c9a84c] rounded-lg hover:bg-[#c9a84c] hover:text-white transition-colors disabled:opacity-50"
-                    title="Extract data with AI">
-                    {extractingId === doc.id ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
-                    {extractingId === doc.id ? 'Extracting...' : 'Extract'}
-                  </button>
-                )}
-                {doc.extracted && (
-                  <span className="text-[9px] font-semibold text-green-600 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded-full">
-                    Extracted
-                  </span>
-                )}
-                <a href={doc.file_url} target="_blank" rel="noopener noreferrer"
-                  className="p-1.5 text-gray-400 hover:text-[#c9a84c] transition-colors" title="Download">
-                  <Download size={14} />
-                </a>
-                <button onClick={() => { if (window.confirm('Delete this document?')) deleteDocument(doc.id) }}
-                  className="p-1.5 text-gray-400 hover:text-red-500 transition-colors" title="Delete">
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-            {/* Extracted data preview */}
-            {doc.extracted && (
-              <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
-                <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Extracted Data</p>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {Object.entries(doc.extracted).filter(([_, v]) => v !== null && v !== '' && v !== undefined).slice(0, 12).map(([key, val]) => (
-                    <div key={key} className="text-[10px]">
-                      <span className="text-gray-400">{key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}: </span>
-                      <span className="text-gray-700 font-medium">
-                        {typeof val === 'number' ? (val > 1000 ? `$${val.toLocaleString()}` : String(val))
-                          : typeof val === 'boolean' ? (val ? 'Yes' : 'No')
-                          : typeof val === 'string' ? (val.length > 60 ? val.slice(0, 60) + '...' : val)
-                          : Array.isArray(val) ? `${val.length} items`
-                          : String(val)}
-                      </span>
-                    </div>
-                  ))}
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {doc.doc_type !== 'other' && !doc.extracted && (
+                    <button onClick={() => handleExtract(doc)} disabled={extractingId === doc.id}
+                      className="flex items-center gap-1 px-2 py-1 text-[9px] font-semibold text-[#c9a84c] border border-[#c9a84c] rounded-lg hover:bg-[#c9a84c] hover:text-white transition-colors disabled:opacity-50">
+                      {extractingId === doc.id ? <Loader2 size={9} className="animate-spin" /> : <Sparkles size={9} />} Extract
+                    </button>
+                  )}
+                  <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="p-1 text-gray-400 hover:text-[#c9a84c]"><Download size={13} /></a>
+                  <button onClick={() => { if (window.confirm('Delete?')) deleteDocument(doc.id) }} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={13} /></button>
                 </div>
               </div>
-            )}
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

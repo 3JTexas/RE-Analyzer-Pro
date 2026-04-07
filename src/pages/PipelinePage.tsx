@@ -12,7 +12,6 @@ import { DealTeamSection } from '../components/pipeline/DealTeamSection'
 import { ExpensesSection } from '../components/pipeline/ExpensesSection'
 import { RepairsSection } from '../components/pipeline/RepairsSection'
 import { DealTermsSection } from '../components/pipeline/DealTermsSection'
-import { LOITimeline } from '../components/pipeline/LOITimeline'
 import type { Scenario } from '../types'
 import type { MiniPipelineTab, FullPipelineTab, LOIStatus } from '../types/pipeline'
 
@@ -21,7 +20,7 @@ export function PipelinePage() {
   const [property, setProperty] = useState<{ name: string; address: string | null; status: string } | null>(null)
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [propLoading, setPropLoading] = useState(true)
-  const { pipeline, loading: pipelineLoading, updateLOITracking, updateMilestones, updateDealTeam, updateRepairEstimates, updateExpenseBudgets, updateActualInputs, updateDealScenarioId } = usePipeline(id)
+  const { pipeline, loading: pipelineLoading, updateLOITracking, updateMilestones, updateDealTeam, updateRepairEstimates, updateExpenseBudgets, updateActualInputs, updatePSATracking, updateDealScenarioId } = usePipeline(id)
 
   // Wide layout on mount
   useEffect(() => {
@@ -165,14 +164,6 @@ export function PipelinePage() {
         {/* ── Deal Terms ── */}
         {activeTab === 'terms' && pipeline && dealScenario && (
           <div>
-            {/* LOI Timeline */}
-            <LOITimeline
-              loiTracking={pipeline.loi_tracking}
-              onUpdate={updateLOITracking}
-              dealPrice={dealScenario.inputs.price}
-              pipelineId={pipeline.id}
-            />
-
             {/* Projected vs Actual deal terms */}
             <DealTermsSection
               dealScenario={{ name: dealScenario.name, inputs: dealScenario.inputs }}
@@ -194,7 +185,13 @@ export function PipelinePage() {
 
         {/* ── PENDING: Documents ── */}
         {activeTab === 'documents' && pipeline && (
-          <DocumentsSection pipelineId={pipeline.id} />
+          <DocumentsSection
+            pipelineId={pipeline.id}
+            loiTracking={pipeline.loi_tracking}
+            psaTracking={pipeline.psa_tracking ?? { events: [] }}
+            onUpdateLOI={updateLOITracking}
+            onUpdatePSA={updatePSATracking}
+          />
         )}
 
         {/* ── PENDING: Contacts (limited roles: attorney + broker) ── */}
