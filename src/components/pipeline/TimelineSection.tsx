@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Check, Clock, Circle, ChevronDown, ChevronUp, Calendar, FileText, Send } from 'lucide-react'
 import { fmtDollar } from '../../lib/calc'
-import type { Milestone, MilestoneStatus, LOITracking, LOIEvent } from '../../types/pipeline'
+import type { Milestone, MilestoneStatus, LOITracking, LOIEvent, PSATracking, PSAEvent } from '../../types/pipeline'
 
 interface Props {
   milestones: Milestone[]
   onUpdate: (milestones: Milestone[]) => void
   loiTracking?: LOITracking
+  psaTracking?: PSATracking
   readOnly?: boolean
 }
 
@@ -16,13 +17,18 @@ const STATUS_CONFIG: Record<MilestoneStatus, { icon: typeof Check; color: string
   completed: { icon: Check, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-400', label: 'Completed' },
 }
 
-export function TimelineSection({ milestones, onUpdate, loiTracking, readOnly }: Props) {
+export function TimelineSection({ milestones, onUpdate, loiTracking, psaTracking, readOnly }: Props) {
   const loiEvents = loiTracking?.events ?? []
   const loiStatus = loiTracking?.status ?? 'none'
+  const psaEvents = psaTracking?.events ?? []
 
   // Auto-derive LOI milestone status from LOI events
   const loiMilestoneStatus: MilestoneStatus = loiStatus === 'accepted' ? 'completed'
     : loiEvents.length > 0 ? 'in_progress' : 'pending'
+
+  // Auto-derive PSA milestone status from PSA events
+  const psaMilestoneStatus: MilestoneStatus = psaEvents.some(e => e.type === 'executed') ? 'completed'
+    : psaEvents.length > 0 ? 'in_progress' : 'pending'
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const updateMilestone = (id: string, updates: Partial<Milestone>) => {
@@ -32,6 +38,7 @@ export function TimelineSection({ milestones, onUpdate, loiTracking, readOnly }:
 
   const completedCount = milestones.filter(m => {
     if (m.id === 'loi') return loiMilestoneStatus === 'completed'
+    if (m.id === 'psa') return psaMilestoneStatus === 'completed'
     return m.status === 'completed'
   }).length
   const progressPct = milestones.length > 0 ? (completedCount / milestones.length) * 100 : 0
@@ -60,7 +67,8 @@ export function TimelineSection({ milestones, onUpdate, loiTracking, readOnly }:
         <div className="space-y-2">
           {milestones.map((milestone, i) => {
             const isLOI = milestone.id === 'loi'
-            const effectiveStatus = isLOI ? loiMilestoneStatus : milestone.status
+            const isPSA = milestone.id === 'psa'
+            const effectiveStatus = isLOI ? loiMilestoneStatus : isPSA ? psaMilestoneStatus : milestone.status
             const config = STATUS_CONFIG[effectiveStatus]
             const Icon = config.icon
             const expanded = expandedId === milestone.id
@@ -104,8 +112,8 @@ export function TimelineSection({ milestones, onUpdate, loiTracking, readOnly }:
                   </div>
                 </div>
 
-                {/* Expanded editor — skip for LOI (status derived from events) */}
-                {expanded && !readOnly && !isLOI && (
+                {/* Expanded editor — skip for LOI and PSA (status derived from events) */}
+                {expanded && !readOnly && !isLOI && !isPSA && (
                   <div className="ml-13 mt-2 bg-white border border-[#c9a84c] rounded-lg p-4 shadow-sm" style={{ marginLeft: '52px' }}>
                     {/* Status selector */}
                     <div className="mb-3">
@@ -181,6 +189,45 @@ export function TimelineSection({ milestones, onUpdate, loiTracking, readOnly }:
                         </div>
                       )
                     })}
+                  </div>
+                )}
+
+                {/* PSA events inline — shown when PSA milestone is expanded */}
+                {isPSA && expanded && psaEvents.length > 0 && (
+                  <div className="mt-2 space-y-1.5" style={{ marginLeft: '52px' }}>
+                    <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1">PSA History</p>
+                    {psaEvents.map(evt => {
+                      const evtLabels: Record<string, string> = {
+                        draft_sent: 'Draft Sent', seller_redlines: 'Seller Redlines', revised: 'Revised Draft', executed: 'Executed',
+                      }
+                      const evtColors: Record<string, string> = {
+                        draft_sent: 'text-amber-600', seller_redlines: 'text-orange-600', revised: 'text-blue-600', executed: 'text-green-600',
+                      }
+                      return (
+                        <div key={evt.id} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                          <FileText size={10} className={evtColors[evt.type] ?? 'text-gray-400'} />
+                          <span className={`text-xs font-semibold ${evtColors[evt.type] ?? 'text-gray-700'}`}>{evtLabels[evt.type] ?? evt.type}</span>
+                          {evt.documentUrl && <span className="text-[9px] text-green-600 bg-green-50 border border-green-200 px-1 py-0.5 rounded-full">PDF</span>}
+                          <span className="text-[10px] text-gray-400 ml-auto">
+                            {new Date(evt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </span>
+                          {evt.documentUrl && (
+                            <a href={evt.documentUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-[#c9a84c] hover:underline">
+                              <FileText size={10} />
+                            </a>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Empty state for LOI/PSA when expanded with no events */}
+                {(isLOI || isPSA) && expanded && ((isLOI && loiEvents.length === 0) || (isPSA && psaEvents.length === 0)) && (
+                  <div className="mt-2" style={{ marginLeft: '52px' }}>
+                    <p className="text-xs text-gray-400 italic">
+                      No {isLOI ? 'LOI' : 'PSA'} documents uploaded yet. Use the Documents tab to upload and track iterations.
+                    </p>
                   </div>
                 )}
               </div>
