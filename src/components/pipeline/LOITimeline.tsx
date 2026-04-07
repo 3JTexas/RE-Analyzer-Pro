@@ -114,7 +114,7 @@ export function LOITimeline({ loiTracking, onUpdate, dealPrice, pipelineId }: Pr
       const event: LOIEvent = {
         id: eventId,
         type: uploadType,
-        date: new Date().toISOString().split('T')[0],
+        date: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
         notes: '',
         documentUrl: urlData.publicUrl,
         price: extracted?.purchasePrice ?? null,
@@ -142,7 +142,7 @@ export function LOITimeline({ loiTracking, onUpdate, dealPrice, pipelineId }: Pr
     const event: LOIEvent = {
       id: crypto.randomUUID(),
       type: draft.type,
-      date: new Date().toISOString().split('T')[0],
+      date: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
       notes: draft.notes.trim(),
       documentUrl: null,
       price: draft.price ? parseFloat(draft.price) : null,
