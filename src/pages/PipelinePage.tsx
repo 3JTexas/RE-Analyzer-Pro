@@ -47,21 +47,22 @@ export function PipelinePage() {
   const isActive = status === 'active'
   const isClosed = status === 'closed'
 
-  // Tabs
-  const miniTabs: { id: MiniPipelineTab; label: string }[] = [
-    { id: 'terms', label: 'Deal Terms' },
-    { id: 'documents', label: 'Documents' },
-    { id: 'contacts', label: 'Contacts' },
-  ]
-  const fullTabs: { id: FullPipelineTab; label: string }[] = [
-    { id: 'timeline', label: 'Timeline' },
-    { id: 'documents', label: 'Documents' },
-    { id: 'team', label: 'Deal Team' },
-    { id: 'expenses', label: 'Expenses' },
-    { id: 'repairs', label: 'Repairs' },
-  ]
-  const tabs = isPending ? miniTabs : fullTabs
-  const [activeTab, setActiveTab] = useState<string>(isPending ? 'terms' : 'timeline')
+  // Tabs — Deal Terms always first, full tabs added when Active/Closed
+  const tabs: { id: string; label: string }[] = isPending
+    ? [
+        { id: 'terms', label: 'Deal Terms' },
+        { id: 'documents', label: 'Documents' },
+        { id: 'contacts', label: 'Contacts' },
+      ]
+    : [
+        { id: 'terms', label: 'Deal Terms' },
+        { id: 'timeline', label: 'Timeline' },
+        { id: 'documents', label: 'Documents' },
+        { id: 'team', label: 'Deal Team' },
+        { id: 'expenses', label: 'Expenses' },
+        { id: 'repairs', label: 'Repairs' },
+      ]
+  const [activeTab, setActiveTab] = useState<string>('terms')
 
   useEffect(() => {
     if (isPending) setActiveTab('terms')
