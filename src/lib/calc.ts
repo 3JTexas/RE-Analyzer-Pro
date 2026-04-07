@@ -174,9 +174,20 @@ export function calculate(inputs: ModelInputs, useOM: boolean): ModelOutputs {
       : price * (1 - land / 100)
   const costSegFrac = costSeg / 100
   const bd = deprBase * costSegFrac
-  const sl = (deprBase * (1 - costSegFrac)) / 27.5
+  const sl = (deprBase * (1 - costSegFrac)) / 27.5  // full-year SL
+
+  // Closing date → partial year 1 SL depreciation
+  // IRS mid-month convention: property placed in service in middle of closing month
+  const closingDate = inputs.closingDate
+  let closingMonths = 12
+  if (closingDate) {
+    const month = new Date(closingDate + 'T00:00:00').getMonth() + 1 // 1-12
+    closingMonths = 12 - month + 0.5  // mid-month convention: half the closing month + remaining months
+  }
+  const slY1 = sl * (closingMonths / 12)
+
   const ti = NOI - int1
-  const loss = ti - bd - sl
+  const loss = ti - bd - slY1
   const ts = Math.abs(loss) * brk / 100
 
   // Returns
@@ -185,7 +196,7 @@ export function calculate(inputs: ModelInputs, useOM: boolean): ModelOutputs {
   const coc = eq ? (CF / eq) * 100 : 0
   const atc = eq ? (at / eq) * 100 : 0
   const r1 = eq ? (y1 / eq) * 100 : 0
-  const r2 = eq ? ((CF + sl * brk / 100 + prin1) / eq) * 100 : 0
+  const r2 = eq ? ((CF + slY1 * brk / 100 + prin1) / eq) * 100 : 0
 
   return {
     GSR, pv, av, vac, col, EGI,
@@ -194,7 +205,7 @@ export function calculate(inputs: ModelInputs, useOM: boolean): ModelOutputs {
     pmPct: EGI ? (pmAmt / EGI) * 100 : 0,
     otherIncomeTotal, otherExpensesTotal,
     exp, NOI, CF, cap, dcr,
-    deprBase, bd, sl, ti, loss, ts, at, y1,
+    deprBase, bd, sl, slY1, closingMonths, ti, loss, ts, at, y1,
     coc, atc, r1, r2,
     price, lev, lfp: lf, ir, am, land, costSeg, tu, ou: effectiveOu, rent: effectiveRent, vp, brk,
   }

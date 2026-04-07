@@ -109,8 +109,10 @@ interface BankRow { period: string; pretax: number; slAdded: number; drawn: numb
 function TaxBenefitSection({ d, inputs }: { d: ReturnType<typeof calculate>; inputs: ModelInputs }) {
   const bracket = d.brk / 100
   const bonusSav = d.bd * bracket
-  const slMonthly = (d.sl * bracket) / 12
-  const slAnnual = d.sl * bracket
+  const slMonthlyFull = (d.sl * bracket) / 12  // monthly SL for full years
+  const slAnnualFull = d.sl * bracket
+  const closingMonths = d.closingMonths
+  const startMonth = Math.round(12 - closingMonths)  // 0-indexed month in Y1 where dep starts
   const monthlyCF = d.CF / 12
   const fullSL = d.deprBase / 27.5
 
@@ -119,25 +121,31 @@ function TaxBenefitSection({ d, inputs }: { d: ReturnType<typeof calculate>; inp
     let bal = bonusSav // Day 1: bonus loaded
     let exhausted = false
 
-    // Y1 — 12 monthly rows
+    // Y1 — 12 monthly rows, SL only applies from closing month forward
+    let y1SlTotal = 0
     for (let m = 0; m < 12; m++) {
-      const sl = slMonthly
+      // Mid-month convention: half month for closing month, full for subsequent
+      const isBeforeClosing = m < startMonth
+      const isClosingMonth = m === startMonth
+      const sl = isBeforeClosing ? 0 : isClosingMonth ? slMonthlyFull * 0.5 : slMonthlyFull
+      y1SlTotal += sl
       bal += sl
       const drawn = monthlyCF < 0 ? Math.abs(monthlyCF) : 0
       const added = monthlyCF >= 0 ? monthlyCF : 0
       bal = bal - drawn + added
       let note = ''
-      if (m === 0) note = `Bonus dep loaded — ${fmtCell(bonusSav)} tax shield`
+      if (m === startMonth) note = `Bonus dep loaded — ${fmtCell(bonusSav)} tax shield`
+      if (m < startMonth) note = 'Pre-closing'
       if (!exhausted && bal < 0) { note = 'Shield exhausted — cash losses begin'; exhausted = true }
       rows.push({ period: `${MO[m]} Y1`, pretax: monthlyCF, slAdded: sl, drawn, balance: bal, note })
     }
     // Y1 subtotal
-    const y1Pretax = d.CF, y1Sl = slAnnual, y1Drawn = monthlyCF < 0 ? Math.abs(monthlyCF) * 12 : 0
-    rows.push({ period: 'Year 1 Total', pretax: y1Pretax, slAdded: y1Sl, drawn: y1Drawn, balance: bal, note: '', isSub: true })
+    const y1Pretax = d.CF, y1Drawn = monthlyCF < 0 ? Math.abs(monthlyCF) * 12 : 0
+    rows.push({ period: 'Year 1 Total', pretax: y1Pretax, slAdded: y1SlTotal, drawn: y1Drawn, balance: bal, note: '', isSub: true })
 
-    // Y2-5 annual
+    // Y2-5 annual (full year SL)
     for (let y = 2; y <= 5; y++) {
-      const sl = slAnnual
+      const sl = slAnnualFull
       bal += sl
       const drawn = d.CF < 0 ? Math.abs(d.CF) : 0
       const added = d.CF >= 0 ? d.CF : 0
@@ -147,7 +155,7 @@ function TaxBenefitSection({ d, inputs }: { d: ReturnType<typeof calculate>; inp
       rows.push({ period: `Year ${y}`, pretax: d.CF, slAdded: sl, drawn, balance: bal, note })
     }
     // 5yr total
-    const totPretax = d.CF * 5, totSl = slAnnual * 5, totDrawn = rows.filter(r => !r.isSub && !r.isTotal).reduce((s, r) => s + r.drawn, 0)
+    const totPretax = d.CF * 5, totSl = y1SlTotal + slAnnualFull * 4, totDrawn = rows.filter(r => !r.isSub && !r.isTotal).reduce((s, r) => s + r.drawn, 0)
     rows.push({ period: '5-Year Total', pretax: totPretax, slAdded: totSl, drawn: totDrawn, balance: bal, note: '', isTotal: true })
 
     // Chart lines — 60 months, benefit bank model
@@ -155,10 +163,16 @@ function TaxBenefitSection({ d, inputs }: { d: ReturnType<typeof calculate>; inp
     let b1 = bonusSav, b2 = 0, b3 = 0
     const slOnlyMonthly = (fullSL * bracket) / 12
     for (let m = 0; m < 60; m++) {
+      // Y1 months before closing: no SL
+      const isY1 = m < 12
+      const isBeforeClosing = isY1 && m < startMonth
+      const isClosingMonth = isY1 && m === startMonth
+      const slThis = isBeforeClosing ? 0 : isClosingMonth ? slMonthlyFull * 0.5 : slMonthlyFull
+      const slOnlyThis = isBeforeClosing ? 0 : isClosingMonth ? slOnlyMonthly * 0.5 : slOnlyMonthly
       // Line 1: bonus bank
-      b1 += slMonthly + monthlyCF
+      b1 += slThis + monthlyCF
       // Line 2: SL only bank (no bonus)
-      b2 += slOnlyMonthly + monthlyCF
+      b2 += slOnlyThis + monthlyCF
       // Line 3: no tax benefit, pure cumulative pretax
       b3 += monthlyCF
       line1.push(Math.round(b1)); line2.push(Math.round(b2)); line3.push(Math.round(b3))
@@ -166,7 +180,7 @@ function TaxBenefitSection({ d, inputs }: { d: ReturnType<typeof calculate>; inp
     const ext1 = line1.findIndex(v => v < 0)
     const slPeakVal = Math.max(...line2), slPeakIdx = line2.indexOf(slPeakVal)
     return { rows, chartLines: { line1, line2, line3, ext1, slPeakIdx, slPeakVal } }
-  }, [d.CF, d.bd, d.sl, d.brk, d.deprBase, bonusSav, slMonthly, slAnnual, monthlyCF, fullSL, bracket])
+  }, [d.CF, d.bd, d.sl, d.brk, d.deprBase, bonusSav, slMonthlyFull, slAnnualFull, monthlyCF, fullSL, bracket, startMonth, closingMonths])
 
   const fmtK = (n: number) => n >= 0 ? `$${Math.round(n/1000)}k` : `($${Math.round(Math.abs(n)/1000)}k)`
   const cellColor = (v: number) => Math.abs(v) < 0.5 ? 'text-gray-400' : v < 0 ? 'text-red-600' : 'text-green-700'
@@ -1939,6 +1953,9 @@ export function ModelCalculator({
                 <InputField label="Cost seg % (5/7/15yr)" type="number" value={inputs.costSeg} step={1}
                   tooltip="Percentage of the depreciable building value that qualifies for accelerated 5/7/15-year depreciation via cost segregation study. These assets receive 100% bonus depreciation in Year 1."
                   badgeColor="amber" badge="estimated" onChange={e => set('costSeg', +e.target.value)} />
+                <InputField label="Closing date" type="date" value={inputs.closingDate ?? ''}
+                  tooltip="Expected or actual closing date. Determines partial-year depreciation in Year 1 using IRS mid-month convention — you get half the closing month plus all remaining months."
+                  onChange={e => set('closingDate', e.target.value)} />
               </div>
               <div className="space-y-2">
                 {/* 1031 toggle */}
@@ -2142,20 +2159,26 @@ export function ModelCalculator({
               const bracket = d.brk / 100
               const depBasis = d.deprBase  // from calc.ts — already accounts for 1031 deferred gain + land
               const bonusDed = depBasis * (inputs.costSeg / 100)
-              const slAnnual = (depBasis * (1 - inputs.costSeg / 100)) / 27.5
-              const y1PaperLoss = d.NOI - bonusDed - slAnnual
+              const slFull = (depBasis * (1 - inputs.costSeg / 100)) / 27.5
+              const slY1 = d.slY1  // partial year from calc.ts
+              const y1PaperLoss = d.NOI - bonusDed - slY1
               const y1TaxBenefit = Math.max(0, -y1PaperLoss) * bracket
               const years = Array.from({ length: 10 }, (_, i) => i + 1)
               const noiArr = years.map(() => d.NOI)
-              const taxableArr = years.map(y => y === 1 ? d.NOI - bonusDed - slAnnual : d.NOI - slAnnual)
+              const taxableArr = years.map(y => y === 1 ? d.NOI - bonusDed - slY1 : d.NOI - slFull)
+              const isPartialYear = d.closingMonths < 12
 
               // Basis breakdown for display
-              const has1031 = inputs.is1031 && (d as any).deferredGain > 0
               const ex1031Result = inputs.is1031 ? calc1031(inputs) : null
               const deferredGain = ex1031Result?.capitalGain ?? 0
               const basisBefore1031 = inputs.price
               const basisAfterGain = inputs.is1031 && deferredGain > 0 ? basisBefore1031 - deferredGain : basisBefore1031
               const landAmount = basisAfterGain * (inputs.land / 100)
+
+              // Closing month label
+              const closingLabel = inputs.closingDate
+                ? new Date(inputs.closingDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                : null
 
               return (
                 <>
@@ -2171,6 +2194,10 @@ export function ModelCalculator({
                       <PLRow label="Depreciable basis" value={fmtDollar(depBasis)} variant="total" />
                     </div>
                     <PLRow label={`Year 1 bonus deduction (${inputs.costSeg}% cost seg)`} value={fmtDollar(bonusDed)} variant="pos" />
+                    <PLRow label={isPartialYear ? `Year 1 SL dep (${d.closingMonths.toFixed(1)} mo from ${closingLabel})` : 'Year 1 SL depreciation'} value={fmtDollar(slY1)} variant="pos" />
+                    {isPartialYear && (
+                      <PLRow label="Full-year SL depreciation" value={fmtDollar(slFull)} indent />
+                    )}
                     <PLRow label="Year 1 paper loss" value={y1PaperLoss < 0 ? `(${fmtDollar(Math.abs(y1PaperLoss))})` : fmtDollar(y1PaperLoss)} variant={y1PaperLoss < 0 ? 'pos' : 'neg'} indent />
                     <PLRow label={`Year 1 tax benefit @ ${d.brk}%`} value={fmtDollar(y1TaxBenefit)} variant="total" />
                   </div>
@@ -2199,20 +2226,28 @@ export function ModelCalculator({
 
             {/* ── Section C: 27.5-Year Depreciation Schedule ── */}
             {inputs.price > 0 && d.brk > 0 && (() => {
-              const depBasis = inputs.price * (1 - inputs.land / 100) * (1 - inputs.costSeg / 100)
+              const depBasis = d.deprBase * (1 - inputs.costSeg / 100)  // SL portion only
               const annualDed = depBasis / 27.5
               const bracket = d.brk / 100
               const annualShield = annualDed * bracket
+              const y1Ded = annualDed * (d.closingMonths / 12)
+              const y1Shield = y1Ded * bracket
+              const isPartialYear = d.closingMonths < 12
               const years28 = Array.from({ length: 28 }, (_, i) => i + 1)
-              const shieldArr = years28.map((_, i) => i < 27 ? annualShield : annualShield * 0.5)
+              // Year 1 partial, years 2-27 full, year 28 remainder
+              const dedArr = years28.map(y => y === 1 ? y1Ded : y < 28 ? annualDed : annualDed * (isPartialYear ? (12 - d.closingMonths) / 12 : 0.5))
+              const shieldArr = dedArr.map(d => d * bracket)
               const cumulArr = years28.map((_, i) => shieldArr.slice(0, i + 1).reduce((a, b) => a + b, 0))
               return (
                 <>
                   <SectionHeader title="27.5-Year Depreciation Schedule" tooltip="Residential rental property is depreciated straight-line (SL) over 27.5 years — meaning an equal deduction every year for 27.5 years. Each year you deduct an equal share of the depreciable basis (purchase price minus land value, minus any cost-segregated assets), creating a consistent annual tax shield. The shield ends when the basis is fully depreciated." />
                   <div className="border border-gray-100 rounded-lg p-3 mb-3">
-                    <PLRow label="Depreciable basis (after cost seg)" value={fmtDollar(depBasis)} />
-                    <PLRow label="Annual deduction" value={fmtDollar(annualDed)} variant="pos" indent />
-                    <PLRow label={`Annual tax shield @ ${d.brk}%`} value={fmtDollar(annualShield)} variant="total" />
+                    <PLRow label="SL depreciable basis (after cost seg)" value={fmtDollar(depBasis)} />
+                    <PLRow label="Annual deduction (full year)" value={fmtDollar(annualDed)} variant="pos" indent />
+                    {isPartialYear && (
+                      <PLRow label={`Year 1 deduction (${d.closingMonths.toFixed(1)} months)`} value={fmtDollar(y1Ded)} variant="pos" indent />
+                    )}
+                    <PLRow label={`${isPartialYear ? 'Year 1' : 'Annual'} tax shield @ ${d.brk}%`} value={fmtDollar(isPartialYear ? y1Shield : annualShield)} variant="total" />
                   </div>
                   <div className="mb-4" style={{ height: 200 }}>
                     <Bar
@@ -2246,7 +2281,7 @@ export function ModelCalculator({
               <PLRow label="Less: Y1 mortgage interest" value={`(${fmtDollar(d.int1)})`} variant="neg" indent />
               <PLRow label="Income before depreciation" value={fmtNeg(d.ti)} variant="total" />
               <PLRow label="Bonus dep — 5/7/15-yr (100%)" value={`(${fmtDollar(d.bd)})`} variant="pos" indent />
-              <PLRow label="27.5-yr straight-line dep" value={`(${fmtDollar(d.sl)})`} variant="pos" indent />
+              <PLRow label={d.closingMonths < 12 ? `SL dep (${d.closingMonths.toFixed(1)} mo)` : '27.5-yr straight-line dep'} value={`(${fmtDollar(d.slY1)})`} variant="pos" indent />
               <PLRow label="Year 1 paper loss (REP offset)" value={`(${fmtDollar(Math.abs(d.loss))})`} variant="total" />
               <PLRow label={`Tax savings @ ${d.brk}%`} value={fmtDollar(d.ts)} variant="pos" />
               <PLRow label="After-tax cash flow" value={fmtNeg(d.at)} />

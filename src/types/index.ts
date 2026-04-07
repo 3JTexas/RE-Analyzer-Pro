@@ -47,6 +47,7 @@ export interface ModelInputs {
   brk: number      // tax bracket %
   land: number     // land % (non-depreciable)
   costSeg: number  // cost seg % allocated to 5/7/15yr components (default 23)
+  closingDate?: string // closing date (YYYY-MM-DD) — determines partial-year depreciation
   is1031: boolean  // 1031 exchange — use carryover basis for depreciation
   basis1031: number // carryover adjusted basis $ (used when is1031 = true)
   equity1031: number // 1031 equity rolling in $ (reduces cash to close)
@@ -108,7 +109,9 @@ export interface ModelOutputs {
   // Tax
   deprBase: number  // depreciable basis used
   bd: number        // bonus depreciation
-  sl: number        // 27.5yr SL depreciation
+  sl: number        // 27.5yr SL depreciation (full year)
+  slY1: number      // SL depreciation for year 1 (partial if closing date set)
+  closingMonths: number // months of depreciation in year 1 (1-12)
   ti: number        // taxable income before dep
   loss: number      // paper loss
   ts: number        // tax savings
