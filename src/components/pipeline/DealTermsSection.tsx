@@ -1,5 +1,7 @@
-import { useState, useMemo, useRef } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { RefreshCw, Download } from 'lucide-react'
+import { pdf } from '@react-pdf/renderer'
+import { DealTermsPdf } from './DealTermsPdf'
 import { calculate, fmtDollar, fmtPct, fmtX, fmtNeg } from '../../lib/calc'
 import type { ModelInputs } from '../../types'
 import type { DealPipeline } from '../../types/pipeline'
@@ -9,6 +11,8 @@ interface Props {
   actualInputs: Partial<ModelInputs>
   onUpdateActuals: (actuals: Partial<ModelInputs>) => void
   onChangeScenario: () => void
+  propertyName: string
+  propertyAddress: string | null
 }
 
 interface FieldDef {
@@ -112,9 +116,9 @@ function fmtFieldVal(val: number | undefined, field: FieldDef): string {
   return String(val)
 }
 
-export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, onChangeScenario }: Props) {
+export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, onChangeScenario, propertyName, propertyAddress }: Props) {
   const projected = dealScenario.inputs
-  const [editing, setEditing] = useState(false)
+  const [generating, setGenerating] = useState(false)
 
   // Merge actuals over projected for calculation
   const effectiveInputs: ModelInputs = useMemo(() => ({
@@ -154,10 +158,30 @@ export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, 
           <h3 className="text-sm font-semibold text-gray-900">Deal Terms — {dealScenario.name}</h3>
           <p className="text-[10px] text-gray-400 mt-0.5">Projected from scenario · Enter actuals as quotes come in</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <button onClick={onChangeScenario}
             className="flex items-center gap-1 text-[10px] font-medium text-gray-400 hover:text-gray-600 transition-colors">
             <RefreshCw size={10} /> Change scenario
+          </button>
+          <button
+            onClick={async () => {
+              setGenerating(true)
+              try {
+                const blob = await pdf(
+                  <DealTermsPdf projected={projected} actualInputs={actualInputs} scenarioName={dealScenario.name}
+                    propertyName={propertyName} propertyAddress={propertyAddress} />
+                ).toBlob()
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `${(propertyName || 'Property').replace(/[^a-zA-Z0-9]/g, '_')}_Deal_Terms.pdf`
+                a.click()
+                URL.revokeObjectURL(url)
+              } finally { setGenerating(false) }
+            }}
+            disabled={generating}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-[#1a1a2e] text-white rounded-lg hover:bg-[#c9a84c] hover:text-[#1a1a2e] transition-colors disabled:opacity-50">
+            {generating ? 'Generating...' : <><Download size={12} /> PDF</>}
           </button>
         </div>
       </div>

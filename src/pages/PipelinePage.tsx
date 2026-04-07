@@ -178,6 +178,8 @@ export function PipelinePage() {
               actualInputs={pipeline.actual_inputs ?? {}}
               onUpdateActuals={updateActualInputs}
               onChangeScenario={() => selectDealScenario(null)}
+              propertyName={property?.name ?? ''}
+              propertyAddress={property?.address ?? null}
             />
           </div>
         )}

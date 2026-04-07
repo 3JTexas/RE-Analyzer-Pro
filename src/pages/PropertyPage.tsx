@@ -194,7 +194,7 @@ export function PropertyPage() {
           {(status === 'pending' || status === 'active' || status === 'closed') && (
             <Link to={`/property/${id}/pipeline`}
               className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-[#c9a84c] text-white rounded-sm hover:bg-[#b8963f] transition-colors whitespace-nowrap">
-              Track Deal <ArrowRight size={12} />
+              Deal Tracker <ArrowRight size={12} />
             </Link>
           )}
         </div>
