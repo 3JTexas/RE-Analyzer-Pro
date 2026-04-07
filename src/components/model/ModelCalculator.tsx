@@ -2204,12 +2204,21 @@ export function ModelCalculator({
                   <div className="border border-gray-100 rounded-lg p-3 mb-3">
                     {/* Basis breakdown */}
                     <div className="mb-2 pb-2 border-b border-gray-100">
-                      <PLRow label="Purchase price" value={fmtDollar(basisBefore1031)} />
-                      {inputs.is1031 && deferredGain > 0 && (
-                        <PLRow label="Less: 1031 deferred gain" value={`(${fmtDollar(deferredGain)})`} variant="neg" indent />
+                      {inputs.is1031 && inputs.basis1031 > 0 ? (
+                        <>
+                          <PLRow label="Carryover basis override" value={fmtDollar(inputs.basis1031)} variant="total" />
+                          <p className="text-[9px] text-amber-600 mt-1">Manual override active — clear Carryover basis to use calculated basis</p>
+                        </>
+                      ) : (
+                        <>
+                          <PLRow label="Purchase price" value={fmtDollar(basisBefore1031)} />
+                          {inputs.is1031 && deferredGain > 0 && (
+                            <PLRow label="Less: 1031 deferred gain" value={`(${fmtDollar(deferredGain)})`} variant="neg" indent />
+                          )}
+                          <PLRow label={`Less: Land @ ${inputs.land}%`} value={`(${fmtDollar(landAmount)})`} variant="neg" indent />
+                          <PLRow label="Depreciable basis" value={fmtDollar(depBasis)} variant="total" />
+                        </>
                       )}
-                      <PLRow label={`Less: Land @ ${inputs.land}%`} value={`(${fmtDollar(landAmount)})`} variant="neg" indent />
-                      <PLRow label="Depreciable basis" value={fmtDollar(depBasis)} variant="total" />
                     </div>
                     <PLRow label={`Year 1 bonus deduction (${inputs.costSeg}% cost seg)`} value={fmtDollar(bonusDed)} variant="pos" />
                     <PLRow label={isPartialYear ? `Year 1 SL dep (${d.closingMonths.toFixed(1)} mo from ${closingLabel})` : 'Year 1 SL depreciation'} value={fmtDollar(slY1)} variant="pos" />
