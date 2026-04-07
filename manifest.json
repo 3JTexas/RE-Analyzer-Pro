@@ -1,0 +1,15 @@
+{
+  "name": "Deal Analyzer",
+  "short_name": "Deal Analyzer",
+  "description": "Multifamily investment underwriting — OM vs physical occupancy, tax analysis, REP status",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0D2340",
+  "theme_color": "#0D2340",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
