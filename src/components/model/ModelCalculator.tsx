@@ -1713,26 +1713,32 @@ export function ModelCalculator({
                       <span>Cash to close</span>
                       <span className={cashToClose === 0 ? 'text-green-700' : ''}>{fmtDollar(cashToClose)}</span>
                     </div>
-                    {(excessBeforeApply > 0 || inputs.applyExcessToDown) && (
-                      <div className="bg-amber-50 border-t border-amber-200 rounded-b -mx-3 -mb-2 mt-2 px-3 py-2">
-                        <div className="flex justify-between items-center text-[11px] text-amber-700 font-semibold">
-                          <span>{inputs.applyExcessToDown ? 'Excess applied to reduce loan' : 'Excess 1031 capital'}</span>
-                          <span>{fmtDollar(excessBeforeApply)}</span>
-                        </div>
-                        <div className="flex items-center justify-between mt-1.5">
-                          <p className="text-[9px] text-amber-600">{inputs.applyExcessToDown ? 'Loan reduced — lower debt service & better DCR' : 'Apply to reduce loan?'}</p>
-                          <button
-                            onClick={() => set('applyExcessToDown', !inputs.applyExcessToDown)}
-                            className="flex items-center ml-2 flex-shrink-0">
-                            <div className={`w-8 h-4 rounded-full transition-colors flex items-center px-0.5
-                              ${inputs.applyExcessToDown ? 'bg-amber-400' : 'bg-gray-300'}`}>
-                              <div className={`w-3 h-3 bg-white rounded-full shadow transition-transform
-                                ${inputs.applyExcessToDown ? 'translate-x-4' : 'translate-x-0'}`} />
-                            </div>
-                          </button>
-                        </div>
+                    <div className={`border-t rounded-b -mx-3 -mb-2 mt-2 px-3 py-2 ${excessBeforeApply > 0 ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}>
+                      <div className="flex justify-between items-center text-[11px] font-semibold">
+                        <span className={excessBeforeApply > 0 ? 'text-amber-700' : 'text-gray-400'}>
+                          {excessBeforeApply > 0
+                            ? (inputs.applyExcessToDown ? 'Excess applied to reduce loan' : 'Excess 1031 capital')
+                            : 'No excess 1031 capital'}
+                        </span>
+                        {excessBeforeApply > 0 && <span className="text-amber-700">{fmtDollar(excessBeforeApply)}</span>}
                       </div>
-                    )}
+                      <div className="flex items-center justify-between mt-1.5">
+                        <p className={`text-[9px] ${excessBeforeApply > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
+                          {excessBeforeApply > 0
+                            ? (inputs.applyExcessToDown ? 'Loan reduced — lower debt service & better DCR' : 'Apply to reduce loan?')
+                            : 'Proceeds do not exceed cash to close'}
+                        </p>
+                        <button
+                          onClick={() => excessBeforeApply > 0 && set('applyExcessToDown', !inputs.applyExcessToDown)}
+                          className={`flex items-center ml-2 flex-shrink-0 ${excessBeforeApply === 0 ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                          <div className={`w-8 h-4 rounded-full transition-colors flex items-center px-0.5
+                            ${excessBeforeApply > 0 && inputs.applyExcessToDown ? 'bg-amber-400' : 'bg-gray-300'}`}>
+                            <div className={`w-3 h-3 bg-white rounded-full shadow transition-transform
+                              ${excessBeforeApply > 0 && inputs.applyExcessToDown ? 'translate-x-4' : 'translate-x-0'}`} />
+                          </div>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )
@@ -2120,25 +2126,39 @@ export function ModelCalculator({
                       </div>
 
                       {/* Apply excess to down payment checkbox */}
-                      {ex.excessCapital > 0 && (() => {
-                        const checked = !!inputs.applyExcessToDown
-                        const newLoan = Math.max(0, inputs.price - ex.netProceeds)
-                        const newMp = pmtCalcExport(newLoan, inputs.ir, inputs.am)
+                      {(() => {
+                        const hasExcess = ex.excessCapital > 0
+                        const checked = hasExcess && !!inputs.applyExcessToDown
+                        const newLoan = hasExcess ? Math.max(0, inputs.price - ex.netProceeds) : d.loan
+                        const newMp = hasExcess ? pmtCalcExport(newLoan, inputs.ir, inputs.am) : d.mp
                         const newDs = newMp * 12
                         const newDcr = newDs > 0 ? d.NOI / newDs : 0
                         return (
-                          <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 mb-3">
-                            <label className="flex items-start gap-2 cursor-pointer">
-                              <input type="checkbox" checked={checked}
+                          <div className={`rounded-lg px-3 py-2.5 mb-3 ${hasExcess ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50 border border-gray-200'}`}>
+                            <label className={`flex items-start gap-2 ${hasExcess ? 'cursor-pointer' : 'cursor-default'}`}>
+                              <input type="checkbox" checked={checked} disabled={!hasExcess}
                                 onChange={e => set('applyExcessToDown' as keyof ModelInputs, e.target.checked as any)}
-                                className="mt-0.5 w-3.5 h-3.5 rounded border-blue-300" />
+                                className={`mt-0.5 w-3.5 h-3.5 rounded ${hasExcess ? 'border-blue-300' : 'border-gray-300'}`} />
                               <div>
-                                <p className="text-[11px] font-semibold text-blue-800">
-                                  Apply excess {fmtDollar(ex.excessCapital)} to additional down payment
-                                </p>
-                                <p className="text-[10px] text-blue-600 mt-0.5">
-                                  Reduces loan to {fmtDollar(newLoan)} · Payment {fmtDollar(newMp)}/mo · DCR {fmtX(newDcr)}
-                                </p>
+                                {hasExcess ? (
+                                  <>
+                                    <p className="text-[11px] font-semibold text-blue-800">
+                                      Apply excess {fmtDollar(ex.excessCapital)} to additional down payment
+                                    </p>
+                                    <p className="text-[10px] text-blue-600 mt-0.5">
+                                      {checked ? `Reduces loan to ${fmtDollar(newLoan)} · Payment ${fmtDollar(newMp)}/mo · DCR ${fmtX(newDcr)}` : 'Apply to reduce loan?'}
+                                    </p>
+                                  </>
+                                ) : (
+                                  <>
+                                    <p className="text-[11px] font-medium text-gray-400">
+                                      Apply excess capital to additional down payment
+                                    </p>
+                                    <p className="text-[10px] text-gray-400 mt-0.5">
+                                      No excess cash — 1031 proceeds do not exceed cash to close
+                                    </p>
+                                  </>
+                                )}
                               </div>
                             </label>
                           </div>
