@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Building2, Plus, Trash2, ChevronRight, GripVertical, Camera, Loader2, ArrowRight, TrendingUp, Clock, DollarSign } from 'lucide-react'
 import { useProperties, useScenario } from '../hooks/useScenario'
@@ -11,7 +11,31 @@ import type { SetupConfirmMeta } from '../components/OMSetupFlow'
 
 export function PropertiesPage() {
   const { properties, loading, createProperty, deleteProperty, reorderProperties, refresh } = useProperties()
-  // view state removed — unified dashboard with Live Deals + R&D sections
+  const [pipelines, setPipelines] = useState<Record<string, string | null>>({}) // propertyId → deal_scenario_id
+
+  // Load pipeline deal_scenario_ids for all properties
+  useEffect(() => {
+    if (properties.length === 0) return
+    supabase.from('deal_pipelines').select('property_id, deal_scenario_id').then(({ data }) => {
+      if (data) {
+        const map: Record<string, string | null> = {}
+        data.forEach((p: any) => { map[p.property_id] = p.deal_scenario_id })
+        setPipelines(map)
+      }
+    })
+  }, [properties])
+
+  const getDealPrice = (p: Property): number => {
+    const dealScenarioId = pipelines[p.id]
+    if (dealScenarioId) {
+      const ds = p.scenarios?.find(s => s.id === dealScenarioId)
+      if (ds) return ds.inputs?.price ?? 0
+    }
+    // Fallback: first non-default scenario
+    const fallback = p.scenarios?.find(s => !s.is_default) ?? p.scenarios?.[0]
+    return fallback?.inputs?.price ?? 0
+  }
+
   const dragIdx = useRef<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
   const { createScenario } = useScenario()
@@ -86,10 +110,7 @@ export function PropertiesPage() {
             const liveDeals = properties.filter(p => p.status === 'pending' || p.status === 'active')
             const closedDeals = properties.filter(p => p.status === 'closed')
             const research = properties.filter(p => !p.status || p.status === 'research')
-            const totalPipelineValue = liveDeals.reduce((sum, p) => {
-              const ds = p.scenarios?.find(s => !s.is_default) ?? p.scenarios?.[0]
-              return sum + (ds?.inputs?.price ?? 0)
-            }, 0)
+            const totalPipelineValue = liveDeals.reduce((sum, p) => sum + getDealPrice(p), 0)
 
             const statusBadge = (s: string) => {
               const cfg: Record<string, string> = {
@@ -102,8 +123,7 @@ export function PropertiesPage() {
             }
 
             const DealCard = ({ p }: { p: Property }) => {
-              const ds = p.scenarios?.find(s => !s.is_default) ?? p.scenarios?.[0]
-              const price = ds?.inputs?.price ?? 0
+              const price = getDealPrice(p)
               return (
                 <Link to={`/property/${p.id}/pipeline`}
                   className="flex items-center gap-4 bg-white border border-gray-200 rounded-lg p-4 hover:border-[#c9a84c] transition-colors group">
