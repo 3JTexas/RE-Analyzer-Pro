@@ -2184,11 +2184,13 @@ export function ModelCalculator({
               const taxableArr = years.map(y => y === 1 ? d.NOI - bonusDed - slY1 : d.NOI - slFull)
               const isPartialYear = d.closingMonths < 12
 
-              // Basis breakdown for display
+              // Basis breakdown for display — mirror calc.ts logic
               const ex1031Result = inputs.is1031 ? calc1031(inputs) : null
-              const deferredGain = ex1031Result?.capitalGain ?? 0
+              const manualGain = inputs.deferredGain1031 ?? 0
+              const autoGain = ex1031Result?.capitalGain ?? 0
+              const deferredGain = inputs.is1031 ? (manualGain > 0 ? manualGain : autoGain) : 0
               const basisBefore1031 = inputs.price
-              const basisAfterGain = inputs.is1031 && deferredGain > 0 ? basisBefore1031 - deferredGain : basisBefore1031
+              const basisAfterGain = deferredGain > 0 ? basisBefore1031 - deferredGain : basisBefore1031
               const landAmount = basisAfterGain * (inputs.land / 100)
 
               // Closing month label
