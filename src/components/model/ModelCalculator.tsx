@@ -2140,7 +2140,7 @@ export function ModelCalculator({
             {/* ── Section B: Bonus Depreciation ── */}
             {inputs.price > 0 && d.brk > 0 && (() => {
               const bracket = d.brk / 100
-              const depBasis = inputs.price * (1 - inputs.land / 100)
+              const depBasis = d.deprBase  // from calc.ts — already accounts for 1031 deferred gain + land
               const bonusDed = depBasis * (inputs.costSeg / 100)
               const slAnnual = (depBasis * (1 - inputs.costSeg / 100)) / 27.5
               const y1PaperLoss = d.NOI - bonusDed - slAnnual
@@ -2148,11 +2148,29 @@ export function ModelCalculator({
               const years = Array.from({ length: 10 }, (_, i) => i + 1)
               const noiArr = years.map(() => d.NOI)
               const taxableArr = years.map(y => y === 1 ? d.NOI - bonusDed - slAnnual : d.NOI - slAnnual)
+
+              // Basis breakdown for display
+              const has1031 = inputs.is1031 && (d as any).deferredGain > 0
+              const ex1031Result = inputs.is1031 ? calc1031(inputs) : null
+              const deferredGain = ex1031Result?.capitalGain ?? 0
+              const basisBefore1031 = inputs.price
+              const basisAfterGain = inputs.is1031 && deferredGain > 0 ? basisBefore1031 - deferredGain : basisBefore1031
+              const landAmount = basisAfterGain * (inputs.land / 100)
+
               return (
                 <>
                   <SectionHeader title="Bonus Depreciation" tooltip="Cost segregation identifies building components (fixtures, land improvements, personal property) that qualify for 5, 7, or 15-year depreciation instead of 27.5 years. Under current bonus depreciation rules, these assets can be fully expensed in Year 1, creating a large paper loss that offsets your other ordinary income at your bracket rate. Cash flow is unchanged — only your tax bill moves." />
                   <div className="border border-gray-100 rounded-lg p-3 mb-3">
-                    <PLRow label="Year 1 bonus deduction" value={fmtDollar(bonusDed)} variant="pos" />
+                    {/* Basis breakdown */}
+                    <div className="mb-2 pb-2 border-b border-gray-100">
+                      <PLRow label="Purchase price" value={fmtDollar(basisBefore1031)} />
+                      {inputs.is1031 && deferredGain > 0 && (
+                        <PLRow label="Less: 1031 deferred gain" value={`(${fmtDollar(deferredGain)})`} variant="neg" indent />
+                      )}
+                      <PLRow label={`Less: Land @ ${inputs.land}%`} value={`(${fmtDollar(landAmount)})`} variant="neg" indent />
+                      <PLRow label="Depreciable basis" value={fmtDollar(depBasis)} variant="total" />
+                    </div>
+                    <PLRow label={`Year 1 bonus deduction (${inputs.costSeg}% cost seg)`} value={fmtDollar(bonusDed)} variant="pos" />
                     <PLRow label="Year 1 paper loss" value={y1PaperLoss < 0 ? `(${fmtDollar(Math.abs(y1PaperLoss))})` : fmtDollar(y1PaperLoss)} variant={y1PaperLoss < 0 ? 'pos' : 'neg'} indent />
                     <PLRow label={`Year 1 tax benefit @ ${d.brk}%`} value={fmtDollar(y1TaxBenefit)} variant="total" />
                   </div>
