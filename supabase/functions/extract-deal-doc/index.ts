@@ -18,14 +18,18 @@ const PROMPTS: Record<string, string> = {
   "buyerName": "Buyer/purchaser name (string)",
   "sellerName": "Seller name (string)",
   "propertyAddress": "Property address (string)",
-  "loiDate": "Date of LOI (string, as written)",
+  "loiDate": "Date of the LOI in YYYY-MM-DD format (string). Look at the date at the top of the letter.",
+  "executionDate": "Date the LOI was signed/executed in YYYY-MM-DD format (string). Look at the signature block dates. If both parties signed on different dates, use the later date. Return null if no signature dates found.",
   "expirationDays": "LOI expiration in business days (number)",
   "contingencies": "Summary of all contingencies and special conditions (string)",
   "ddDeliveryDays": "Days for seller to deliver DD documents (number)",
   "notes": "Any other notable terms, exclusions, or special conditions (string)"
 }
 
-Important: Extract only what is explicitly stated. Do not guess or infer values.`,
+Important:
+- Extract only what is explicitly stated. Do not guess or infer values.
+- All dates must be returned in YYYY-MM-DD format (e.g. 2026-04-03, not "April 3, 2026").
+- Check the signature block for execution dates — these may differ from the LOI date at the top.`,
 
   psa: `Extract the following fields from this Purchase and Sale Agreement. Return ONLY a JSON object with these exact keys. Use null for any field you cannot find.
 

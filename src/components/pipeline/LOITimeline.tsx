@@ -112,10 +112,23 @@ export function LOITimeline({ loiTracking, onUpdate, dealPrice, pipelineId }: Pr
       }
 
       // Use document date from extraction if available, otherwise today
-      let eventDate = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]
-      if (extracted?.loiDate) {
-        const parsed = new Date(extracted.loiDate as any)
-        if (!isNaN(parsed.getTime())) eventDate = parsed.toISOString().split('T')[0]
+      const localToday = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]
+      let eventDate = localToday
+      // Prefer execution date (when signed) over LOI date (when written)
+      const dateStr = (extracted as any)?.executionDate ?? extracted?.loiDate
+      if (dateStr) {
+        const raw = String(dateStr).trim()
+        // Try ISO format first (YYYY-MM-DD), then natural language
+        const d = new Date(raw)
+        if (!isNaN(d.getTime())) {
+          eventDate = raw.match(/^\d{4}-\d{2}-\d{2}$/) ? raw : new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0]
+        } else {
+          // Try adding context for partial dates
+          const d2 = new Date(raw + ' 2026')
+          if (!isNaN(d2.getTime())) {
+            eventDate = new Date(d2.getTime() - d2.getTimezoneOffset() * 60000).toISOString().split('T')[0]
+          }
+        }
       }
 
       const event: LOIEvent = {
