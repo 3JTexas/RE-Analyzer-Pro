@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { RefreshCw, Download } from 'lucide-react'
+import { RefreshCw, Download, Lock, Unlock } from 'lucide-react'
 import { pdf } from '@react-pdf/renderer'
 import { DealTermsPdf } from './DealTermsPdf'
 import { calculate, fmtDollar, fmtPct, fmtX, fmtNeg } from '../../lib/calc'
@@ -119,6 +119,7 @@ function fmtFieldVal(val: number | undefined, field: FieldDef): string {
 export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, onChangeScenario, propertyName, propertyAddress }: Props) {
   const projected = dealScenario.inputs
   const [generating, setGenerating] = useState(false)
+  const [unlocked, setUnlocked] = useState(false)
 
   // Merge actuals over projected for calculation
   const effectiveInputs: ModelInputs = useMemo(() => ({
@@ -159,6 +160,11 @@ export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, 
           <p className="text-[10px] text-gray-400 mt-0.5">Projected from scenario · Enter actuals as quotes come in</p>
         </div>
         <div className="flex items-center gap-3">
+          <button onClick={() => setUnlocked(!unlocked)}
+            className={`flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors
+              ${unlocked ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            {unlocked ? <><Unlock size={10} /> Editing Actuals</> : <><Lock size={10} /> Locked</>}
+          </button>
           <button onClick={onChangeScenario}
             className="flex items-center gap-1 text-[10px] font-medium text-gray-400 hover:text-gray-600 transition-colors">
             <RefreshCw size={10} /> Change scenario
@@ -246,13 +252,19 @@ export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, 
                           {fmtFieldVal(projVal, field)}
                         </td>
                         <td className="px-4 py-2 text-right">
-                          <ActualInput
-                            value={hasActual ? actVal : ''}
-                            field={field}
-                            onChange={v => setActual(field.key, v)}
-                            onClear={() => clearActual(field.key)}
-                            hasActual={hasActual}
-                          />
+                          {unlocked ? (
+                            <ActualInput
+                              value={hasActual ? actVal : ''}
+                              field={field}
+                              onChange={v => setActual(field.key, v)}
+                              onClear={() => clearActual(field.key)}
+                              hasActual={hasActual}
+                            />
+                          ) : (
+                            <span className={`text-xs ${hasActual ? 'font-semibold text-gray-900' : 'text-gray-300'}`}>
+                              {hasActual ? fmtFieldVal(actNum, field) : '—'}
+                            </span>
+                          )}
                         </td>
                         <td className={`px-4 py-2 text-right font-medium
                           ${!hasActual ? 'text-gray-300' :
