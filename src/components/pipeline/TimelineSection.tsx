@@ -104,8 +104,8 @@ export function TimelineSection({ milestones, onUpdate, loiTracking, readOnly }:
                   </div>
                 </div>
 
-                {/* Expanded editor */}
-                {expanded && !readOnly && (
+                {/* Expanded editor — skip for LOI (status derived from events) */}
+                {expanded && !readOnly && !isLOI && (
                   <div className="ml-13 mt-2 bg-white border border-[#c9a84c] rounded-lg p-4 shadow-sm" style={{ marginLeft: '52px' }}>
                     {/* Status selector */}
                     <div className="mb-3">
