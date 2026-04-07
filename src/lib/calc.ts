@@ -165,11 +165,13 @@ export function calculate(inputs: ModelInputs, useOM: boolean): ModelOutputs {
   const dcr = ds ? NOI / ds : 0
 
   // Depreciation — 1031 reduces basis by deferred gain, otherwise price × (1 - land%)
-  // In a 1031, new basis = new price - deferred gain; then exclude land
-  const deferredGain = ex1031 ? ex1031.capitalGain : 0
+  // Deferred gain: use manual entry if provided, otherwise auto-calc from prior sale
+  const manualGain = inputs.deferredGain1031 ?? 0
+  const autoGain = ex1031 ? ex1031.capitalGain : 0
+  const deferredGain = is1031 ? (manualGain > 0 ? manualGain : autoGain) : 0
   const deprBase = is1031 && basis1031 > 0
-    ? basis1031  // manual override
-    : is1031 && deferredGain > 0
+    ? basis1031  // full manual basis override
+    : deferredGain > 0
       ? (price - deferredGain) * (1 - land / 100)
       : price * (1 - land / 100)
   const costSegFrac = costSeg / 100

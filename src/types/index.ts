@@ -49,8 +49,9 @@ export interface ModelInputs {
   costSeg: number  // cost seg % allocated to 5/7/15yr components (default 23)
   closingDate?: string // closing date (YYYY-MM-DD) — determines partial-year depreciation
   is1031: boolean  // 1031 exchange — use carryover basis for depreciation
-  basis1031: number // carryover adjusted basis $ (used when is1031 = true)
+  basis1031: number // carryover adjusted basis $ (manual override, used when is1031 = true)
   equity1031: number // 1031 equity rolling in $ (reduces cash to close)
+  deferredGain1031?: number // deferred gain from relinquished sale (auto-calc from prior sale or manual entry)
   targetCapRate?: number // offer calculator target cap rate %
   targetOfferPrice?: number // offer calculator target price $
   offerCalcMode?: 'cap' | 'price' // which offer calculator mode is active

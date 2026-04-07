@@ -1974,24 +1974,40 @@ export function ModelCalculator({
                   </div>
                   <p className="text-[9px] text-gray-400">Use carryover basis for depreciation</p>
                 </div>
-                {inputs.is1031 && (
-                  <>
-                    <InputField label="Carryover basis ($)" type="number" dollar value={inputs.basis1031} step={10000} min={0}
-                      tooltip="Your adjusted tax basis in the relinquished property being carried over. This replaces the normal depreciation basis on the new property — lower carryover basis = smaller depreciation deductions going forward."
-                      badgeColor="amber" badge="verify w/ CPA" onChange={e => set('basis1031', Math.max(0, +e.target.value))} />
-                    {(inputs.priorSalePrice ?? 0) > 0 ? (
-                      <div className="bg-gray-50 rounded-lg p-2.5">
-                        <label className="text-xs text-gray-500 mb-1 block">1031 equity applied</label>
-                        <div className="text-sm font-medium text-gray-900">${Math.round(inputs.equity1031).toLocaleString()}</div>
-                        <p className="text-[9px] text-gray-400 mt-0.5">Auto-calculated from 1031 analysis below</p>
-                      </div>
-                    ) : (
-                      <InputField label="1031 equity applied ($)" type="number" dollar value={inputs.equity1031} step={10000}
-                        tooltip="Net proceeds from your prior sale rolling into this deal. Reduces your required cash to close. Auto-calculated from the 1031 analysis below when prior sale price is entered."
-                        badgeColor="amber" badge="from relinquished sale" onChange={e => set('equity1031', +e.target.value)} />
-                    )}
-                  </>
-                )}
+                {inputs.is1031 && (() => {
+                  const ex = calc1031(inputs)
+                  const autoGain = ex?.capitalGain ?? 0
+                  const hasAutoGain = autoGain > 0
+                  return (
+                    <>
+                      {hasAutoGain ? (
+                        <div className="bg-gray-50 rounded-lg p-2.5">
+                          <label className="text-xs text-gray-500 mb-1 block">Deferred gain</label>
+                          <div className="text-sm font-medium text-gray-900">${Math.round(autoGain).toLocaleString()}</div>
+                          <p className="text-[9px] text-gray-400 mt-0.5">Auto-calculated from 1031 analysis below</p>
+                        </div>
+                      ) : (
+                        <InputField label="Deferred gain ($)" type="number" dollar value={inputs.deferredGain1031 ?? 0} step={10000} min={0}
+                          tooltip="Capital gain deferred from the relinquished property sale. Reduces the depreciable basis on the replacement property. Auto-calculated when you fill in the 1031 Exchange Analysis section below."
+                          badgeColor="amber" badge="from relinquished sale" onChange={e => set('deferredGain1031', Math.max(0, +e.target.value))} />
+                      )}
+                      {hasAutoGain ? (
+                        <div className="bg-gray-50 rounded-lg p-2.5">
+                          <label className="text-xs text-gray-500 mb-1 block">1031 equity applied</label>
+                          <div className="text-sm font-medium text-gray-900">${Math.round(inputs.equity1031).toLocaleString()}</div>
+                          <p className="text-[9px] text-gray-400 mt-0.5">Auto-calculated from 1031 analysis below</p>
+                        </div>
+                      ) : (
+                        <InputField label="1031 equity applied ($)" type="number" dollar value={inputs.equity1031} step={10000}
+                          tooltip="Net proceeds from your prior sale rolling into this deal. Reduces your required cash to close. Auto-calculated from the 1031 analysis below when prior sale price is entered."
+                          badgeColor="amber" badge="from relinquished sale" onChange={e => set('equity1031', +e.target.value)} />
+                      )}
+                      <InputField label="Carryover basis override ($)" type="number" dollar value={inputs.basis1031} step={10000} min={0}
+                        tooltip="Optional manual override — replaces the entire calculated depreciable basis. Leave at 0 to use the auto-calculated basis (purchase price minus deferred gain minus land). Only use if your CPA gives you a specific number."
+                        badgeColor="amber" badge="optional override" onChange={e => set('basis1031', Math.max(0, +e.target.value))} />
+                    </>
+                  )
+                })()}
               </div>
             </div>
 
