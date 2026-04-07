@@ -164,10 +164,14 @@ export function calculate(inputs: ModelInputs, useOM: boolean): ModelOutputs {
   const cap = price ? (NOI / price) * 100 : 0
   const dcr = ds ? NOI / ds : 0
 
-  // Depreciation — 1031 uses carryover basis, otherwise price × (1 - land%)
+  // Depreciation — 1031 reduces basis by deferred gain, otherwise price × (1 - land%)
+  // In a 1031, new basis = new price - deferred gain; then exclude land
+  const deferredGain = ex1031 ? ex1031.capitalGain : 0
   const deprBase = is1031 && basis1031 > 0
-    ? basis1031
-    : price * (1 - land / 100)
+    ? basis1031  // manual override
+    : is1031 && deferredGain > 0
+      ? (price - deferredGain) * (1 - land / 100)
+      : price * (1 - land / 100)
   const costSegFrac = costSeg / 100
   const bd = deprBase * costSegFrac
   const sl = (deprBase * (1 - costSegFrac)) / 27.5
