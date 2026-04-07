@@ -204,7 +204,7 @@ export function PipelinePage() {
 
         {/* ── ACTIVE: Timeline ── */}
         {activeTab === 'timeline' && pipeline && (isActive || isClosed) && (
-          <TimelineSection milestones={pipeline.milestones} onUpdate={updateMilestones} readOnly={isClosed} />
+          <TimelineSection milestones={pipeline.milestones} onUpdate={updateMilestones} loiTracking={pipeline.loi_tracking} readOnly={isClosed} />
         )}
 
         {/* ── ACTIVE: Deal Team (all roles) ── */}

@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { Check, Clock, Circle, ChevronDown, ChevronUp, Calendar } from 'lucide-react'
-import type { Milestone, MilestoneStatus } from '../../types/pipeline'
+import { Check, Clock, Circle, ChevronDown, ChevronUp, Calendar, FileText, Send } from 'lucide-react'
+import { fmtDollar } from '../../lib/calc'
+import type { Milestone, MilestoneStatus, LOITracking, LOIEvent } from '../../types/pipeline'
 
 interface Props {
   milestones: Milestone[]
   onUpdate: (milestones: Milestone[]) => void
+  loiTracking?: LOITracking
   readOnly?: boolean
 }
 
@@ -14,7 +16,13 @@ const STATUS_CONFIG: Record<MilestoneStatus, { icon: typeof Check; color: string
   completed: { icon: Check, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-400', label: 'Completed' },
 }
 
-export function TimelineSection({ milestones, onUpdate, readOnly }: Props) {
+export function TimelineSection({ milestones, onUpdate, loiTracking, readOnly }: Props) {
+  const loiEvents = loiTracking?.events ?? []
+  const loiStatus = loiTracking?.status ?? 'none'
+
+  // Auto-derive LOI milestone status from LOI events
+  const loiMilestoneStatus: MilestoneStatus = loiStatus === 'accepted' ? 'completed'
+    : loiEvents.length > 0 ? 'in_progress' : 'pending'
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const updateMilestone = (id: string, updates: Partial<Milestone>) => {
@@ -22,7 +30,10 @@ export function TimelineSection({ milestones, onUpdate, readOnly }: Props) {
     onUpdate(updated)
   }
 
-  const completedCount = milestones.filter(m => m.status === 'completed').length
+  const completedCount = milestones.filter(m => {
+    if (m.id === 'loi') return loiMilestoneStatus === 'completed'
+    return m.status === 'completed'
+  }).length
   const progressPct = milestones.length > 0 ? (completedCount / milestones.length) * 100 : 0
 
   return (
@@ -48,7 +59,9 @@ export function TimelineSection({ milestones, onUpdate, readOnly }: Props) {
 
         <div className="space-y-2">
           {milestones.map((milestone, i) => {
-            const config = STATUS_CONFIG[milestone.status]
+            const isLOI = milestone.id === 'loi'
+            const effectiveStatus = isLOI ? loiMilestoneStatus : milestone.status
+            const config = STATUS_CONFIG[effectiveStatus]
             const Icon = config.icon
             const expanded = expandedId === milestone.id
             const isLast = i === milestones.length - 1
@@ -137,6 +150,37 @@ export function TimelineSection({ milestones, onUpdate, readOnly }: Props) {
                         className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-[#c9a84c] bg-white text-gray-800 resize-none"
                       />
                     </div>
+                  </div>
+                )}
+
+                {/* LOI events inline — shown when LOI milestone is expanded */}
+                {isLOI && expanded && loiEvents.length > 0 && (
+                  <div className="mt-2 space-y-1.5" style={{ marginLeft: '52px' }}>
+                    <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1">LOI History</p>
+                    {loiEvents.map(evt => {
+                      const evtLabels: Record<string, string> = {
+                        sent: 'LOI Sent', counter_offer: 'Counter-Offer', revised: 'Revised LOI', accepted: 'Accepted', rejected: 'Rejected',
+                      }
+                      const evtColors: Record<string, string> = {
+                        sent: 'text-amber-600', counter_offer: 'text-orange-600', revised: 'text-blue-600', accepted: 'text-green-600', rejected: 'text-red-600',
+                      }
+                      return (
+                        <div key={evt.id} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                          <Send size={10} className={evtColors[evt.type] ?? 'text-gray-400'} />
+                          <span className={`text-xs font-semibold ${evtColors[evt.type] ?? 'text-gray-700'}`}>{evtLabels[evt.type] ?? evt.type}</span>
+                          {evt.price && <span className="text-xs font-bold text-gray-900">{fmtDollar(evt.price)}</span>}
+                          {evt.documentUrl && <span className="text-[9px] text-green-600 bg-green-50 border border-green-200 px-1 py-0.5 rounded-full">PDF</span>}
+                          <span className="text-[10px] text-gray-400 ml-auto">
+                            {new Date(evt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </span>
+                          {evt.documentUrl && (
+                            <a href={evt.documentUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-[#c9a84c] hover:underline">
+                              <FileText size={10} />
+                            </a>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>

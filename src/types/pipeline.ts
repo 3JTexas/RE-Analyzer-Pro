@@ -156,6 +156,7 @@ export interface RepairEstimate {
 
 // ── Pipeline record ──────────────────────────────────────────────────────
 export const DEFAULT_MILESTONES: Milestone[] = [
+  { id: 'loi', name: 'LOI', date: null, status: 'pending', notes: '' },
   { id: 'psa', name: 'PSA Executed', date: null, status: 'pending', notes: '' },
   { id: 'inspection', name: 'Inspection Period', date: null, status: 'pending', notes: '' },
   { id: 'financing', name: 'Financing Contingency', date: null, status: 'pending', notes: '' },
