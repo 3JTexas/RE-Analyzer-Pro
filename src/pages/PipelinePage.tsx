@@ -183,14 +183,34 @@ export function PipelinePage() {
           </div>
         )}
 
-        {/* ── PENDING: Documents ── */}
+        {/* ── Documents ── */}
         {activeTab === 'documents' && pipeline && (
           <DocumentsSection
             pipelineId={pipeline.id}
             loiTracking={pipeline.loi_tracking}
             psaTracking={pipeline.psa_tracking ?? { events: [] }}
-            onUpdateLOI={updateLOITracking}
-            onUpdatePSA={updatePSATracking}
+            onUpdateLOI={loi => {
+              updateLOITracking(loi)
+              // Auto-sync LOI milestone
+              const events = loi.events ?? []
+              const last = events[events.length - 1]
+              const loiStatus = !last ? 'pending' : (last.type === 'accepted' ? 'completed' : 'in_progress')
+              const updated = (pipeline.milestones ?? []).map(m =>
+                m.id === 'loi' ? { ...m, status: loiStatus as any, date: last?.date ?? m.date } : m
+              )
+              if (JSON.stringify(updated) !== JSON.stringify(pipeline.milestones)) updateMilestones(updated)
+            }}
+            onUpdatePSA={psa => {
+              updatePSATracking(psa)
+              // Auto-sync PSA milestone
+              const events = psa.events ?? []
+              const last = events[events.length - 1]
+              const psaStatus = !last ? 'pending' : (last.type === 'executed' ? 'completed' : 'in_progress')
+              const updated = (pipeline.milestones ?? []).map(m =>
+                m.id === 'psa' ? { ...m, status: psaStatus as any, date: last?.date ?? m.date } : m
+              )
+              if (JSON.stringify(updated) !== JSON.stringify(pipeline.milestones)) updateMilestones(updated)
+            }}
           />
         )}
 

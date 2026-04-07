@@ -49,6 +49,8 @@ export function DocIterationTimeline({ title, events, onUpdate, eventTypes, extr
   const [uploadType, setUploadType] = useState(eventTypes[0]?.id ?? '')
   const [extracting, setExtracting] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [editingTermsId, setEditingTermsId] = useState<string | null>(null)
+  const [termsDraft, setTermsDraft] = useState<Record<string, any>>({})
   const [draft, setDraft] = useState({ type: '', notes: '', price: '' })
   const fileRef = useRef<HTMLInputElement>(null)
   const attachRef = useRef<HTMLInputElement>(null)
@@ -305,24 +307,59 @@ export function DocIterationTimeline({ title, events, onUpdate, eventTypes, extr
                                 placeholder="..." className="w-full text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-[#c9a84c] bg-white" />
                             </div>
                           </div>
-                          {evt.extractedTerms && (
+                          {evt.extractedTerms && (() => {
+                            const isEditing = editingTermsId === evt.id
+                            const displayData = isEditing ? termsDraft : evt.extractedTerms!
+                            const entries = Object.entries(displayData).filter(([_, v]) => v !== null && v !== undefined)
+
+                            return (
                             <div className="bg-gray-50 border border-gray-200 rounded-lg p-2.5 mb-2">
-                              <p className="text-[8px] font-semibold text-[#c9a84c] uppercase tracking-wide mb-1.5 flex items-center gap-1"><Sparkles size={8} /> Extracted Terms</p>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <p className="text-[8px] font-semibold text-[#c9a84c] uppercase tracking-wide flex items-center gap-1"><Sparkles size={8} /> Extracted Terms</p>
+                                <div className="flex items-center gap-1">
+                                  {isEditing ? (
+                                    <>
+                                      <button onClick={() => { updateEvent(evt.id, { extractedTerms: termsDraft }); setEditingTermsId(null) }}
+                                        className="px-2 py-0.5 text-[9px] font-semibold bg-green-500 text-white rounded hover:bg-green-600 transition-colors">Save</button>
+                                      <button onClick={() => setEditingTermsId(null)}
+                                        className="px-2 py-0.5 text-[9px] font-medium text-gray-400 hover:text-gray-600">Cancel</button>
+                                    </>
+                                  ) : (
+                                    <button onClick={() => { setTermsDraft({ ...evt.extractedTerms }); setEditingTermsId(evt.id) }}
+                                      className="px-2 py-0.5 text-[9px] font-medium text-gray-400 hover:text-[#c9a84c] transition-colors flex items-center gap-0.5">
+                                      <Edit3 size={8} /> Edit
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5">
-                                {Object.entries(evt.extractedTerms).filter(([_, v]) => v !== null && v !== undefined).slice(0, 12).map(([key, val]) => (
+                                {entries.slice(0, 15).map(([key, val]) => (
                                   <div key={key} className="text-[9px]">
-                                    <span className="text-gray-400">{key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}: </span>
-                                    <span className="text-gray-700 font-medium">
-                                      {typeof val === 'number' ? (val > 100 ? fmtDollar(val) : String(val))
-                                        : typeof val === 'boolean' ? (val ? 'Yes' : 'No')
-                                        : typeof val === 'string' ? (val.length > 50 ? val.slice(0, 50) + '...' : val)
-                                        : Array.isArray(val) ? `${val.length} items` : String(val)}
-                                    </span>
+                                    <label className="text-gray-400 block">{key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}</label>
+                                    {isEditing ? (
+                                      <input
+                                        value={typeof termsDraft[key] === 'boolean' ? (termsDraft[key] ? 'true' : 'false') : String(termsDraft[key] ?? '')}
+                                        onChange={e => {
+                                          const v = e.target.value
+                                          const num = parseFloat(v)
+                                          setTermsDraft(d => ({ ...d, [key]: v === 'true' ? true : v === 'false' ? false : !isNaN(num) && v === String(num) ? num : v }))
+                                        }}
+                                        className="w-full text-[9px] font-medium text-gray-700 border border-gray-300 rounded px-1.5 py-0.5 focus:outline-none focus:border-[#c9a84c] bg-white"
+                                      />
+                                    ) : (
+                                      <span className="text-gray-700 font-medium">
+                                        {typeof val === 'number' ? (val > 100 ? fmtDollar(val) : String(val))
+                                          : typeof val === 'boolean' ? (val ? 'Yes' : 'No')
+                                          : typeof val === 'string' ? (val.length > 50 ? val.slice(0, 50) + '...' : val)
+                                          : Array.isArray(val) ? `${val.length} items` : String(val)}
+                                      </span>
+                                    )}
                                   </div>
                                 ))}
                               </div>
                             </div>
-                          )}
+                            )
+                          })()}
                           <div className="flex items-center gap-2">
                             {evt.documentUrl ? (
                               <a href={evt.documentUrl} target="_blank" rel="noopener noreferrer"
