@@ -64,8 +64,7 @@ export function PipelinePage() {
   const [activeTab, setActiveTab] = useState<string>('terms')
 
   useEffect(() => {
-    if (isPending) setActiveTab('terms')
-    else if (isActive || isClosed) setActiveTab('timeline')
+    setActiveTab('terms')
   }, [isPending, isActive, isClosed])
 
   const statusConfig: Record<string, { label: string; color: string }> = {
@@ -110,6 +109,9 @@ export function PipelinePage() {
             </span>
           </div>
           {property?.address && <p className="text-xs text-gray-400 truncate">{property.address}</p>}
+        </div>
+        <div className="flex-shrink-0 px-3">
+          <span className="text-sm font-bold tracking-widest text-[#1a1a2e] uppercase">Deal Tracker</span>
         </div>
         {dealScenario && (
           <Link to={`/property/${id}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg hover:border-[#c9a84c] transition-colors" title="Open in Model">
