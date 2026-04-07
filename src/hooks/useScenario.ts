@@ -10,7 +10,7 @@ export function useProperties() {
     setLoading(true)
     const { data } = await supabase
       .from('properties')
-      .select('*, scenarios(id, name, is_default, created_at, updated_at)')
+      .select('*, scenarios(id, name, is_default, inputs, created_at, updated_at)')
       .order('display_order', { ascending: true })
       .order('created_at', { ascending: false })
     setProperties((data as Property[]) ?? [])
