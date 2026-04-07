@@ -13,6 +13,7 @@ export interface LOIEvent {
   notes: string
   documentUrl: string | null   // PDF attached to this event
   price: number | null         // offer/counter price at this iteration
+  extractedTerms: LOIExtractedTerms | null  // AI-extracted from uploaded PDF
 }
 
 export interface LOITracking {
