@@ -4,13 +4,25 @@ export type PropertyStatus = 'research' | 'pending' | 'active' | 'closed'
 // ── LOI tracking (Pending status) ────────────────────────────────────────
 export type LOIStatus = 'none' | 'submitted' | 'counter_offer' | 'accepted' | 'rejected'
 
+export type LOIEventType = 'sent' | 'counter_offer' | 'revised' | 'accepted' | 'rejected'
+
+export interface LOIEvent {
+  id: string
+  type: LOIEventType
+  date: string
+  notes: string
+  documentUrl: string | null   // PDF attached to this event
+  price: number | null         // offer/counter price at this iteration
+}
+
 export interface LOITracking {
   status: LOIStatus
+  events: LOIEvent[]           // chronological history of LOI iterations
   submittedDate: string | null
   counterOfferNotes: string
   responseDate: string | null
-  loiDocumentUrl: string | null    // uploaded executed LOI
-  extractedTerms: LOIExtractedTerms | null  // AI-extracted from uploaded LOI
+  loiDocumentUrl: string | null
+  extractedTerms: LOIExtractedTerms | null
 }
 
 export interface LOIExtractedTerms {
@@ -145,6 +157,7 @@ export const DEFAULT_MILESTONES: Milestone[] = [
 
 export const DEFAULT_LOI_TRACKING: LOITracking = {
   status: 'none',
+  events: [],
   submittedDate: null,
   counterOfferNotes: '',
   responseDate: null,

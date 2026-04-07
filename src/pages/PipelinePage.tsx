@@ -12,6 +12,7 @@ import { DealTeamSection } from '../components/pipeline/DealTeamSection'
 import { ExpensesSection } from '../components/pipeline/ExpensesSection'
 import { RepairsSection } from '../components/pipeline/RepairsSection'
 import { DealTermsSection } from '../components/pipeline/DealTermsSection'
+import { LOITimeline } from '../components/pipeline/LOITimeline'
 import type { Scenario } from '../types'
 import type { MiniPipelineTab, FullPipelineTab, LOIStatus } from '../types/pipeline'
 
@@ -163,46 +164,13 @@ export function PipelinePage() {
         {/* ── Deal Terms ── */}
         {activeTab === 'terms' && pipeline && dealScenario && (
           <div>
-            {/* LOI Status */}
-            <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">LOI Status</h3>
-              <div className="flex gap-2 mb-3">
-                {(['none', 'submitted', 'counter_offer', 'accepted', 'rejected'] as const).map(s => {
-                  const loi = pipeline.loi_tracking
-                  const active = loi.status === s
-                  const colors: Record<string, string> = {
-                    none: 'border-gray-400 bg-gray-50 text-gray-600',
-                    submitted: 'border-amber-400 bg-amber-50 text-amber-700',
-                    counter_offer: 'border-orange-400 bg-orange-50 text-orange-700',
-                    accepted: 'border-green-400 bg-green-50 text-green-700',
-                    rejected: 'border-red-400 bg-red-50 text-red-700',
-                  }
-                  const labels: Record<string, string> = {
-                    none: 'Not Sent', submitted: 'Submitted', counter_offer: 'Counter-Offer', accepted: 'Accepted', rejected: 'Rejected',
-                  }
-                  return (
-                    <button key={s}
-                      onClick={() => updateLOITracking({ ...loi, status: s })}
-                      className={`flex-1 py-2 text-xs font-semibold rounded-lg border-2 transition-colors
-                        ${active ? colors[s] : 'border-gray-200 bg-white text-gray-400 hover:border-gray-300'}`}>
-                      {labels[s]}
-                    </button>
-                  )
-                })}
-              </div>
-              {pipeline.loi_tracking.status === 'counter_offer' && (
-                <div className="mt-3">
-                  <label className="block text-[10px] uppercase tracking-wide text-gray-500 font-medium mb-1">Counter-offer notes</label>
-                  <textarea
-                    value={pipeline.loi_tracking.counterOfferNotes}
-                    onChange={e => updateLOITracking({ ...pipeline.loi_tracking, counterOfferNotes: e.target.value })}
-                    placeholder="Price adjustment, revised terms, timeline changes..."
-                    rows={3}
-                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-[#c9a84c] bg-white text-gray-800 resize-none"
-                  />
-                </div>
-              )}
-            </div>
+            {/* LOI Timeline */}
+            <LOITimeline
+              loiTracking={pipeline.loi_tracking}
+              onUpdate={updateLOITracking}
+              dealPrice={dealScenario.inputs.price}
+              pipelineId={pipeline.id}
+            />
 
             {/* Projected vs Actual deal terms */}
             <DealTermsSection
