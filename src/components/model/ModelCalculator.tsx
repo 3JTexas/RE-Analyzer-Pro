@@ -2207,7 +2207,10 @@ export function ModelCalculator({
                       {inputs.is1031 && inputs.basis1031 > 0 ? (
                         <>
                           <PLRow label="Carryover basis override" value={fmtDollar(inputs.basis1031)} variant="total" />
-                          <p className="text-[9px] text-amber-600 mt-1">Manual override active — clear Carryover basis to use calculated basis</p>
+                          <div className="bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mt-1">
+                            <p className="text-[9px] text-amber-700 font-medium">Manual override is active</p>
+                            <p className="text-[9px] text-amber-600 mt-0.5">This overrides the calculated basis (purchase price less deferred gain and land). Set Carryover basis override to $0 above to use the auto-calculated basis instead.</p>
+                          </div>
                         </>
                       ) : (
                         <>

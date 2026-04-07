@@ -38,7 +38,7 @@ function exportVCard(c: DealTeamCandidate, roleLabel: string) {
 }
 
 export function DealTeamSection({ dealTeam, onUpdate, limitedRoles }: Props) {
-  const [expandedRole, setExpandedRole] = useState<string | null>(null)
+  const [expandedRoles, setExpandedRoles] = useState<Set<string>>(new Set())
   const [addingTo, setAddingTo] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState(emptyDraft)
@@ -118,13 +118,17 @@ export function DealTeamSection({ dealTeam, onUpdate, limitedRoles }: Props) {
       {roles.map(role => {
         const candidates = getCandidates(role.id)
         const selected = getSelected(role.id)
-        const expanded = expandedRole === role.id
+        const expanded = expandedRoles.has(role.id)
 
         return (
           <div key={role.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             {/* Role header */}
             <button
-              onClick={() => setExpandedRole(expanded ? null : role.id)}
+              onClick={() => setExpandedRoles(prev => {
+                const next = new Set(prev)
+                if (next.has(role.id)) next.delete(role.id); else next.add(role.id)
+                return next
+              })}
               className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
             >
               <div className="flex items-center gap-3">
