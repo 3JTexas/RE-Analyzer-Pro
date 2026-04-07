@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Plus, Trash2, Check, Phone, Mail, User } from 'lucide-react'
+import { ChevronDown, ChevronUp, Plus, Trash2, Check, Phone, Mail, User, Globe, MapPin } from 'lucide-react'
 import type { DealTeam, DealTeamCandidate, DealTeamRole } from '../../types/pipeline'
 import { DEAL_TEAM_ROLES } from '../../types/pipeline'
 
@@ -12,7 +12,7 @@ interface Props {
 export function DealTeamSection({ dealTeam, onUpdate, limitedRoles }: Props) {
   const [expandedRole, setExpandedRole] = useState<string | null>(null)
   const [addingTo, setAddingTo] = useState<string | null>(null)
-  const [draft, setDraft] = useState({ name: '', company: '', phone: '', email: '', notes: '' })
+  const [draft, setDraft] = useState({ name: '', company: '', phone: '', email: '', website: '', address: '', notes: '' })
 
   const roles = limitedRoles
     ? DEAL_TEAM_ROLES.filter(r => limitedRoles.includes(r.id))
@@ -32,13 +32,15 @@ export function DealTeamSection({ dealTeam, onUpdate, limitedRoles }: Props) {
       company: draft.company.trim(),
       phone: draft.phone.trim(),
       email: draft.email.trim(),
+      website: draft.website.trim(),
+      address: draft.address.trim(),
       notes: draft.notes.trim(),
       selected: getCandidates(role).length === 0,  // auto-select first one
     }
     const updated = { ...dealTeam }
     updated[role] = { candidates: [...getCandidates(role), candidate] }
     onUpdate(updated)
-    setDraft({ name: '', company: '', phone: '', email: '', notes: '' })
+    setDraft({ name: '', company: '', phone: '', email: '', website: '', address: '', notes: '' })
     setAddingTo(null)
   }
 
@@ -118,7 +120,7 @@ export function DealTeamSection({ dealTeam, onUpdate, limitedRoles }: Props) {
                             )}
                           </div>
                           {c.company && <div className="text-[10px] text-gray-500 mt-0.5">{c.company}</div>}
-                          <div className="flex items-center gap-3 mt-1.5">
+                          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                             {c.phone && (
                               <a href={`tel:${c.phone}`} className="text-[10px] text-gray-400 hover:text-[#c9a84c] flex items-center gap-0.5">
                                 <Phone size={9} /> {c.phone}
@@ -129,7 +131,18 @@ export function DealTeamSection({ dealTeam, onUpdate, limitedRoles }: Props) {
                                 <Mail size={9} /> {c.email}
                               </a>
                             )}
+                            {c.website && (
+                              <a href={c.website.startsWith('http') ? c.website : `https://${c.website}`} target="_blank" rel="noopener noreferrer"
+                                className="text-[10px] text-gray-400 hover:text-[#c9a84c] flex items-center gap-0.5">
+                                <Globe size={9} /> {c.website.replace(/^https?:\/\//, '')}
+                              </a>
+                            )}
                           </div>
+                          {c.address && (
+                            <div className="text-[10px] text-gray-400 mt-1 flex items-center gap-0.5">
+                              <MapPin size={9} className="flex-shrink-0" /> {c.address}
+                            </div>
+                          )}
                           {c.notes && <div className="text-[10px] text-gray-400 mt-1 italic">{c.notes}</div>}
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
@@ -151,7 +164,7 @@ export function DealTeamSection({ dealTeam, onUpdate, limitedRoles }: Props) {
                 {/* Add form */}
                 {addingTo === role.id ? (
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                    <div className="grid grid-cols-2 gap-2 mb-2">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
                       <input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
                         placeholder="Name *" className="text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-[#c9a84c] bg-white" />
                       <input value={draft.company} onChange={e => setDraft(d => ({ ...d, company: e.target.value }))}
@@ -160,6 +173,10 @@ export function DealTeamSection({ dealTeam, onUpdate, limitedRoles }: Props) {
                         placeholder="Phone" className="text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-[#c9a84c] bg-white" />
                       <input value={draft.email} onChange={e => setDraft(d => ({ ...d, email: e.target.value }))}
                         placeholder="Email" className="text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-[#c9a84c] bg-white" />
+                      <input value={draft.website} onChange={e => setDraft(d => ({ ...d, website: e.target.value }))}
+                        placeholder="Website" className="text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-[#c9a84c] bg-white" />
+                      <input value={draft.address} onChange={e => setDraft(d => ({ ...d, address: e.target.value }))}
+                        placeholder="Address" className="text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-[#c9a84c] bg-white" />
                     </div>
                     <textarea value={draft.notes} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))}
                       placeholder="Notes (optional)" rows={2}
@@ -170,7 +187,7 @@ export function DealTeamSection({ dealTeam, onUpdate, limitedRoles }: Props) {
                         className="flex-1 bg-[#1a1a2e] text-white text-xs font-medium py-2 rounded-lg hover:bg-[#c9a84c] hover:text-[#1a1a2e] transition-colors disabled:opacity-40">
                         Add Contact
                       </button>
-                      <button onClick={() => { setAddingTo(null); setDraft({ name: '', company: '', phone: '', email: '', notes: '' }) }}
+                      <button onClick={() => { setAddingTo(null); setDraft({ name: '', company: '', phone: '', email: '', website: '', address: '', notes: '' }) }}
                         className="flex-1 bg-white border border-gray-200 text-gray-500 text-xs font-medium py-2 rounded-lg">
                         Cancel
                       </button>

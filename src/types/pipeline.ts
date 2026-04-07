@@ -91,6 +91,8 @@ export interface DealTeamCandidate {
   company: string
   phone: string
   email: string
+  website: string
+  address: string
   notes: string
   selected: boolean
 }
