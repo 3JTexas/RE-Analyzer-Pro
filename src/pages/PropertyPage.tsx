@@ -113,12 +113,6 @@ export function PropertyPage() {
     setEditingCrexi(false)
   }
 
-  const updateStatus = async (status: 'research' | 'pending' | 'active' | 'closed') => {
-    if (!id) return
-    await supabase.from('properties').update({ status }).eq('id', id)
-    setProperty(prev => prev ? { ...prev, status } : prev)
-  }
-
   const status = property?.status ?? 'research'
   const statusConfig = {
     research: { label: 'Research', color: 'bg-gray-100 text-gray-600 border-gray-200' },
@@ -176,23 +170,24 @@ export function PropertyPage() {
             )}
           </div>
         </div>
-        {/* Status pills + Track Deal */}
+        {/* Status indicator + Deal Tracker */}
         <div className="flex items-center gap-2 flex-shrink-0">
           <div className="flex rounded-lg border border-gray-200 overflow-hidden">
             {(['research', 'pending', 'active', 'closed'] as const).map(s => {
-              const active = status === s
+              const isCurrent = status === s
+              const isPast = ['research', 'pending', 'active', 'closed'].indexOf(status) > ['research', 'pending', 'active', 'closed'].indexOf(s)
               const colors: Record<string, string> = {
-                research: active ? 'bg-gray-100 text-gray-700 border-gray-300' : '',
-                pending: active ? 'bg-amber-50 text-amber-700 border-amber-300' : '',
-                active: active ? 'bg-green-50 text-green-700 border-green-300' : '',
-                closed: active ? 'bg-blue-50 text-blue-700 border-blue-300' : '',
+                research: 'bg-gray-100 text-gray-700',
+                pending: 'bg-amber-50 text-amber-700',
+                active: 'bg-green-50 text-green-700',
+                closed: 'bg-blue-50 text-blue-700',
               }
               return (
-                <button key={s} onClick={() => updateStatus(s)}
-                  className={`px-2.5 py-1 text-[10px] font-semibold transition-colors border-r last:border-r-0 border-gray-200
-                    ${active ? colors[s] : 'text-gray-400 hover:bg-gray-50'}`}>
+                <div key={s}
+                  className={`px-2.5 py-1 text-[10px] font-semibold border-r last:border-r-0 border-gray-200
+                    ${isCurrent ? colors[s] : isPast ? 'bg-gray-50 text-gray-400' : 'text-gray-300'}`}>
                   {s === 'research' ? 'Research' : s === 'pending' ? 'Pending' : s === 'active' ? 'Active' : 'Closed'}
-                </button>
+                </div>
               )
             })}
           </div>

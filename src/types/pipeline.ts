@@ -188,6 +188,27 @@ export interface DealPipeline {
   updated_at: string
 }
 
+// ── Status derivation ────────────────────────────────────────────────────
+export function derivePropertyStatus(pipeline: DealPipeline | null): PropertyStatus {
+  if (!pipeline) return 'research'
+  if (!pipeline.deal_scenario_id) return 'research'
+
+  // Check if closing milestone is completed → closed
+  const closingMilestone = pipeline.milestones?.find(m => m.id === 'closing')
+  if (closingMilestone?.status === 'completed') return 'closed'
+
+  // Check LOI events for accepted → active
+  const events = pipeline.loi_tracking?.events ?? []
+  const lastEvent = events[events.length - 1]
+  if (lastEvent?.type === 'accepted') return 'active'
+
+  // Has LOI events → pending
+  if (events.length > 0) return 'pending'
+
+  // Has deal scenario but no LOI activity → pending (just started tracking)
+  return 'pending'
+}
+
 // ── UI helpers ───────────────────────────────────────────────────────────
 export type MiniPipelineTab = 'terms' | 'documents' | 'contacts'
 export type FullPipelineTab = 'timeline' | 'documents' | 'team' | 'expenses' | 'repairs'

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import type { DealPipeline, DealDocument, DealExpense, LOITracking, Milestone, DealTeam, RepairEstimate, ExpenseBudgets, DealDocType } from '../types/pipeline'
-import { DEFAULT_LOI_TRACKING, DEFAULT_MILESTONES } from '../types/pipeline'
+import { DEFAULT_LOI_TRACKING, DEFAULT_MILESTONES, derivePropertyStatus } from '../types/pipeline'
 
 // ── Main pipeline hook ───────────────────────────────────────────────────
 export function usePipeline(propertyId?: string) {
@@ -56,7 +56,11 @@ export function usePipeline(propertyId?: string) {
       .from('deal_pipelines')
       .update({ [field]: value })
       .eq('id', pipeline.id)
-    setPipeline(prev => prev ? { ...prev, [field]: value } : prev)
+    const updated = { ...pipeline, [field]: value }
+    setPipeline(updated)
+    // Auto-sync derived status to properties table
+    const newStatus = derivePropertyStatus(updated as DealPipeline)
+    await supabase.from('properties').update({ status: newStatus }).eq('id', updated.property_id)
   }
 
   const updateLOITracking = (loi: LOITracking) => updateField('loi_tracking', loi)
@@ -68,7 +72,10 @@ export function usePipeline(propertyId?: string) {
   const updateDealScenarioId = async (scenarioId: string | null) => {
     if (!pipeline) return
     await supabase.from('deal_pipelines').update({ deal_scenario_id: scenarioId }).eq('id', pipeline.id)
-    setPipeline(prev => prev ? { ...prev, deal_scenario_id: scenarioId } : prev)
+    const updated = { ...pipeline, deal_scenario_id: scenarioId }
+    setPipeline(updated)
+    const newStatus = derivePropertyStatus(updated as DealPipeline)
+    await supabase.from('properties').update({ status: newStatus }).eq('id', updated.property_id)
   }
 
   return {

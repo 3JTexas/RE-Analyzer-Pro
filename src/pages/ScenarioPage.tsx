@@ -13,6 +13,7 @@ interface PropertyMeta {
   address: string
   units: number
   year_built: number
+  status: string
   property_image_url: string | null
 }
 
@@ -33,7 +34,7 @@ export function ScenarioPage() {
 
       supabase
         .from('properties')
-        .select('name, address, units, year_built, property_image_url')
+        .select('name, address, units, year_built, status, property_image_url')
         .eq('id', scenario.property_id)
         .single()
         .then(({ data }) => {
@@ -57,6 +58,20 @@ export function ScenarioPage() {
           <ChevronLeft size={20} />
           <span className="text-xs">Scenarios</span>
         </Link>
+        {property && (
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-xs font-medium text-gray-500 truncate">{property.name}</span>
+            {property.status && property.status !== 'research' && (
+              <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border
+                ${property.status === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                  property.status === 'active' ? 'bg-green-50 text-green-600 border-green-200' :
+                  property.status === 'closed' ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                  'bg-gray-50 text-gray-400 border-gray-200'}`}>
+                {property.status === 'pending' ? 'Pending' : property.status === 'active' ? 'Active' : property.status === 'closed' ? 'Closed' : ''}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {scenario && (
