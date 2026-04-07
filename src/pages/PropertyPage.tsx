@@ -27,14 +27,19 @@ export function PropertyPage() {
   const [renameDraft, setRenameDraft] = useState('')
   const photoRef = useRef<HTMLInputElement>(null)
 
+  const [dealScenarioId, setDealScenarioId] = useState<string | null>(null)
+  const [showOtherScenarios, setShowOtherScenarios] = useState(false)
+
   const loadData = async () => {
     if (!id) return
-    const [{ data: prop }, scens] = await Promise.all([
+    const [{ data: prop }, scens, { data: pipeline }] = await Promise.all([
       supabase.from('properties').select('*').eq('id', id).single(),
       getScenariosForProperty(id),
+      supabase.from('deal_pipelines').select('deal_scenario_id').eq('property_id', id).single(),
     ])
     setProperty(prop as Property)
     setScenarios(scens)
+    if (pipeline?.deal_scenario_id) setDealScenarioId(pipeline.deal_scenario_id)
     setLoading(false)
   }
 
@@ -247,9 +252,51 @@ export function PropertyPage() {
                 <Plus size={14} /> Add scenario
               </button>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {scenarios.map(s => (
+          ) : (() => {
+            const dealScenario = dealScenarioId ? scenarios.find(s => s.id === dealScenarioId) : null
+            const otherScenarios = dealScenarioId ? scenarios.filter(s => s.id !== dealScenarioId) : scenarios
+            const showingOthers = !dealScenarioId || showOtherScenarios
+
+            return (
+            <div>
+              {/* Deal scenario — promoted */}
+              {dealScenario && (
+                <div className="mb-4">
+                  <p className="text-[10px] font-semibold text-[#c9a84c] uppercase tracking-wide mb-2">Active Deal Scenario</p>
+                  <div className="bg-white border-2 border-[#c9a84c] rounded-sm overflow-hidden group">
+                    <Link to={`/scenario/${dealScenario.id}`}
+                      className="flex items-center px-4 py-4">
+                      <div className="w-10 h-10 rounded-sm flex items-center justify-center mr-3 flex-shrink-0 border border-[#c9a84c] bg-amber-50">
+                        <BarChart3 size={20} className="text-[#c9a84c]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-gray-900">{dealScenario.name}</div>
+                        <div className="text-[10px] text-[#c9a84c] font-medium mt-0.5">
+                          Active deal · {new Date(dealScenario.updated_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </Link>
+                    <div className="border-t border-[#c9a84c]/20 flex">
+                      <button onClick={() => { setRenamingId(dealScenario.id); setRenameDraft(dealScenario.name) }}
+                        className="flex items-center gap-1 px-3 py-2 text-[10px] text-gray-400 hover:text-[#c9a84c] transition-colors">
+                        <Pencil size={11} /> Rename
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Other scenarios — collapsible when deal scenario exists */}
+              {dealScenarioId && otherScenarios.length > 0 && (
+                <button onClick={() => setShowOtherScenarios(!showOtherScenarios)}
+                  className="flex items-center gap-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2 hover:text-gray-600 transition-colors">
+                  {showOtherScenarios ? '▾' : '▸'} Other Scenarios ({otherScenarios.length})
+                </button>
+              )}
+
+              {showingOthers && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {otherScenarios.map(s => (
                 <div key={s.id} className="bg-white border border-gray-200 rounded-sm hover:border-[#c9a84c] transition-colors overflow-hidden group">
                   <Link to={`/scenario/${s.id}`}
                     className="flex items-center px-4 py-3.5">
@@ -294,7 +341,10 @@ export function PropertyPage() {
                 </div>
               ))}
             </div>
-          )}
+              )}
+            </div>
+            )
+          })()}
         </div>
       )}
     </div>
