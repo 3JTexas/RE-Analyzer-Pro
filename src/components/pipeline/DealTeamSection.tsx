@@ -16,9 +16,13 @@ interface Props {
 const emptyDraft = { name: '', company: '', phone: '', email: '', website: '', address: '', notes: '' }
 
 function exportVCard(c: DealTeamCandidate, roleLabel: string) {
+  const nameParts = c.name.trim().split(/\s+/)
+  const lastName = nameParts.length > 1 ? nameParts.slice(-1)[0] : c.name.trim()
+  const firstName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : ''
   const lines = [
     'BEGIN:VCARD',
     'VERSION:3.0',
+    `N:${lastName};${firstName};;;`,
     `FN:${c.name}`,
   ]
   if (c.company) lines.push(`ORG:${c.company}`)
