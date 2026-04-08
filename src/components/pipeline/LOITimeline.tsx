@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Send, MessageSquare, FileCheck, XCircle, RefreshCw, Upload, FileText, Plus, Loader2, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
+import { Send, Inbox, MessageSquare, FileCheck, XCircle, RefreshCw, Upload, FileText, Plus, Loader2, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { fmtDollar } from '../../lib/calc'
 import type { LOITracking, LOIEvent, LOIEventType, LOIExtractedTerms } from '../../types/pipeline'
@@ -13,6 +13,7 @@ interface Props {
 
 const EVENT_CONFIG: Record<LOIEventType, { icon: typeof Send; color: string; bg: string; border: string; label: string }> = {
   sent: { icon: Send, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-300', label: 'LOI Sent' },
+  received: { icon: Inbox, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-300', label: 'LOI Received' },
   counter_offer: { icon: MessageSquare, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-300', label: 'Counter-Offer Received' },
   revised: { icon: RefreshCw, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-300', label: 'Revised LOI Sent' },
   accepted: { icon: FileCheck, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-300', label: 'LOI Accepted' },
@@ -274,6 +275,7 @@ export function LOITimeline({ loiTracking, onUpdate, dealPrice, pipelineId }: Pr
               <select value={uploadType} onChange={e => setUploadType(e.target.value as LOIEventType)}
                 className="text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-[#c9a84c] bg-white">
                 <option value="sent">LOI Sent</option>
+                <option value="received">LOI Received</option>
                 <option value="counter_offer">Counter-Offer Received</option>
                 <option value="revised">Revised LOI Sent</option>
                 <option value="accepted">LOI Accepted (Executed)</option>
@@ -314,6 +316,7 @@ export function LOITimeline({ loiTracking, onUpdate, dealPrice, pipelineId }: Pr
             <select value={draft.type} onChange={e => setDraft(d => ({ ...d, type: e.target.value as LOIEventType }))}
               className="text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-[#c9a84c] bg-white">
               <option value="sent">LOI Sent</option>
+              <option value="received">LOI Received</option>
               <option value="counter_offer">Counter-Offer Received</option>
               <option value="revised">Revised LOI Sent</option>
               <option value="accepted">LOI Accepted</option>
@@ -415,6 +418,7 @@ export function LOITimeline({ loiTracking, onUpdate, dealPrice, pipelineId }: Pr
                               <select value={event.type} onChange={e => updateEvent(event.id, { type: e.target.value as LOIEventType })}
                                 className="w-full text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-[#c9a84c] bg-white">
                                 <option value="sent">LOI Sent</option>
+                                <option value="received">LOI Received</option>
                                 <option value="counter_offer">Counter-Offer</option>
                                 <option value="revised">Revised LOI</option>
                                 <option value="accepted">Accepted</option>

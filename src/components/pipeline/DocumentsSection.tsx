@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Upload, FileText, Trash2, Loader2, Download, Sparkles, Send, MessageSquare, RefreshCw, FileCheck, XCircle, Edit3 } from 'lucide-react'
+import { Upload, FileText, Trash2, Loader2, Download, Sparkles, Send, Inbox, MessageSquare, RefreshCw, FileCheck, XCircle, Edit3 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useDealDocuments } from '../../hooks/usePipeline'
 import { DocIterationTimeline } from './DocIterationTimeline'
@@ -25,6 +25,7 @@ const DOC_TYPE_COLORS: Record<DealDocType, string> = {
 // LOI event type configs
 const LOI_EVENT_TYPES = [
   { id: 'sent', label: 'LOI Sent', config: { icon: Send, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-300', label: 'LOI Sent' } },
+  { id: 'received', label: 'LOI Received', config: { icon: Inbox, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-300', label: 'LOI Received' } },
   { id: 'counter_offer', label: 'Counter-Offer Received', config: { icon: MessageSquare, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-300', label: 'Counter-Offer' } },
   { id: 'revised', label: 'Revised LOI Sent', config: { icon: RefreshCw, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-300', label: 'Revised LOI' } },
   { id: 'accepted', label: 'LOI Accepted', config: { icon: FileCheck, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-300', label: 'Accepted' } },
@@ -34,6 +35,7 @@ const LOI_EVENT_TYPES = [
 // PSA event type configs
 const PSA_EVENT_TYPES = [
   { id: 'draft_sent', label: 'PSA Draft Sent', config: { icon: Send, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-300', label: 'Draft Sent' } },
+  { id: 'draft_received', label: 'PSA Draft Received', config: { icon: Inbox, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-300', label: 'Draft Received' } },
   { id: 'seller_redlines', label: 'Seller Redlines', config: { icon: Edit3, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-300', label: 'Seller Redlines' } },
   { id: 'revised', label: 'Revised PSA', config: { icon: RefreshCw, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-300', label: 'Revised PSA' } },
   { id: 'executed', label: 'PSA Executed', config: { icon: FileCheck, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-300', label: 'Executed' } },

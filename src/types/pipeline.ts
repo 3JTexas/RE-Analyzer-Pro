@@ -4,10 +4,10 @@ export type PropertyStatus = 'research' | 'pending' | 'active' | 'closed'
 // ── LOI tracking (Pending status) ────────────────────────────────────────
 export type LOIStatus = 'none' | 'submitted' | 'counter_offer' | 'accepted' | 'rejected'
 
-export type LOIEventType = 'sent' | 'counter_offer' | 'revised' | 'accepted' | 'rejected'
+export type LOIEventType = 'sent' | 'received' | 'counter_offer' | 'revised' | 'accepted' | 'rejected'
 
 // PSA iteration tracking (same pattern as LOI)
-export type PSAEventType = 'draft_sent' | 'seller_redlines' | 'revised' | 'executed'
+export type PSAEventType = 'draft_sent' | 'draft_received' | 'seller_redlines' | 'revised' | 'executed'
 
 export interface PSAEvent {
   id: string

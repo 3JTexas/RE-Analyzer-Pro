@@ -167,10 +167,10 @@ export function TimelineSection({ milestones, onUpdate, loiTracking, psaTracking
                     <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1">LOI History</p>
                     {loiEvents.map(evt => {
                       const evtLabels: Record<string, string> = {
-                        sent: 'LOI Sent', counter_offer: 'Counter-Offer', revised: 'Revised LOI', accepted: 'Accepted', rejected: 'Rejected',
+                        sent: 'LOI Sent', received: 'LOI Received', counter_offer: 'Counter-Offer', revised: 'Revised LOI', accepted: 'Accepted', rejected: 'Rejected',
                       }
                       const evtColors: Record<string, string> = {
-                        sent: 'text-amber-600', counter_offer: 'text-orange-600', revised: 'text-blue-600', accepted: 'text-green-600', rejected: 'text-red-600',
+                        sent: 'text-amber-600', received: 'text-purple-600', counter_offer: 'text-orange-600', revised: 'text-blue-600', accepted: 'text-green-600', rejected: 'text-red-600',
                       }
                       return (
                         <div key={evt.id} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
@@ -198,10 +198,10 @@ export function TimelineSection({ milestones, onUpdate, loiTracking, psaTracking
                     <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1">PSA History</p>
                     {psaEvents.map(evt => {
                       const evtLabels: Record<string, string> = {
-                        draft_sent: 'Draft Sent', seller_redlines: 'Seller Redlines', revised: 'Revised Draft', executed: 'Executed',
+                        draft_sent: 'Draft Sent', draft_received: 'Draft Received', seller_redlines: 'Seller Redlines', revised: 'Revised Draft', executed: 'Executed',
                       }
                       const evtColors: Record<string, string> = {
-                        draft_sent: 'text-amber-600', seller_redlines: 'text-orange-600', revised: 'text-blue-600', executed: 'text-green-600',
+                        draft_sent: 'text-amber-600', draft_received: 'text-purple-600', seller_redlines: 'text-orange-600', revised: 'text-blue-600', executed: 'text-green-600',
                       }
                       return (
                         <div key={evt.id} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
