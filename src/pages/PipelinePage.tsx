@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ChevronLeft, FileText, Home, ExternalLink } from 'lucide-react'
+import { ChevronLeft, FileText, Home, ExternalLink, StickyNote } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { usePipeline } from '../hooks/usePipeline'
 import { getScenariosForProperty } from '../hooks/useScenario'
@@ -12,6 +12,8 @@ import { DealTeamSection } from '../components/pipeline/DealTeamSection'
 import { ExpensesSection } from '../components/pipeline/ExpensesSection'
 import { RepairsSection } from '../components/pipeline/RepairsSection'
 import { DealTermsSection } from '../components/pipeline/DealTermsSection'
+import { AllNotesPanel } from '../components/pipeline/AllNotesPanel'
+import { useCustomRoles } from '../hooks/useCustomRoles'
 import type { Scenario } from '../types'
 import type { MiniPipelineTab, FullPipelineTab, LOIStatus } from '../types/pipeline'
 
@@ -21,6 +23,7 @@ export function PipelinePage() {
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [propLoading, setPropLoading] = useState(true)
   const { pipeline, loading: pipelineLoading, updateLOITracking, updateMilestones, updateDealTeam, updateRepairEstimates, updateExpenseBudgets, updateActualInputs, updatePSATracking, updateDealScenarioId } = usePipeline(id)
+  const { customRoles, addRole, removeRole } = useCustomRoles()
 
   // Wide layout on mount
   useEffect(() => {
@@ -62,6 +65,7 @@ export function PipelinePage() {
         { id: 'repairs', label: 'Repairs' },
       ]
   const [activeTab, setActiveTab] = useState<string>('terms')
+  const [showNotes, setShowNotes] = useState(false)
 
   useEffect(() => {
     setActiveTab('terms')
@@ -119,7 +123,22 @@ export function PipelinePage() {
             <span className="text-xs font-medium text-gray-700">{dealScenario.name}</span>
           </Link>
         )}
+        <button
+          onClick={() => setShowNotes(!showNotes)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors flex-shrink-0
+            ${showNotes ? 'bg-amber-50 border-[#c9a84c] text-[#c9a84c]' : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-[#c9a84c] hover:text-[#c9a84c]'}`}
+          title="All Notes">
+          <StickyNote size={12} />
+          <span className="text-xs font-medium">Notes</span>
+        </button>
       </div>
+
+      {/* All Notes panel */}
+      {showNotes && pipeline && (
+        <div className="border-b border-gray-200 bg-amber-50/30 px-4 md:px-8 py-4 max-h-80 overflow-y-auto">
+          <AllNotesPanel pipeline={pipeline} />
+        </div>
+      )}
 
       {/* Tab bar */}
       <div className="flex border-b border-gray-200 bg-gray-50 px-4 md:px-8">
@@ -224,7 +243,7 @@ export function PipelinePage() {
 
         {/* ── PENDING: Contacts (limited roles: attorney + broker) ── */}
         {activeTab === 'contacts' && pipeline && (
-          <DealTeamSection dealTeam={pipeline.deal_team} onUpdate={updateDealTeam} limitedRoles={['attorney', 'broker']} />
+          <DealTeamSection dealTeam={pipeline.deal_team} onUpdate={updateDealTeam} limitedRoles={['attorney', 'broker']} customRoles={customRoles} />
         )}
 
         {/* ── ACTIVE: Timeline ── */}
@@ -234,7 +253,7 @@ export function PipelinePage() {
 
         {/* ── ACTIVE: Deal Team (all roles) ── */}
         {activeTab === 'team' && pipeline && (
-          <DealTeamSection dealTeam={pipeline.deal_team} onUpdate={updateDealTeam} />
+          <DealTeamSection dealTeam={pipeline.deal_team} onUpdate={updateDealTeam} customRoles={customRoles} onAddRole={addRole} onRemoveRole={removeRole} />
         )}
 
         {/* ── ACTIVE: Expenses ── */}

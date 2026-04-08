@@ -70,11 +70,9 @@ export interface Milestone {
   notes: string
 }
 
-export type DealTeamRole =
-  | 'attorney' | 'inspector' | 'property_manager' | 'lender'
-  | 'title_company' | 'broker' | 'appraiser' | 'insurance_agent'
+export type DealTeamRole = string  // built-in + custom roles
 
-export const DEAL_TEAM_ROLES: { id: DealTeamRole; label: string }[] = [
+export const DEAL_TEAM_ROLES: { id: string; label: string }[] = [
   { id: 'attorney', label: 'Attorney' },
   { id: 'inspector', label: 'Inspector' },
   { id: 'property_manager', label: 'Property Manager' },
