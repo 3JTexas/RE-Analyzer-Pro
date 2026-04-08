@@ -7,7 +7,7 @@ export type LOIStatus = 'none' | 'submitted' | 'counter_offer' | 'accepted' | 'r
 export type LOIEventType = 'sent' | 'received' | 'counter_offer' | 'revised' | 'accepted' | 'rejected'
 
 // PSA iteration tracking (same pattern as LOI)
-export type PSAEventType = 'draft_sent' | 'draft_received' | 'seller_redlines' | 'revised' | 'executed'
+export type PSAEventType = 'draft_sent' | 'draft_received' | 'seller_redlines' | 'buyer_redlines' | 'revised_sent' | 'revised_received' | 'executed'
 
 export interface PSAEvent {
   id: string

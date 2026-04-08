@@ -34,10 +34,12 @@ const LOI_EVENT_TYPES = [
 
 // PSA event type configs
 const PSA_EVENT_TYPES = [
-  { id: 'draft_sent', label: 'PSA Draft Sent', config: { icon: Send, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-300', label: 'Draft Sent' } },
-  { id: 'draft_received', label: 'PSA Draft Received', config: { icon: Inbox, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-300', label: 'Draft Received' } },
+  { id: 'draft_sent', label: 'Draft Sent (Buyer)', config: { icon: Send, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-300', label: 'Draft Sent' } },
+  { id: 'draft_received', label: 'Draft Received (Seller)', config: { icon: Inbox, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-300', label: 'Draft Received' } },
   { id: 'seller_redlines', label: 'Seller Redlines', config: { icon: Edit3, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-300', label: 'Seller Redlines' } },
-  { id: 'revised', label: 'Revised PSA', config: { icon: RefreshCw, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-300', label: 'Revised PSA' } },
+  { id: 'buyer_redlines', label: 'Buyer Redlines', config: { icon: Edit3, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-300', label: 'Buyer Redlines' } },
+  { id: 'revised_sent', label: 'Revised PSA Sent', config: { icon: RefreshCw, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-300', label: 'Revised Sent' } },
+  { id: 'revised_received', label: 'Revised PSA Received', config: { icon: RefreshCw, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-300', label: 'Revised Received' } },
   { id: 'executed', label: 'PSA Executed', config: { icon: FileCheck, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-300', label: 'Executed' } },
 ]
 
@@ -52,8 +54,10 @@ const loiSuggestNext = (events: any[]) => {
 const psaSuggestNext = (events: any[]) => {
   if (events.length === 0) return 'draft_sent'
   const last = events[events.length - 1].type
-  if (last === 'draft_sent' || last === 'revised') return 'seller_redlines'
-  if (last === 'seller_redlines') return 'revised'
+  if (last === 'draft_sent' || last === 'revised_sent') return 'seller_redlines'
+  if (last === 'draft_received' || last === 'revised_received') return 'buyer_redlines'
+  if (last === 'seller_redlines') return 'revised_sent'
+  if (last === 'buyer_redlines') return 'revised_received'
   return 'draft_sent'
 }
 

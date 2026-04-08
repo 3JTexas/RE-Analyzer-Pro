@@ -198,10 +198,10 @@ export function TimelineSection({ milestones, onUpdate, loiTracking, psaTracking
                     <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1">PSA History</p>
                     {psaEvents.map(evt => {
                       const evtLabels: Record<string, string> = {
-                        draft_sent: 'Draft Sent', draft_received: 'Draft Received', seller_redlines: 'Seller Redlines', revised: 'Revised Draft', executed: 'Executed',
+                        draft_sent: 'Draft Sent', draft_received: 'Draft Received', seller_redlines: 'Seller Redlines', buyer_redlines: 'Buyer Redlines', revised_sent: 'Revised Sent', revised_received: 'Revised Received', revised: 'Revised', executed: 'Executed',
                       }
                       const evtColors: Record<string, string> = {
-                        draft_sent: 'text-amber-600', draft_received: 'text-purple-600', seller_redlines: 'text-orange-600', revised: 'text-blue-600', executed: 'text-green-600',
+                        draft_sent: 'text-blue-600', draft_received: 'text-purple-600', seller_redlines: 'text-orange-600', buyer_redlines: 'text-amber-600', revised_sent: 'text-blue-600', revised_received: 'text-purple-600', revised: 'text-blue-600', executed: 'text-green-600',
                       }
                       return (
                         <div key={evt.id} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
