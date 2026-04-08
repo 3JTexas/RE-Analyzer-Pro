@@ -373,11 +373,11 @@ export function LOITimeline({ loiTracking, onUpdate, dealPrice, pipelineId }: Pr
                     </div>
 
                     <div
-                      className={`border rounded-lg p-3 cursor-pointer transition-colors
-                        ${isLatest ? config.border + ' ' + config.bg : 'border-gray-200 bg-white hover:border-gray-300'}`}
-                      onClick={() => setExpandedId(expanded ? null : event.id)}
+                      className={`border rounded-lg p-3 transition-colors
+                        ${isLatest ? config.border + ' ' + config.bg : 'border-gray-200 bg-white'}`}
                     >
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between cursor-pointer"
+                        onClick={() => setExpandedId(expanded ? null : event.id)}>
                         <div className="flex items-center gap-2">
                           <span className={`text-xs font-semibold ${isLatest ? config.color : 'text-gray-700'}`}>
                             {config.label}

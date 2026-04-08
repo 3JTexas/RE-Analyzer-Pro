@@ -269,10 +269,10 @@ export function DocIterationTimeline({ title, events, onUpdate, eventTypes, extr
                       ${isLatest ? cfg.border + ' ' + cfg.bg : 'border-gray-300 bg-gray-100'}`} style={{ zIndex: 1 }}>
                       {extracting === evt.id ? <Loader2 size={11} className="animate-spin text-[#c9a84c]" /> : <Icon size={11} className={isLatest ? cfg.color : 'text-gray-400'} />}
                     </div>
-                    <div className={`border rounded-lg p-2.5 cursor-pointer transition-colors
-                      ${isLatest ? cfg.border + ' ' + cfg.bg : 'border-gray-200 bg-white hover:border-gray-300'}`}
-                      onClick={() => setExpandedId(expanded ? null : evt.id)}>
-                      <div className="flex items-center justify-between">
+                    <div className={`border rounded-lg p-2.5 transition-colors
+                      ${isLatest ? cfg.border + ' ' + cfg.bg : 'border-gray-200 bg-white'}`}>
+                      <div className="flex items-center justify-between cursor-pointer"
+                        onClick={() => setExpandedId(expanded ? null : evt.id)}>
                         <div className="flex items-center gap-2">
                           <span className={`text-xs font-semibold ${isLatest ? cfg.color : 'text-gray-700'}`}>{cfg.label}</span>
                           {evt.price && showPrice && <span className="text-xs font-bold text-gray-900">{fmtDollar(evt.price)}</span>}
