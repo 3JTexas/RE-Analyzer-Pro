@@ -155,7 +155,7 @@ export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, 
               try {
                 const blob = await pdf(
                   <DealTermsPdf projected={projected} actualInputs={actualInputs} scenarioName={dealScenario.name}
-                    propertyName={propertyName} propertyAddress={propertyAddress} />
+                    propertyName={propertyName} propertyAddress={propertyAddress} keyDates={keyDates} />
                 ).toBlob()
                 const url = URL.createObjectURL(blob)
                 const a = document.createElement('a')

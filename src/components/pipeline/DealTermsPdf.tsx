@@ -1,6 +1,7 @@
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer'
 import { calculate, fmtDollar, fmtPct, fmtX, fmtNeg } from '../../lib/calc'
 import type { ModelInputs } from '../../types'
+import type { KeyDates } from '../../types/pipeline'
 
 const C = { text: '#1a1a2e', gray: '#666', muted: '#888', accent: '#c9a84c', green: '#1D6B3E', red: '#A32D2D', border: '#E5E3DC' }
 
@@ -60,9 +61,10 @@ interface Props {
   scenarioName: string
   propertyName: string
   propertyAddress: string | null
+  keyDates?: KeyDates
 }
 
-export function DealTermsPdf({ projected, actualInputs, scenarioName, propertyName, propertyAddress }: Props) {
+export function DealTermsPdf({ projected, actualInputs, scenarioName, propertyName, propertyAddress, keyDates }: Props) {
   const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
   const logoSrc = `${import.meta.env.BASE_URL}Chai_Logo.jpeg`
 
@@ -78,6 +80,33 @@ export function DealTermsPdf({ projected, actualInputs, scenarioName, propertyNa
         <Text style={s.title}>Deal Terms — {propertyName}</Text>
         <Text style={s.subtitle}>{propertyAddress ? `${propertyAddress} · ` : ''}{scenarioName} · {date}</Text>
         <View style={s.orangeLine} />
+
+        {/* Key Dates */}
+        {keyDates && Object.values(keyDates).some(v => v) && (() => {
+          const fmtDt = (d: string | null) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+          const dateFields: { label: string; value: string | null }[] = [
+            { label: 'Effective Date', value: keyDates.effectiveDate },
+            { label: 'Earnest Money Due', value: keyDates.earnestMoneyDueDate },
+            { label: 'DD Period Ends', value: keyDates.ddEndDate },
+            { label: 'Financing Deadline', value: keyDates.financingDeadlineDate },
+            { label: 'Closing Date', value: keyDates.closingDate },
+          ].filter(f => f.value)
+          return (
+            <View style={{ marginBottom: 12 }}>
+              <View style={s.sectionHdr}>
+                <Text style={s.sectionHdrText}>KEY DATES</Text>
+              </View>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                {dateFields.map((f, i) => (
+                  <View key={i} style={{ width: '33.33%', padding: '5 8', borderBottomWidth: 0.3, borderBottomColor: C.border, backgroundColor: i % 2 === 0 ? 'white' : '#FAFAF8' }}>
+                    <Text style={{ fontSize: 7, color: C.muted, marginBottom: 1 }}>{f.label}</Text>
+                    <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: C.text }}>{fmtDt(f.value)}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )
+        })()}
 
         {/* Key metrics */}
         <View style={s.metricsRow}>
