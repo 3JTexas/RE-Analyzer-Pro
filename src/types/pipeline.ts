@@ -207,28 +207,47 @@ export const EMPTY_KEY_DATES: KeyDates = {
   closingDate: null,
 }
 
+// Parse various date formats (YYYY-MM-DD, "April 10, 2026", "4/10/2026", etc.) to YYYY-MM-DD
+function parseToISO(val: any): string | null {
+  if (!val || typeof val !== 'string') return null
+  // Already ISO
+  if (/^\d{4}-\d{2}-\d{2}/.test(val)) return val.split('T')[0]
+  // Try native Date parsing (handles "April 10, 2026", "4/10/2026", etc.)
+  const d = new Date(val)
+  if (!isNaN(d.getTime())) {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+  return null
+}
+
+function addDaysToDate(dateStr: string, days: number): string | null {
+  const d = new Date(dateStr + 'T00:00:00')
+  if (isNaN(d.getTime())) return null
+  d.setDate(d.getDate() + days)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 export function deriveKeyDatesFromPSA(terms: Record<string, any>): Partial<KeyDates> {
-  const effective = terms.effectiveDate ?? null
+  const effective = parseToISO(terms.effectiveDate)
   const ddDays = terms.ddPeriodDays ? Number(terms.ddPeriodDays) : null
   const closingDays = terms.closingDays ? Number(terms.closingDays) : null
   const loanDays = terms.loanApprovalDays ? Number(terms.loanApprovalDays) : null
-
-  const addDays = (dateStr: string, days: number): string => {
-    const d = new Date(dateStr + 'T00:00:00')
-    d.setDate(d.getDate() + days)
-    return d.toISOString().split('T')[0]
-  }
+  const closingDateRaw = parseToISO(terms.closingDate)
 
   return {
     effectiveDate: effective,
-    earnestMoneyDueDate: effective ? addDays(effective, 3) : null,
-    ddEndDate: effective && ddDays ? addDays(effective, ddDays) : null,
-    financingDeadlineDate: effective && loanDays ? addDays(effective, loanDays) : null,
-    closingDate: terms.closingDate
-      ? (typeof terms.closingDate === 'string' && terms.closingDate.match(/^\d{4}-\d{2}-\d{2}/)
-        ? terms.closingDate.split('T')[0]
-        : null)
-      : (effective && closingDays ? addDays(effective, closingDays) : null),
+    earnestMoneyDueDate: effective ? addDaysToDate(effective, 3) : null,
+    ddEndDate: effective && ddDays ? addDaysToDate(effective, ddDays) : null,
+    financingDeadlineDate: effective && loanDays ? addDaysToDate(effective, loanDays) : null,
+    closingDate: closingDateRaw
+      ? closingDateRaw
+      : (effective && closingDays ? addDaysToDate(effective, closingDays) : null),
   }
 }
 
