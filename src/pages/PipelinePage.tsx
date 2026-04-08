@@ -13,6 +13,7 @@ import { ExpensesSection } from '../components/pipeline/ExpensesSection'
 import { RepairsSection } from '../components/pipeline/RepairsSection'
 import { DealTermsSection } from '../components/pipeline/DealTermsSection'
 import { AllNotesPanel } from '../components/pipeline/AllNotesPanel'
+import { CrimeMap } from '../components/pipeline/CrimeMap'
 import { useCustomRoles } from '../hooks/useCustomRoles'
 import type { Scenario } from '../types'
 import type { MiniPipelineTab, FullPipelineTab, LOIStatus } from '../types/pipeline'
@@ -63,6 +64,7 @@ export function PipelinePage() {
         { id: 'team', label: 'Deal Team' },
         { id: 'expenses', label: 'Expenses' },
         { id: 'repairs', label: 'Repairs' },
+        { id: 'crime', label: 'Crime Map' },
       ]
   const [activeTab, setActiveTab] = useState<string>('terms')
   const [showNotes, setShowNotes] = useState(false)
@@ -277,6 +279,15 @@ export function PipelinePage() {
             propertyName={property?.name ?? ''}
             propertyAddress={property?.address ?? null}
             readOnly={isClosed}
+          />
+        )}
+
+        {/* ── ACTIVE: Crime Map ── */}
+        {activeTab === 'crime' && pipeline && property && (
+          <CrimeMap
+            propertyName={property.name}
+            propertyAddress={property.address ?? ''}
+            pipelineId={pipeline.id}
           />
         )}
       </div>
