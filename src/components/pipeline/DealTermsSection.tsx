@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react'
-import { RefreshCw, Download, Lock, Unlock } from 'lucide-react'
+import { RefreshCw, Download, Lock, Unlock, Sparkles, X, Calendar } from 'lucide-react'
 import { pdf } from '@react-pdf/renderer'
 import { DealTermsPdf } from './DealTermsPdf'
 import { calculate, fmtDollar, fmtPct, fmtX, fmtNeg } from '../../lib/calc'
 import type { ModelInputs } from '../../types'
-import type { DealPipeline } from '../../types/pipeline'
+import type { KeyDates } from '../../types/pipeline'
+import { deriveKeyDatesFromPSA, EMPTY_KEY_DATES } from '../../types/pipeline'
 
 interface Props {
   dealScenario: { name: string; inputs: ModelInputs }
@@ -13,6 +14,9 @@ interface Props {
   onChangeScenario: () => void
   propertyName: string
   propertyAddress: string | null
+  keyDates?: KeyDates
+  onUpdateKeyDates?: (dates: KeyDates) => void
+  psaExtractedTerms?: Record<string, any> | null
 }
 
 interface FieldDef {
@@ -91,7 +95,8 @@ function fmtFieldVal(val: number | undefined, field: FieldDef): string {
   return String(val)
 }
 
-export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, onChangeScenario, propertyName, propertyAddress }: Props) {
+export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, onChangeScenario, propertyName, propertyAddress, keyDates: keyDatesProp, onUpdateKeyDates, psaExtractedTerms }: Props) {
+  const keyDates = keyDatesProp ?? EMPTY_KEY_DATES
   const projected = dealScenario.inputs
   const [generating, setGenerating] = useState(false)
   const [unlocked, setUnlocked] = useState(false)
@@ -166,6 +171,123 @@ export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, 
           </button>
         </div>
       </div>
+
+      {/* Key Dates */}
+      {onUpdateKeyDates && (() => {
+        const DATE_FIELDS: { key: keyof KeyDates; label: string }[] = [
+          { key: 'effectiveDate', label: 'Effective Date' },
+          { key: 'earnestMoneyDueDate', label: 'Earnest Money Due' },
+          { key: 'ddEndDate', label: 'DD Period Ends' },
+          { key: 'financingDeadlineDate', label: 'Financing Deadline' },
+          { key: 'closingDate', label: 'Closing Date' },
+        ]
+
+        const daysUntil = (dateStr: string | null): number | null => {
+          if (!dateStr) return null
+          const diff = new Date(dateStr + 'T00:00:00').getTime() - new Date().setHours(0, 0, 0, 0)
+          return Math.ceil(diff / 86400000)
+        }
+
+        const countdownBadge = (dateStr: string | null) => {
+          const days = daysUntil(dateStr)
+          if (days === null) return null
+          if (days < 0) return <span className="text-[9px] font-semibold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">{Math.abs(days)}d overdue</span>
+          if (days === 0) return <span className="text-[9px] font-semibold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">Today</span>
+          if (days <= 7) return <span className="text-[9px] font-semibold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">{days}d</span>
+          if (days <= 14) return <span className="text-[9px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">{days}d</span>
+          return <span className="text-[9px] font-semibold text-green-600 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded-full">{days}d</span>
+        }
+
+        const fmtDate = (dateStr: string | null) => {
+          if (!dateStr) return '—'
+          return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        }
+
+        const updateDate = (key: keyof KeyDates, val: string) => {
+          onUpdateKeyDates({ ...keyDates, [key]: val || null })
+        }
+
+        const clearDate = (key: keyof KeyDates) => {
+          onUpdateKeyDates({ ...keyDates, [key]: null })
+        }
+
+        const populateFromPSA = () => {
+          if (!psaExtractedTerms) return
+          const derived = deriveKeyDatesFromPSA(psaExtractedTerms)
+          // Only fill nulls — don't overwrite manual entries
+          const merged = { ...keyDates }
+          for (const [k, v] of Object.entries(derived)) {
+            if (v && !(merged as any)[k]) (merged as any)[k] = v
+          }
+          onUpdateKeyDates(merged)
+        }
+
+        const hasAnyDate = DATE_FIELDS.some(f => keyDates[f.key])
+
+        return (
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden mb-5">
+            <div className="flex items-center justify-between px-4 py-2.5 bg-[#1a1a2e]">
+              <div className="flex items-center gap-2">
+                <Calendar size={12} className="text-white" />
+                <h3 className="text-xs font-semibold text-white">Key Dates</h3>
+              </div>
+              {psaExtractedTerms && (
+                <button onClick={populateFromPSA}
+                  className="flex items-center gap-1 text-[10px] font-medium text-[#c9a84c] hover:text-amber-300 transition-colors">
+                  <Sparkles size={10} /> Populate from PSA
+                </button>
+              )}
+            </div>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className="text-left px-4 py-2 font-semibold text-gray-600 w-48">Deadline</th>
+                  <th className="text-left px-4 py-2 font-semibold text-gray-600">Date</th>
+                  <th className="text-right px-4 py-2 font-semibold text-gray-600 w-24">Status</th>
+                  {unlocked && <th className="w-8"></th>}
+                </tr>
+              </thead>
+              <tbody>
+                {DATE_FIELDS.map((f, i) => {
+                  const val = keyDates[f.key]
+                  return (
+                    <tr key={f.key} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                      <td className="px-4 py-2.5 font-medium text-gray-900">{f.label}</td>
+                      <td className="px-4 py-2.5">
+                        {unlocked ? (
+                          <input
+                            type="date"
+                            value={val ?? ''}
+                            onChange={e => updateDate(f.key, e.target.value)}
+                            className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-[#c9a84c] bg-white w-44"
+                          />
+                        ) : (
+                          <span className={val ? 'text-gray-900' : 'text-gray-300'}>{fmtDate(val)}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-right">{countdownBadge(val)}</td>
+                      {unlocked && (
+                        <td className="px-2 py-2.5">
+                          {val && (
+                            <button onClick={() => clearDate(f.key)} className="text-gray-300 hover:text-red-400" title="Clear">
+                              <X size={12} />
+                            </button>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            {!hasAnyDate && !unlocked && (
+              <div className="px-4 py-4 text-center">
+                <p className="text-[10px] text-gray-400">No dates set yet — unlock to enter manually{psaExtractedTerms ? ' or populate from PSA' : ''}</p>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Key metrics comparison */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">

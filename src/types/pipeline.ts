@@ -190,18 +190,61 @@ export const DEFAULT_LOI_TRACKING: LOITracking = {
   extractedTerms: null,
 }
 
+// ── Key Dates ────────────────────────────────────────────────────────────
+export interface KeyDates {
+  effectiveDate: string | null
+  earnestMoneyDueDate: string | null
+  ddEndDate: string | null
+  financingDeadlineDate: string | null
+  closingDate: string | null
+}
+
+export const EMPTY_KEY_DATES: KeyDates = {
+  effectiveDate: null,
+  earnestMoneyDueDate: null,
+  ddEndDate: null,
+  financingDeadlineDate: null,
+  closingDate: null,
+}
+
+export function deriveKeyDatesFromPSA(terms: Record<string, any>): Partial<KeyDates> {
+  const effective = terms.effectiveDate ?? null
+  const ddDays = terms.ddPeriodDays ? Number(terms.ddPeriodDays) : null
+  const closingDays = terms.closingDays ? Number(terms.closingDays) : null
+  const loanDays = terms.loanApprovalDays ? Number(terms.loanApprovalDays) : null
+
+  const addDays = (dateStr: string, days: number): string => {
+    const d = new Date(dateStr + 'T00:00:00')
+    d.setDate(d.getDate() + days)
+    return d.toISOString().split('T')[0]
+  }
+
+  return {
+    effectiveDate: effective,
+    earnestMoneyDueDate: effective ? addDays(effective, 3) : null,
+    ddEndDate: effective && ddDays ? addDays(effective, ddDays) : null,
+    financingDeadlineDate: effective && loanDays ? addDays(effective, loanDays) : null,
+    closingDate: terms.closingDate
+      ? (typeof terms.closingDate === 'string' && terms.closingDate.match(/^\d{4}-\d{2}-\d{2}/)
+        ? terms.closingDate.split('T')[0]
+        : null)
+      : (effective && closingDays ? addDays(effective, closingDays) : null),
+  }
+}
+
 export interface DealPipeline {
   id: string
   property_id: string
   user_id: string
-  deal_scenario_id: string | null  // which scenario represents the offer/deal terms
+  deal_scenario_id: string | null
   loi_tracking: LOITracking
   psa_tracking: PSATracking
   milestones: Milestone[]
   deal_team: DealTeam
   repair_estimates: RepairEstimate[]
   expense_budgets: ExpenseBudgets
-  actual_inputs: Partial<import('../types').ModelInputs>  // actual quotes/terms as they come in
+  actual_inputs: Partial<import('../types').ModelInputs>
+  key_dates: KeyDates
   created_at: string
   updated_at: string
 }

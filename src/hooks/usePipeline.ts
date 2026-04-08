@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import type { DealPipeline, DealDocument, DealExpense, LOITracking, Milestone, DealTeam, RepairEstimate, ExpenseBudgets, DealDocType } from '../types/pipeline'
+import type { DealPipeline, DealDocument, DealExpense, LOITracking, Milestone, DealTeam, RepairEstimate, ExpenseBudgets, DealDocType, KeyDates } from '../types/pipeline'
 import { DEFAULT_LOI_TRACKING, DEFAULT_MILESTONES, derivePropertyStatus } from '../types/pipeline'
 
 // ── Main pipeline hook ───────────────────────────────────────────────────
@@ -70,6 +70,7 @@ export function usePipeline(propertyId?: string) {
   const updateExpenseBudgets = (budgets: ExpenseBudgets) => updateField('expense_budgets', budgets)
   const updateActualInputs = (actuals: Record<string, any>) => updateField('actual_inputs', actuals)
   const updatePSATracking = (psa: any) => updateField('psa_tracking', psa)
+  const updateKeyDates = (dates: KeyDates) => updateField('key_dates', dates)
   const updateDealScenarioId = async (scenarioId: string | null) => {
     if (!pipeline) return
     await supabase.from('deal_pipelines').update({ deal_scenario_id: scenarioId }).eq('id', pipeline.id)
@@ -83,7 +84,7 @@ export function usePipeline(propertyId?: string) {
     pipeline, loading, refresh: fetch,
     updateLOITracking, updateMilestones, updateDealTeam,
     updateRepairEstimates, updateExpenseBudgets, updateActualInputs,
-    updatePSATracking, updateDealScenarioId,
+    updatePSATracking, updateKeyDates, updateDealScenarioId,
   }
 }
 

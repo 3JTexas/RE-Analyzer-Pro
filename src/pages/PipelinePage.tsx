@@ -22,7 +22,7 @@ export function PipelinePage() {
   const [property, setProperty] = useState<{ name: string; address: string | null; status: string } | null>(null)
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [propLoading, setPropLoading] = useState(true)
-  const { pipeline, loading: pipelineLoading, updateLOITracking, updateMilestones, updateDealTeam, updateRepairEstimates, updateExpenseBudgets, updateActualInputs, updatePSATracking, updateDealScenarioId } = usePipeline(id)
+  const { pipeline, loading: pipelineLoading, updateLOITracking, updateMilestones, updateDealTeam, updateRepairEstimates, updateExpenseBudgets, updateActualInputs, updatePSATracking, updateKeyDates, updateDealScenarioId } = usePipeline(id)
   const { customRoles, addRole, removeRole } = useCustomRoles()
 
   // Wide layout on mount
@@ -81,6 +81,11 @@ export function PipelinePage() {
   // Deal scenario
   const dealScenario = scenarios.find(s => s.id === pipeline?.deal_scenario_id)
   const nonBrokerScenarios = scenarios.filter(s => !s.is_default)
+
+  // Latest PSA event with extracted terms (for key dates auto-population)
+  const psaEvents = pipeline?.psa_tracking?.events ?? []
+  const latestPSAWithTerms = [...psaEvents].reverse().find(e => e.extractedTerms)
+  const psaExtractedTerms = latestPSAWithTerms?.extractedTerms ?? null
 
   const selectDealScenario = async (scenarioId: string | null) => {
     if (!pipeline) return
@@ -199,6 +204,9 @@ export function PipelinePage() {
               onChangeScenario={() => selectDealScenario(null)}
               propertyName={property?.name ?? ''}
               propertyAddress={property?.address ?? null}
+              keyDates={pipeline.key_dates ?? { effectiveDate: null, earnestMoneyDueDate: null, ddEndDate: null, financingDeadlineDate: null, closingDate: null }}
+              onUpdateKeyDates={updateKeyDates}
+              psaExtractedTerms={psaExtractedTerms}
             />
           </div>
         )}
