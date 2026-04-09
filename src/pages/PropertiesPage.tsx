@@ -1,16 +1,24 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Building2, Plus, Trash2, ChevronRight, GripVertical, Camera, Loader2, ArrowRight, TrendingUp, Clock, DollarSign } from 'lucide-react'
+import { Building2, Plus, Trash2, ChevronRight, GripVertical, Camera, Loader2, ArrowRight, TrendingUp, Clock, DollarSign, Tag } from 'lucide-react'
 import { useProperties, useScenario } from '../hooks/useScenario'
+import { useSellingProperties, use1031Links } from '../hooks/useSellingProperties'
 import { supabase } from '../lib/supabase'
 import { Spinner } from '../components/ui'
 import { SetupFlow } from '../components/OMSetupFlow'
 import { fmtDollar } from '../lib/calc'
+import { computeSaleAnalysis } from '../types/selling'
+import { SellingPropertyCard } from '../components/selling/SellingPropertyCard'
 import type { ModelInputs, Property } from '../types'
 import type { SetupConfirmMeta } from '../components/OMSetupFlow'
 
 export function PropertiesPage() {
   const { properties, loading, createProperty, deleteProperty, reorderProperties, refresh } = useProperties()
+  const { properties: sellingProps, loading: sellingLoading, create: createSelling, update: updateSelling, remove: removeSelling } = useSellingProperties()
+  const { links: allLinks, createLink, removeLink } = use1031Links()
+  const [showAddSelling, setShowAddSelling] = useState(false)
+  const [newSellingName, setNewSellingName] = useState('')
+  const [newSellingAddress, setNewSellingAddress] = useState('')
   const [pipelines, setPipelines] = useState<Record<string, string | null>>({}) // propertyId → deal_scenario_id
 
   // Load pipeline deal_scenario_ids for all properties
@@ -202,6 +210,66 @@ export function PropertiesPage() {
                     </div>
                   </div>
                 )}
+
+                {/* ── Properties I'm Selling ── */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-[11px] tracking-[0.15em] uppercase text-purple-500 font-semibold flex items-center gap-2">
+                      <Tag size={13} /> Properties I'm Selling
+                    </h2>
+                    {!showAddSelling && (
+                      <button onClick={() => setShowAddSelling(true)}
+                        className="flex items-center gap-1 text-[10px] font-medium text-purple-500 hover:text-purple-600 transition-colors">
+                        <Plus size={12} /> Add Sale
+                      </button>
+                    )}
+                  </div>
+                  {showAddSelling && (
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-3">
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <input value={newSellingName} onChange={e => setNewSellingName(e.target.value)}
+                          placeholder="Property name *" autoFocus
+                          className="text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-purple-400 bg-white" />
+                        <input value={newSellingAddress} onChange={e => setNewSellingAddress(e.target.value)}
+                          placeholder="Address (optional)"
+                          className="text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-purple-400 bg-white" />
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={async () => {
+                          if (newSellingName.trim()) {
+                            await createSelling(newSellingName.trim(), newSellingAddress.trim() || undefined)
+                            setNewSellingName(''); setNewSellingAddress(''); setShowAddSelling(false)
+                          }
+                        }} disabled={!newSellingName.trim()}
+                          className="px-4 py-2 text-xs font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-40">
+                          Add
+                        </button>
+                        <button onClick={() => { setShowAddSelling(false); setNewSellingName(''); setNewSellingAddress('') }}
+                          className="px-4 py-2 text-xs font-medium bg-white border border-gray-200 text-gray-500 rounded-lg">
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {sellingProps.length > 0 ? (
+                    <div className="space-y-2">
+                      {sellingProps.map(sp => (
+                        <SellingPropertyCard
+                          key={sp.id}
+                          property={sp}
+                          onUpdate={updateSelling}
+                          onDelete={removeSelling}
+                          links={allLinks.filter(l => l.selling_property_id === sp.id)}
+                          buyProperties={properties.map(p => ({ id: p.id, name: p.name, address: p.address ?? '' }))}
+                          onCreateLink={createLink}
+                          onRemoveLink={removeLink}
+                        />
+                      ))}
+                    </div>
+                  ) : !showAddSelling && (
+                    <p className="text-xs text-gray-400 py-2">No properties being sold — add one to track 1031 exchange proceeds</p>
+                  )}
+                </div>
 
                 {/* ── R&D section ── */}
                 <div className="mb-6">

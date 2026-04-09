@@ -30,19 +30,21 @@ Deno.serve(async (req) => {
     const now = new Date()
     const oneYearAgo = new Date(now)
     oneYearAgo.setFullYear(now.getFullYear() - 1)
-    const dtEnd = datetime_end || now.toISOString().split('T')[0] + 'T23:59:59.000Z'
-    const dtStart = datetime_ini || oneYearAgo.toISOString().split('T')[0] + 'T00:00:00.000Z'
+    const fmtDate = (d: Date) => d.toISOString().split('T')[0]
+    const dtEnd = datetime_end || fmtDate(now)
+    const dtStart = datetime_ini || fmtDate(oneYearAgo)
     const dist = distance || '2mi'
 
-    // Fetch all pages
+    // Fetch all pages (GET request to RapidAPI)
     let allIncidents: any[] = []
     let page = 1
     let totalPages = 1
 
-    while (page <= totalPages && page <= 5) { // cap at 5 pages to conserve API calls
-      const url = `https://crimeometer.p.rapidapi.com/v1/incidents/raw-data?lat=${lat}&lon=${lon}&distance=${dist}&datetime_ini=${dtStart}&datetime_end=${dtEnd}&page=${page}`
+    while (page <= totalPages && page <= 5) {
+      const url = `https://crimeometer.p.rapidapi.com/raw-data/?lat=${lat}&lon=${lon}&distance=${dist}&datetime_ini=${dtStart}&datetime_end=${dtEnd}&page=${page}`
 
       const resp = await fetch(url, {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
