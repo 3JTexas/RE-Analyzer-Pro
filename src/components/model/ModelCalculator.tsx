@@ -13,6 +13,9 @@ import { generatePDF, ReportDocument, fetchImageAsBase64 } from '../pdf/PdfRepor
 import type { ScenarioCol, ReportProps, ExportTab } from '../pdf/PdfReport'
 import { PDFViewer, BlobProvider, pdf } from '@react-pdf/renderer'
 import { loadCompareState, saveCompareState } from '../../lib/uiState'
+import { getLinkedSellingProperties } from '../../hooks/useSellingProperties'
+import type { SellingProperty } from '../../types/selling'
+import { computeSaleAnalysis } from '../../types/selling'
 import { exportToExcel } from '../../lib/excelExport'
 import { LOIModal } from '../loi/LOIModal'
 import { TaxRecordImport } from '../TaxRecordImport'
@@ -805,6 +808,15 @@ export function ModelCalculator({
   const pdfMenuRef = useRef<HTMLDivElement>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
   const tabContentRef = useRef<HTMLDivElement>(null)
+
+  // 1031 linked selling properties
+  const [linkedSales, setLinkedSales] = useState<{ selling_property: SellingProperty; allocated_amount: number }[]>([])
+  useEffect(() => {
+    if (!propertyId) return
+    getLinkedSellingProperties(propertyId).then(links => {
+      setLinkedSales(links.map(l => ({ selling_property: l.selling_property, allocated_amount: l.allocated_amount })))
+    })
+  }, [propertyId])
 
   // Compare tab: which two scenarios to diff
   const [compareA, setCompareA] = useState<string>(currentScenarioId ?? 'current')
@@ -1980,6 +1992,35 @@ export function ModelCalculator({
                   </div>
                   <p className="text-[9px] text-gray-400">Use carryover basis for depreciation</p>
                 </div>
+                {inputs.is1031 && linkedSales.length > 0 && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-2.5 mb-1">
+                    <p className="text-[9px] font-semibold text-purple-600 uppercase tracking-wide mb-1">Linked Sale{linkedSales.length > 1 ? 's' : ''}</p>
+                    {linkedSales.map((ls, i) => (
+                      <div key={i} className="flex items-center justify-between text-xs mb-0.5">
+                        <span className="text-purple-700 font-medium">{ls.selling_property.name}</span>
+                        <span className="text-purple-900 font-bold">${Math.round(ls.allocated_amount).toLocaleString()}</span>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => {
+                        // Auto-fill from the first (or only) linked sale
+                        const sp = linkedSales[0].selling_property
+                        const totalEquity = linkedSales.reduce((s, l) => s + l.allocated_amount, 0)
+                        set('priorSalePrice', sp.sale_price)
+                        set('priorSellingCostsPct', sp.selling_costs_pct)
+                        set('priorMortgagePayoff', sp.mortgage_payoff)
+                        set('priorPurchasePrice', sp.original_purchase_price)
+                        set('priorImprovements', sp.capital_improvements)
+                        set('priorDepreciation', sp.depreciation_taken)
+                        set('cgRate', sp.cg_rate)
+                        set('reclaimRate', sp.recapture_rate)
+                        set('equity1031', totalEquity)
+                      }}
+                      className="mt-1.5 text-[10px] font-medium text-purple-600 hover:text-purple-700 transition-colors">
+                      Auto-fill 1031 fields from sale
+                    </button>
+                  </div>
+                )}
                 {inputs.is1031 && (() => {
                   const ex = calc1031(inputs)
                   const autoGain = ex?.capitalGain ?? 0

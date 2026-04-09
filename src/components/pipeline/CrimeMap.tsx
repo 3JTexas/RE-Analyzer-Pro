@@ -1,21 +1,16 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { MapContainer, TileLayer, Circle, CircleMarker, Popup, useMap } from 'react-leaflet'
-import { Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { Upload, AlertTriangle, RefreshCw, FileText, X } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 
 interface CrimeIncident {
-  incident_code: string
-  incident_date: string
-  incident_offense: string
-  incident_offense_code: string
-  incident_offense_description: string
-  incident_offense_detail_description: string
-  incident_offense_crime_against: string
-  incident_latitude: number
-  incident_longitude: number
-  incident_address: string
-  incident_source_name: string
+  date: string
+  type: string
+  description: string
+  address: string
+  lat: number
+  lng: number
+  source?: string
 }
 
 interface Props {
@@ -26,22 +21,26 @@ interface Props {
   pipelineId: string
 }
 
-// Crime category colors
-const CRIME_COLORS: Record<string, { color: string; label: string }> = {
-  Person: { color: '#DC2626', label: 'Violent (Person)' },
-  Property: { color: '#D97706', label: 'Property' },
-  Society: { color: '#7C3AED', label: 'Society' },
-  'Not a Crime': { color: '#6B7280', label: 'Other' },
+// Crime category colors — match by keyword in type/description
+function categorize(type: string): { color: string; label: string } {
+  const t = (type || '').toLowerCase()
+  if (t.includes('assault') || t.includes('robbery') || t.includes('murder') || t.includes('homicide') || t.includes('battery') || t.includes('shooting') || t.includes('rape') || t.includes('kidnap'))
+    return { color: '#DC2626', label: 'Violent' }
+  if (t.includes('burglary') || t.includes('theft') || t.includes('larceny') || t.includes('vehicle') || t.includes('shoplifting') || t.includes('vandalism') || t.includes('arson') || t.includes('trespass'))
+    return { color: '#D97706', label: 'Property' }
+  if (t.includes('drug') || t.includes('narcotic') || t.includes('dui') || t.includes('alcohol') || t.includes('prostitution'))
+    return { color: '#7C3AED', label: 'Drug/Vice' }
+  return { color: '#6B7280', label: 'Other' }
 }
 
 const RING_CONFIG = [
-  { radius: 804.67, label: '0.5 mi', color: '#22C55E', opacity: 0.15 },   // 0.5 miles in meters
-  { radius: 1609.34, label: '1 mi', color: '#EAB308', opacity: 0.10 },     // 1 mile
-  { radius: 3218.69, label: '2 mi', color: '#EF4444', opacity: 0.07 },     // 2 miles
+  { radius: 804.67, label: '0.5 mi', color: '#22C55E', opacity: 0.15 },
+  { radius: 1609.34, label: '1 mi', color: '#EAB308', opacity: 0.10 },
+  { radius: 3218.69, label: '2 mi', color: '#EF4444', opacity: 0.07 },
 ]
 
 function distanceMiles(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 3958.8 // Earth radius in miles
+  const R = 3958.8
   const dLat = (lat2 - lat1) * Math.PI / 180
   const dLon = (lon2 - lon1) * Math.PI / 180
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2
@@ -50,10 +49,61 @@ function distanceMiles(lat1: number, lon1: number, lat2: number, lon2: number): 
 
 function FitBounds({ lat, lng }: { lat: number; lng: number }) {
   const map = useMap()
-  useEffect(() => {
-    map.setView([lat, lng], 13)
-  }, [lat, lng, map])
+  useEffect(() => { map.setView([lat, lng], 13) }, [lat, lng, map])
   return null
+}
+
+// Auto-detect CSV columns
+function detectColumns(headers: string[]): { lat?: string; lng?: string; date?: string; type?: string; description?: string; address?: string } {
+  const h = headers.map(s => s.toLowerCase().trim())
+  const find = (candidates: string[]) => {
+    const idx = h.findIndex(col => candidates.some(c => col.includes(c)))
+    return idx >= 0 ? headers[idx] : undefined
+  }
+  return {
+    lat: find(['latitude', 'lat', 'y_coord', 'ycoord', 'point_y']),
+    lng: find(['longitude', 'lon', 'lng', 'x_coord', 'xcoord', 'point_x']),
+    date: find(['date', 'occurred', 'incident_date', 'report_date', 'datetime']),
+    type: find(['type', 'offense', 'crime_type', 'category', 'ucr', 'incident_type', 'description']),
+    description: find(['description', 'offense_description', 'narrative', 'details', 'crime_description']),
+    address: find(['address', 'location', 'block', 'street', 'incident_address', 'block_address']),
+  }
+}
+
+function parseCSV(text: string): CrimeIncident[] {
+  const lines = text.split('\n').filter(l => l.trim())
+  if (lines.length < 2) return []
+
+  // Handle both comma and tab delimited
+  const delimiter = lines[0].includes('\t') ? '\t' : ','
+  const headers = lines[0].split(delimiter).map(h => h.replace(/^"|"$/g, '').trim())
+  const cols = detectColumns(headers)
+
+  if (!cols.lat || !cols.lng) {
+    // Try to geocode from address later — for now require lat/lng
+    console.warn('CSV missing lat/lng columns. Headers:', headers)
+  }
+
+  const incidents: CrimeIncident[] = []
+  for (let i = 1; i < lines.length; i++) {
+    const vals = lines[i].split(delimiter).map(v => v.replace(/^"|"$/g, '').trim())
+    const row: Record<string, string> = {}
+    headers.forEach((h, j) => { row[h] = vals[j] ?? '' })
+
+    const lat = parseFloat(row[cols.lat ?? ''] ?? '')
+    const lng = parseFloat(row[cols.lng ?? ''] ?? '')
+    if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) continue
+
+    incidents.push({
+      date: row[cols.date ?? ''] ?? '',
+      type: row[cols.type ?? ''] ?? 'Unknown',
+      description: row[cols.description ?? ''] ?? '',
+      address: row[cols.address ?? ''] ?? '',
+      lat, lng,
+      source: 'CSV Import',
+    })
+  }
+  return incidents
 }
 
 export function CrimeMap({ lat: latProp, lng: lngProp, propertyName, propertyAddress, pipelineId }: Props) {
@@ -62,10 +112,9 @@ export function CrimeMap({ lat: latProp, lng: lngProp, propertyName, propertyAdd
   )
   const [geocoding, setGeocoding] = useState(false)
   const [incidents, setIncidents] = useState<CrimeIncident[]>([])
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [fetched, setFetched] = useState(false)
   const [filter, setFilter] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   // Geocode address if no coords provided
   useEffect(() => {
@@ -86,25 +135,26 @@ export function CrimeMap({ lat: latProp, lng: lngProp, propertyName, propertyAdd
   const lat = coords?.lat ?? 0
   const lng = coords?.lng ?? 0
 
-  const fetchCrimeData = async () => {
-    setLoading(true)
+  const handleFileUpload = (file: File) => {
     setError(null)
-    try {
-      const { data, error: fnError } = await supabase.functions.invoke('crime-data', {
-        body: { lat, lon: lng, distance: '2mi' },
-      })
-      if (fnError) throw new Error(fnError.message)
-      if (data.error) throw new Error(data.error)
-      setIncidents(data.incidents || [])
-      setFetched(true)
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string
+        const parsed = parseCSV(text)
+        if (parsed.length === 0) {
+          setError('No incidents found in file. Make sure it has latitude/longitude columns.')
+          return
+        }
+        setIncidents(parsed)
+      } catch (err: any) {
+        setError(`Failed to parse file: ${err.message}`)
+      }
     }
+    reader.readAsText(file)
   }
 
-  // Categorize incidents by ring
+  // Ring stats
   const ringStats = useMemo(() => {
     const stats = [
       { label: '< 0.5 mi', count: 0, violent: 0, property: 0 },
@@ -112,33 +162,35 @@ export function CrimeMap({ lat: latProp, lng: lngProp, propertyName, propertyAdd
       { label: '1–2 mi', count: 0, violent: 0, property: 0 },
     ]
     for (const inc of incidents) {
-      const d = distanceMiles(lat, lng, inc.incident_latitude, inc.incident_longitude)
+      const d = distanceMiles(lat, lng, inc.lat, inc.lng)
       const idx = d <= 0.5 ? 0 : d <= 1 ? 1 : 2
-      stats[idx].count++
-      if (inc.incident_offense_crime_against === 'Person') stats[idx].violent++
-      if (inc.incident_offense_crime_against === 'Property') stats[idx].property++
+      if (idx < 3) {
+        stats[idx].count++
+        const cat = categorize(inc.type)
+        if (cat.label === 'Violent') stats[idx].violent++
+        if (cat.label === 'Property') stats[idx].property++
+      }
     }
     return stats
   }, [incidents, lat, lng])
 
-  // Category totals for legend
   const categoryTotals = useMemo(() => {
     const totals: Record<string, number> = {}
     for (const inc of incidents) {
-      const cat = inc.incident_offense_crime_against || 'Other'
+      const cat = categorize(inc.type).label
       totals[cat] = (totals[cat] || 0) + 1
     }
     return totals
   }, [incidents])
 
   const filtered = useMemo(() =>
-    filter ? incidents.filter(i => i.incident_offense_crime_against === filter) : incidents
+    filter ? incidents.filter(i => categorize(i.type).label === filter) : incidents
   , [incidents, filter])
 
   if (geocoding) {
     return (
       <div className="text-center py-12">
-        <Loader2 size={24} className="animate-spin text-gray-400 mx-auto mb-3" />
+        <div className="animate-spin w-6 h-6 border-2 border-gray-300 border-t-[#c9a84c] rounded-full mx-auto mb-3" />
         <p className="text-xs text-gray-500">Geocoding address...</p>
       </div>
     )
@@ -149,45 +201,45 @@ export function CrimeMap({ lat: latProp, lng: lngProp, propertyName, propertyAdd
       <div className="text-center py-12">
         <AlertTriangle size={24} className="text-red-400 mx-auto mb-3" />
         <p className="text-xs text-red-600">Could not determine property coordinates</p>
-        <p className="text-[10px] text-gray-400 mt-1">Address: {propertyAddress}</p>
       </div>
     )
   }
 
-  if (!fetched && !loading) {
+  // No data loaded yet
+  if (incidents.length === 0) {
     return (
       <div className="text-center py-12">
-        <AlertTriangle size={32} className="text-gray-200 mx-auto mb-3" />
+        <FileText size={32} className="text-gray-200 mx-auto mb-3" />
         <p className="text-sm font-medium text-gray-600 mb-1">Crime Map</p>
-        <p className="text-xs text-gray-400 mb-4">Fetch crime incidents within 2 miles of {propertyAddress}</p>
+        <p className="text-xs text-gray-400 mb-1">{propertyAddress}</p>
         <p className="text-[10px] text-gray-400 mb-4">Coordinates: {lat.toFixed(4)}, {lng.toFixed(4)}</p>
-        <button onClick={fetchCrimeData}
-          className="px-6 py-2.5 text-xs font-semibold bg-[#1a1a2e] text-white rounded-lg hover:bg-[#c9a84c] hover:text-[#1a1a2e] transition-colors">
-          Load Crime Data
-        </button>
-        <p className="text-[9px] text-gray-400 mt-2">Uses 1 Crimeometer API call · Last 12 months · 2 mi radius</p>
-      </div>
-    )
-  }
 
-  if (loading) {
-    return (
-      <div className="text-center py-12">
-        <Loader2 size={24} className="animate-spin text-[#c9a84c] mx-auto mb-3" />
-        <p className="text-xs text-gray-500">Fetching crime data...</p>
-      </div>
-    )
-  }
+        <div className="max-w-sm mx-auto">
+          <p className="text-xs text-gray-500 mb-3">Upload crime data CSV from <a href="https://www.crimemapping.com/map/fl/palmbeachcounty" target="_blank" rel="noopener noreferrer" className="text-[#c9a84c] hover:underline">CrimeMapping.com</a></p>
+          <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-[#c9a84c] transition-colors cursor-pointer"
+            onClick={() => fileRef.current?.click()}
+            onDragOver={e => { e.preventDefault(); e.stopPropagation() }}
+            onDrop={e => { e.preventDefault(); e.stopPropagation(); const f = e.dataTransfer.files[0]; if (f) handleFileUpload(f) }}>
+            <Upload size={20} className="text-gray-400 mx-auto mb-2" />
+            <p className="text-xs text-gray-500">Drop CSV/Excel here or click to browse</p>
+            <p className="text-[9px] text-gray-400 mt-1">Needs latitude & longitude columns</p>
+          </div>
+          <input ref={fileRef} type="file" accept=".csv,.tsv,.txt,.xlsx" className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = '' }} />
+        </div>
 
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <AlertTriangle size={24} className="text-red-400 mx-auto mb-3" />
-        <p className="text-xs text-red-600 mb-3">{error}</p>
-        <button onClick={fetchCrimeData}
-          className="px-4 py-2 text-xs font-medium bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">
-          <RefreshCw size={12} className="inline mr-1" /> Retry
-        </button>
+        {error && <p className="text-xs text-red-600 mt-3">{error}</p>}
+
+        <div className="mt-6 bg-gray-50 rounded-lg p-4 max-w-md mx-auto text-left">
+          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">How to get crime data:</p>
+          <ol className="text-[10px] text-gray-500 space-y-1 list-decimal list-inside">
+            <li>Go to <a href="https://www.crimemapping.com/map/fl/palmbeachcounty" target="_blank" rel="noopener noreferrer" className="text-[#c9a84c] hover:underline">CrimeMapping.com (Palm Beach County)</a></li>
+            <li>Search for the property address</li>
+            <li>Set your date range and radius</li>
+            <li>Click the download/export button to get a spreadsheet</li>
+            <li>Save as CSV and upload here</li>
+          </ol>
+        </div>
       </div>
     )
   }
@@ -215,22 +267,28 @@ export function CrimeMap({ lat: latProp, lng: lngProp, propertyName, propertyAdd
           className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${!filter ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300 text-gray-500 hover:border-gray-400'}`}>
           All ({incidents.length})
         </button>
-        {Object.entries(CRIME_COLORS).map(([key, cfg]) => {
-          const count = categoryTotals[key] || 0
-          if (count === 0) return null
+        {Object.entries(categoryTotals).map(([label, count]) => {
+          const cfg = categorize(label)
           return (
-            <button key={key} onClick={() => setFilter(filter === key ? null : key)}
+            <button key={label} onClick={() => setFilter(filter === label ? null : label)}
               className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors flex items-center gap-1
-                ${filter === key ? 'text-white border-transparent' : 'border-gray-300 text-gray-500 hover:border-gray-400'}`}
-              style={filter === key ? { backgroundColor: cfg.color, borderColor: cfg.color } : undefined}>
+                ${filter === label ? 'text-white border-transparent' : 'border-gray-300 text-gray-500 hover:border-gray-400'}`}
+              style={filter === label ? { backgroundColor: cfg.color, borderColor: cfg.color } : undefined}>
               <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: cfg.color }} />
-              {cfg.label} ({count})
+              {label} ({count})
             </button>
           )
         })}
-        <button onClick={fetchCrimeData} className="ml-auto text-[10px] text-gray-400 hover:text-[#c9a84c] transition-colors flex items-center gap-1">
-          <RefreshCw size={10} /> Refresh
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <button onClick={() => fileRef.current?.click()} className="text-[10px] text-gray-400 hover:text-[#c9a84c] transition-colors flex items-center gap-1">
+            <Upload size={10} /> Upload new data
+          </button>
+          <button onClick={() => setIncidents([])} className="text-[10px] text-gray-400 hover:text-red-400 transition-colors flex items-center gap-1">
+            <X size={10} /> Clear
+          </button>
+        </div>
+        <input ref={fileRef} type="file" accept=".csv,.tsv,.txt" className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = '' }} />
       </div>
 
       {/* Map */}
@@ -261,22 +319,20 @@ export function CrimeMap({ lat: latProp, lng: lngProp, propertyName, propertyAdd
 
           {/* Crime incident pins */}
           {filtered.map((inc, i) => {
-            const cat = inc.incident_offense_crime_against || 'Not a Crime'
-            const cfg = CRIME_COLORS[cat] || CRIME_COLORS['Not a Crime']
-            const dist = distanceMiles(lat, lng, inc.incident_latitude, inc.incident_longitude)
+            const cat = categorize(inc.type)
+            const dist = distanceMiles(lat, lng, inc.lat, inc.lng)
             return (
-              <CircleMarker key={inc.incident_code || i}
-                center={[inc.incident_latitude, inc.incident_longitude]}
+              <CircleMarker key={i}
+                center={[inc.lat, inc.lng]}
                 radius={4}
-                pathOptions={{ color: cfg.color, fillColor: cfg.color, fillOpacity: 0.7, weight: 1 }}>
+                pathOptions={{ color: cat.color, fillColor: cat.color, fillOpacity: 0.7, weight: 1 }}>
                 <Popup>
                   <div className="text-[11px] leading-relaxed" style={{ minWidth: 180 }}>
-                    <strong style={{ color: cfg.color }}>{inc.incident_offense}</strong><br />
-                    {inc.incident_offense_description && <span className="text-gray-600">{inc.incident_offense_description}<br /></span>}
-                    {inc.incident_address && <span className="text-gray-500">{inc.incident_address}<br /></span>}
+                    <strong style={{ color: cat.color }}>{inc.type}</strong><br />
+                    {inc.description && inc.description !== inc.type && <span className="text-gray-600">{inc.description}<br /></span>}
+                    {inc.address && <span className="text-gray-500">{inc.address}<br /></span>}
                     <span className="text-gray-400">
-                      {new Date(inc.incident_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      {' · '}{dist.toFixed(2)} mi away
+                      {inc.date && `${inc.date} · `}{dist.toFixed(2)} mi away
                     </span>
                   </div>
                 </Popup>
