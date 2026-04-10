@@ -6,3 +6,4 @@ ios
 android
 *.local
 .DS_Store
+.vercel

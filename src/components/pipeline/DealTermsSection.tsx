@@ -108,11 +108,11 @@ export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, 
 
   const updateRentGrowth = (val: number) => {
     setRentGrowth(val)
-    onUpdateActuals({ ...actualInputs, _rentGrowth: val })
+    onUpdateActuals({ ...actualInputs, _rentGrowth: val } as any)
   }
   const updateExpGrowth = (val: number) => {
     setExpGrowth(val)
-    onUpdateActuals({ ...actualInputs, _expGrowth: val })
+    onUpdateActuals({ ...actualInputs, _expGrowth: val } as any)
   }
 
   // Merge actuals over projected for calculation
@@ -514,7 +514,7 @@ export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, 
                   const cgRate = (effectiveInputs.cgRate ?? 20) / 100
                   const taxDeferred = ex1031?.totalTaxDeferred
                     ?? (effectiveInputs.is1031 && deferredGain > 0 ? deferredGain * cgRate : 0)
-                  const rows: { label: string; tip: string; p: number; a: number; yVals: number[]; bold: boolean; highlight?: boolean; highlight1031?: boolean }[] = [
+                  const rows: { label: string; tip: string; p: number; a: number; yVals: number[]; bold: boolean; highlight?: boolean; highlight1031?: boolean; y1Only?: boolean }[] = [
                     { label: 'Gross Scheduled Rent', tip: 'Total rent if every unit were occupied at current market rent, before any vacancy deduction', p: projectedCalc.GSR, a: actualCalc.GSR, yVals: yearCalcs.map(yc => yc.GSR), bold: false },
                     { label: 'Vacancy', tip: 'Lost rent from unoccupied units and collection loss. Physical vacancy uses actual empty units; gross vacancy uses a percentage of scheduled rent', p: -projectedCalc.vac, a: -actualCalc.vac, yVals: yearCalcs.map(yc => -yc.vac), bold: false },
                     { label: 'Effective Gross Income', tip: 'Actual collected rent after vacancy, plus other income (laundry, parking, fees). This is the real top-line revenue the property generates', p: projectedCalc.EGI, a: actualCalc.EGI, yVals: yearCalcs.map(yc => yc.EGI), bold: true },
@@ -543,9 +543,9 @@ export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, 
                   return (<>
                     {rows.map((row, i) => {
                       const delta = row.a - row.p
-                      const isY1Only = (row as any).y1Only
+                      const isY1Only = row.y1Only
                       return (
-                        <tr key={i} className={(row as any).highlight1031 ? 'bg-amber-50 border-t border-amber-200' : row.highlight ? 'bg-green-50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                        <tr key={i} className={row.highlight1031 ? 'bg-amber-50 border-t border-amber-200' : row.highlight ? 'bg-green-50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
                           <td className={`px-4 py-2 whitespace-nowrap ${row.bold ? 'font-semibold text-gray-900' : 'text-gray-600'}`} title={row.tip}>{row.label}</td>
                           <td className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">{fmtNeg(row.p)}</td>
                           <td className={`px-3 py-2 text-right font-medium whitespace-nowrap ${row.bold ? 'text-gray-900' : 'text-gray-700'}`}>{fmtNeg(row.a)}</td>
