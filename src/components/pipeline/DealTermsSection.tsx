@@ -102,6 +102,7 @@ export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, 
   const projected = dealScenario.inputs
   const [generating, setGenerating] = useState(false)
   const [unlocked, setUnlocked] = useState(false)
+  const [pdfDropdown, setPdfDropdown] = useState(false)
   const [rentGrowth, setRentGrowth] = useState(() => (actualInputs as any)._rentGrowth ?? 2)
   const [expGrowth, setExpGrowth] = useState(() => (actualInputs as any)._expGrowth ?? 3)
 
@@ -178,6 +179,23 @@ export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, 
     return better ? 'text-green-600' : 'text-red-600'
   }
 
+  const generatePdf = async (mode: 'full' | 'projected' | 'actual') => {
+    setGenerating(true)
+    try {
+      const blob = await pdf(
+        <DealTermsPdf projected={projected} actualInputs={actualInputs} scenarioName={dealScenario.name}
+          propertyName={propertyName} propertyAddress={propertyAddress} keyDates={keyDates} mode={mode} />
+      ).toBlob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const suffix = mode === 'projected' ? '_Projected' : mode === 'actual' ? '_Actual' : ''
+      a.download = `${(propertyName || 'Property').replace(/[^a-zA-Z0-9]/g, '_')}_Deal_Terms${suffix}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } finally { setGenerating(false) }
+  }
+
   return (
     <div>
       {/* Header */}
@@ -196,26 +214,29 @@ export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, 
             className="flex items-center gap-1 text-[10px] font-medium text-gray-400 hover:text-gray-600 transition-colors">
             <RefreshCw size={10} /> Change scenario
           </button>
-          <button
-            onClick={async () => {
-              setGenerating(true)
-              try {
-                const blob = await pdf(
-                  <DealTermsPdf projected={projected} actualInputs={actualInputs} scenarioName={dealScenario.name}
-                    propertyName={propertyName} propertyAddress={propertyAddress} keyDates={keyDates} />
-                ).toBlob()
-                const url = URL.createObjectURL(blob)
-                const a = document.createElement('a')
-                a.href = url
-                a.download = `${(propertyName || 'Property').replace(/[^a-zA-Z0-9]/g, '_')}_Deal_Terms.pdf`
-                a.click()
-                URL.revokeObjectURL(url)
-              } finally { setGenerating(false) }
-            }}
-            disabled={generating}
-            className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-[#1a1a2e] text-white rounded-lg hover:bg-[#c9a84c] hover:text-[#1a1a2e] transition-colors disabled:opacity-50">
-            {generating ? 'Generating...' : <><Download size={12} /> PDF</>}
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setPdfDropdown(!pdfDropdown)}
+              disabled={generating}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-[#1a1a2e] text-white rounded-lg hover:bg-[#c9a84c] hover:text-[#1a1a2e] transition-colors disabled:opacity-50">
+              {generating ? 'Generating...' : <><Download size={12} /> PDF ▾</>}
+            </button>
+            {pdfDropdown && (
+              <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden min-w-[160px]"
+                onMouseLeave={() => setPdfDropdown(false)}>
+                <button onClick={() => { setPdfDropdown(false); generatePdf('full') }}
+                  className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                  Comparative
+                  <span className="block text-[10px] text-gray-400 font-normal">Projected vs Actual + Delta</span>
+                </button>
+                <button onClick={() => { setPdfDropdown(false); generatePdf('actual') }}
+                  className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors border-t border-gray-100">
+                  Actuals Only
+                  <span className="block text-[10px] text-gray-400 font-normal">Actual terms + 5-year projection</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -386,6 +407,17 @@ export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, 
                     const delta = actNum - projVal
                     const isExpense = section === 'Expenses'
 
+                    // Annualized total for per-unit and monthly fields
+                    const tu = effectiveInputs.tu || 0
+                    const annualize = (val: number): number | null => {
+                      if (!val || !tu) return null
+                      if (field.key === 'rent') return val * tu * 12
+                      if (field.perUnit) return val * tu
+                      return null
+                    }
+                    const projAnnual = annualize(projVal)
+                    const actAnnual = annualize(actNum)
+
                     return (
                       <tr key={field.key} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
                         <td className="px-4 py-2 font-medium text-gray-800" title={field.tip}>
@@ -393,19 +425,24 @@ export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, 
                           {field.unit && <span className="text-gray-400 font-normal ml-1">{field.unit}</span>}
                         </td>
                         <td className="px-4 py-2 text-right text-gray-500">
+                          {projAnnual !== null && <span className="text-gray-300 text-[10px] mr-1.5">({fmtDollar(projAnnual)}/yr)</span>}
                           {fmtFieldVal(projVal, field)}
                         </td>
                         <td className="px-4 py-2 text-right">
                           {unlocked ? (
-                            <ActualInput
-                              value={hasActual ? actVal : ''}
-                              field={field}
-                              onChange={v => setActual(field.key, v)}
-                              onClear={() => clearActual(field.key)}
-                              hasActual={hasActual}
-                            />
+                            <div>
+                              <ActualInput
+                                value={hasActual ? actVal : ''}
+                                field={field}
+                                onChange={v => setActual(field.key, v)}
+                                onClear={() => clearActual(field.key)}
+                                hasActual={hasActual}
+                              />
+                              {hasActual && actAnnual !== null && <div className="text-[10px] text-gray-300 mt-0.5">({fmtDollar(actAnnual)}/yr)</div>}
+                            </div>
                           ) : (
                             <span className={`text-xs ${hasActual ? 'font-semibold text-gray-900' : 'text-gray-300'}`}>
+                              {hasActual && actAnnual !== null && <span className="text-gray-300 text-[10px] font-normal mr-1.5">({fmtDollar(actAnnual)}/yr)</span>}
                               {hasActual ? fmtFieldVal(actNum, field) : '—'}
                             </span>
                           )}

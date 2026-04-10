@@ -29,13 +29,13 @@ const fmtFieldVal = (v: number, dollar?: boolean, pct?: boolean, unit?: string) 
   dollar ? fmtD(v) : pct ? `${v}%` : unit ? `${v} ${unit}` : String(v)
 
 interface FieldDef {
-  key: string; label: string; dollar?: boolean; pct?: boolean; unit?: string; section: string
+  key: string; label: string; dollar?: boolean; pct?: boolean; unit?: string; section: string; perUnit?: boolean; isRent?: boolean
 }
 
 const FIELDS: FieldDef[] = [
   { key: 'tu', label: 'Total Units', section: 'Income' },
   { key: 'ou', label: 'Occupied Units', section: 'Income' },
-  { key: 'rent', label: 'Avg Rent / Unit / Mo', section: 'Income', dollar: true },
+  { key: 'rent', label: 'Avg Rent / Unit / Mo', section: 'Income', dollar: true, isRent: true },
   { key: 'vp', label: 'Vacancy %', section: 'Income', pct: true },
   { key: 'price', label: 'Purchase Price', section: 'Financing', dollar: true },
   { key: 'ir', label: 'Interest Rate', section: 'Financing', pct: true },
@@ -44,12 +44,12 @@ const FIELDS: FieldDef[] = [
   { key: 'lf', label: 'Lender Fee', section: 'Financing', pct: true },
   { key: 'cc', label: 'Closing Costs', section: 'Financing', pct: true },
   { key: 'tax', label: 'Real Estate Taxes', section: 'Expenses', dollar: true },
-  { key: 'ins', label: 'Insurance', section: 'Expenses', dollar: true, unit: '/unit/yr' },
+  { key: 'ins', label: 'Insurance', section: 'Expenses', dollar: true, unit: '/unit/yr', perUnit: true },
   { key: 'util', label: 'Total Utilities', section: 'Expenses', dollar: true },
-  { key: 'rm', label: 'R&M', section: 'Expenses', dollar: true, unit: '/unit/yr' },
+  { key: 'rm', label: 'R&M', section: 'Expenses', dollar: true, unit: '/unit/yr', perUnit: true },
   { key: 'cs', label: 'Contract Services', section: 'Expenses', dollar: true },
   { key: 'ga', label: 'G&A', section: 'Expenses', dollar: true },
-  { key: 'res', label: 'Reserves', section: 'Expenses', dollar: true, unit: '/unit/yr' },
+  { key: 'res', label: 'Reserves', section: 'Expenses', dollar: true, unit: '/unit/yr', perUnit: true },
   { key: 'pm', label: 'Prop Mgmt', section: 'Expenses', pct: true },
   { key: 'capx', label: 'Cap X', section: 'Expenses', dollar: true },
 ]
@@ -81,9 +81,10 @@ interface Props {
   propertyName: string
   propertyAddress: string | null
   keyDates?: KeyDates
+  mode?: 'full' | 'projected' | 'actual'  // full = both columns, projected = projected only, actual = actuals only
 }
 
-export function DealTermsPdf({ projected, actualInputs, scenarioName, propertyName, propertyAddress, keyDates }: Props) {
+export function DealTermsPdf({ projected, actualInputs, scenarioName, propertyName, propertyAddress, keyDates, mode = 'full' }: Props) {
   const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
   const logoSrc = `${import.meta.env.BASE_URL}Chai_Logo.jpeg`
 
@@ -128,7 +129,7 @@ export function DealTermsPdf({ projected, actualInputs, scenarioName, propertyNa
     <Document title={`Deal Terms — ${propertyName}`}>
       <Page size="LETTER" style={s.page}>
         <Image src={logoSrc} style={{ width: 120, marginBottom: 10 }} />
-        <Text style={s.title}>Deal Terms — {propertyName}</Text>
+        <Text style={s.title}>Deal Terms{mode === 'projected' ? ' (Projected)' : mode === 'actual' ? ' (Actual)' : ''} — {propertyName}</Text>
         <Text style={s.subtitle}>{propertyAddress ? `${propertyAddress} · ` : ''}{scenarioName} · {date}</Text>
         <View style={s.orangeLine} />
 
@@ -162,19 +163,23 @@ export function DealTermsPdf({ projected, actualInputs, scenarioName, propertyNa
         {/* Key metrics */}
         <View style={s.metricsRow}>
           {[
-            { label: 'NOI', val: hasActuals ? actCalc.NOI : projCalc.NOI, prev: projCalc.NOI, fmt: fmtDollar },
-            { label: 'Cap Rate', val: hasActuals ? actCalc.cap : projCalc.cap, prev: projCalc.cap, fmt: fmtPct },
-            { label: 'DCR', val: hasActuals ? actCalc.dcr : projCalc.dcr, prev: projCalc.dcr, fmt: fmtX },
-            { label: 'Cash-on-Cash', val: hasActuals ? actCalc.coc : projCalc.coc, prev: projCalc.coc, fmt: fmtPct },
-          ].map(m => (
-            <View key={m.label} style={s.metricCard}>
-              <Text style={s.metricLabel}>{m.label}</Text>
-              <Text style={s.metricValue}>{m.fmt(m.val)}</Text>
-              {hasActuals && Math.abs(m.val - m.prev) > 0.01 && (
-                <Text style={[s.metricSub, { color: m.val > m.prev ? C.green : C.red }]}>was {m.fmt(m.prev)}</Text>
-              )}
-            </View>
-          ))}
+            { label: 'NOI', proj: projCalc.NOI, act: actCalc.NOI, fmt: fmtDollar },
+            { label: 'Cap Rate', proj: projCalc.cap, act: actCalc.cap, fmt: fmtPct },
+            { label: 'DCR', proj: projCalc.dcr, act: actCalc.dcr, fmt: fmtX },
+            { label: 'Cash-on-Cash', proj: projCalc.coc, act: actCalc.coc, fmt: fmtPct },
+          ].map(m => {
+            const val = mode === 'projected' ? m.proj : (hasActuals ? m.act : m.proj)
+            const showDelta = mode === 'full' && hasActuals && Math.abs(m.act - m.proj) > 0.01
+            return (
+              <View key={m.label} style={s.metricCard}>
+                <Text style={s.metricLabel}>{m.label}</Text>
+                <Text style={s.metricValue}>{m.fmt(val)}</Text>
+                {showDelta && (
+                  <Text style={[s.metricSub, { color: m.act > m.proj ? C.green : C.red }]}>was {m.fmt(m.proj)}</Text>
+                )}
+              </View>
+            )
+          })}
         </View>
 
         {/* Deal terms table by section */}
@@ -187,9 +192,9 @@ export function DealTermsPdf({ projected, actualInputs, scenarioName, propertyNa
               </View>
               <View style={s.tableHdr}>
                 <Text style={[s.tableHdrText, { flex: 2 }]}>Field</Text>
-                <Text style={[s.tableHdrText, { flex: 1.5, textAlign: 'right' }]}>Projected</Text>
-                {hasActuals && <Text style={[s.tableHdrText, { flex: 1.5, textAlign: 'right', color: C.accent }]}>Actual</Text>}
-                {hasActuals && <Text style={[s.tableHdrText, { flex: 1, textAlign: 'right' }]}>Delta</Text>}
+                {mode !== 'actual' && <Text style={[s.tableHdrText, { flex: 1.5, textAlign: 'right' }]}>Projected</Text>}
+                {mode !== 'projected' && hasActuals && <Text style={[s.tableHdrText, { flex: 1.5, textAlign: 'right', color: C.accent }]}>{mode === 'actual' ? 'Value' : 'Actual'}</Text>}
+                {mode === 'full' && hasActuals && <Text style={[s.tableHdrText, { flex: 1, textAlign: 'right' }]}>Delta</Text>}
               </View>
               {sectionFields.map((f, i) => {
                 const projVal = (projected as any)[f.key] ?? 0
@@ -198,16 +203,32 @@ export function DealTermsPdf({ projected, actualInputs, scenarioName, propertyNa
                 const actNum = hasAct ? Number(actVal) : projVal
                 const delta = actNum - projVal
                 const isExpense = section === 'Expenses'
+                const tu = effective.tu || 0
+                const annualize = (val: number): string | null => {
+                  if (!val || !tu) return null
+                  if (f.isRent) return `(${fmtD(val * tu * 12)}/yr)`
+                  if (f.perUnit) return `(${fmtD(val * tu)}/yr)`
+                  return null
+                }
+                const projAnn = annualize(projVal)
+                const actAnn = annualize(actNum)
                 return (
                   <View key={f.key} style={i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
                     <Text style={{ flex: 2, fontSize: 8.5 }}>{f.label}{f.unit ? ` ${f.unit}` : ''}</Text>
-                    <Text style={{ flex: 1.5, fontSize: 8.5, textAlign: 'right', color: C.gray }}>{fmtFieldVal(projVal, f.dollar, f.pct, f.unit)}</Text>
-                    {hasActuals && (
-                      <Text style={{ flex: 1.5, fontSize: 8.5, textAlign: 'right', fontFamily: hasAct ? 'Helvetica-Bold' : 'Helvetica', color: hasAct ? C.text : C.muted }}>
-                        {hasAct ? fmtFieldVal(actNum, f.dollar, f.pct) : '—'}
+                    {mode !== 'actual' && (
+                      <Text style={{ flex: 1.5, fontSize: 8.5, textAlign: 'right', color: C.gray }}>
+                        {projAnn && <Text style={{ fontSize: 7, color: '#bbb' }}>{projAnn} </Text>}{fmtFieldVal(projVal, f.dollar, f.pct, f.unit)}
                       </Text>
                     )}
-                    {hasActuals && (
+                    {mode !== 'projected' && hasActuals && (
+                      <Text style={{ flex: 1.5, fontSize: 8.5, textAlign: 'right',
+                        fontFamily: hasAct ? 'Helvetica-Bold' : 'Helvetica',
+                        color: mode === 'actual' ? (hasAct ? C.text : C.gray) : (hasAct ? C.text : C.muted) }}>
+                        {actAnn && (mode === 'actual' || hasAct) && <Text style={{ fontSize: 7, color: '#bbb', fontFamily: 'Helvetica' }}>{actAnn} </Text>}
+                        {mode === 'actual' ? fmtFieldVal(actNum, f.dollar, f.pct) : (hasAct ? fmtFieldVal(actNum, f.dollar, f.pct) : '—')}
+                      </Text>
+                    )}
+                    {mode === 'full' && hasActuals && (
                       <Text style={{ flex: 1, fontSize: 8.5, textAlign: 'right', fontFamily: 'Helvetica-Bold',
                         color: !hasAct || delta === 0 ? C.muted : isExpense ? (delta > 0 ? C.red : C.green) : (delta > 0 ? C.green : C.red) }}>
                         {!hasAct || delta === 0 ? '—' : f.dollar ? `${delta > 0 ? '+' : '-'}${fmtD(Math.abs(delta))}` : f.pct ? `${delta > 0 ? '+' : ''}${delta.toFixed(2)}%` : `${delta > 0 ? '+' : ''}${delta}`}
@@ -221,45 +242,66 @@ export function DealTermsPdf({ projected, actualInputs, scenarioName, propertyNa
         })}
 
         {/* P&L Impact with 5-year projection */}
-        {hasActuals && (
+        {(mode === 'full' ? hasActuals : true) && (
           <View>
             <View style={[s.sectionHdr, { marginTop: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-              <Text style={s.sectionHdrText}>P&L IMPACT — 5-YEAR HOLD PROJECTION</Text>
+              <Text style={s.sectionHdrText}>P&L — 5-YEAR HOLD PROJECTION{mode === 'projected' ? ' (PROJECTED)' : mode === 'actual' ? ' (ACTUAL)' : ''}</Text>
               <Text style={{ fontSize: 7, color: '#999' }}>Rent growth: {rentGrowth}% · Exp escalation: {expGrowth}%</Text>
             </View>
             <View style={s.tableHdr}>
               <Text style={[s.tableHdrText, { flex: 2.2 }]}>Line Item</Text>
-              <Text style={[s.tableHdrText, { flex: 1.1, textAlign: 'right' }]}>Projected</Text>
-              <Text style={[s.tableHdrText, { flex: 1.1, textAlign: 'right', color: C.accent }]}>Year 1</Text>
-              <Text style={[s.tableHdrText, { flex: 0.8, textAlign: 'right' }]}>Delta</Text>
+              {mode === 'full' && <Text style={[s.tableHdrText, { flex: 1.1, textAlign: 'right' }]}>Projected</Text>}
+              <Text style={[s.tableHdrText, { flex: 1.1, textAlign: 'right', color: mode === 'projected' ? C.text : C.accent }]}>Year 1</Text>
+              {mode === 'full' && <Text style={[s.tableHdrText, { flex: 0.8, textAlign: 'right' }]}>Delta</Text>}
               <Text style={[s.tableHdrText, { flex: 1, textAlign: 'right' }]}>Year 2</Text>
               <Text style={[s.tableHdrText, { flex: 1, textAlign: 'right' }]}>Year 3</Text>
               <Text style={[s.tableHdrText, { flex: 1, textAlign: 'right' }]}>Year 4</Text>
               <Text style={[s.tableHdrText, { flex: 1, textAlign: 'right' }]}>Year 5</Text>
             </View>
             {(() => {
+              // For projected-only mode, recalculate projections from projected inputs (not actuals)
+              const projYearCalcs = mode === 'projected' ? [2, 3, 4, 5].map(year => {
+                const rg = Math.pow(1 + rentGrowth / 100, year - 1)
+                const eg = Math.pow(1 + expGrowth / 100, year - 1)
+                const scaled: ModelInputs = {
+                  ...projected,
+                  rent: projected.rent * rg,
+                  rentRoll: projected.rentRoll?.map(u => ({ ...u, rent: (u.rent || 0) * rg })),
+                  otherIncome: projected.otherIncome?.map(x => ({ ...x, amount: (x.amount || 0) * rg })),
+                  tax: projected.tax * eg, ins: projected.ins * eg, rm: projected.rm * eg, res: projected.res * eg,
+                  cs: projected.cs * eg, ga: projected.ga * eg, util: projected.util * eg,
+                  utilElec: projected.utilElec * eg, utilWater: projected.utilWater * eg, utilTrash: projected.utilTrash * eg,
+                  pmPerUnit: projected.pmPerUnit * eg,
+                  otherExpenses: projected.otherExpenses?.map(x => ({ ...x, amount: (x.amount || 0) * eg })),
+                  costSeg: 0, closingDate: undefined,
+                }
+                return calculate(scaled, !(projected.ou > 0 && projected.ou < projected.tu))
+              }) : yearCalcs
+              const useCalc = mode === 'projected' ? projCalc : actCalc
+              const useCx = mode === 'projected' ? capxProj : capxAmt
+              const useYears = projYearCalcs
               const rows: { label: string; p: number; a: number; yVals: number[]; bold: boolean; noi?: boolean; amber?: boolean; y1Only?: boolean }[] = [
-                { label: 'Gross Scheduled Rent', p: projCalc.GSR, a: actCalc.GSR, yVals: yearCalcs.map(yc => yc.GSR), bold: false },
-                { label: 'Vacancy', p: -projCalc.vac, a: -actCalc.vac, yVals: yearCalcs.map(yc => -yc.vac), bold: false },
-                { label: 'Effective Gross Income', p: projCalc.EGI, a: actCalc.EGI, yVals: yearCalcs.map(yc => yc.EGI), bold: true },
-                { label: 'Total Expenses', p: -projCalc.exp, a: -actCalc.exp, yVals: yearCalcs.map(yc => -yc.exp), bold: false },
-                { label: 'NOI', p: projCalc.NOI, a: actCalc.NOI, yVals: yearCalcs.map(yc => yc.NOI), bold: true, noi: true },
-                { label: 'Debt Service', p: -projCalc.ds, a: -actCalc.ds, yVals: yearCalcs.map(yc => -yc.ds), bold: false },
-                ...(capxAmt > 0 || capxProj > 0 ? [
-                  { label: 'Cap X', p: -capxProj, a: -capxAmt, yVals: [0, 0, 0, 0], bold: false },
+                { label: 'Gross Scheduled Rent', p: projCalc.GSR, a: useCalc.GSR, yVals: useYears.map(yc => yc.GSR), bold: false },
+                { label: 'Vacancy', p: -projCalc.vac, a: -useCalc.vac, yVals: useYears.map(yc => -yc.vac), bold: false },
+                { label: 'Effective Gross Income', p: projCalc.EGI, a: useCalc.EGI, yVals: useYears.map(yc => yc.EGI), bold: true },
+                { label: 'Total Expenses', p: -projCalc.exp, a: -useCalc.exp, yVals: useYears.map(yc => -yc.exp), bold: false },
+                { label: 'NOI', p: projCalc.NOI, a: useCalc.NOI, yVals: useYears.map(yc => yc.NOI), bold: true, noi: true },
+                { label: 'Debt Service', p: -projCalc.ds, a: -useCalc.ds, yVals: useYears.map(yc => -yc.ds), bold: false },
+                ...(useCx > 0 || (mode === 'full' && (capxAmt > 0 || capxProj > 0)) ? [
+                  { label: 'Cap X', p: -capxProj, a: -useCx, yVals: [0, 0, 0, 0], bold: false },
                 ] : []),
-                { label: 'Pre-Tax Cash Flow', p: projCalc.CF - capxProj, a: actCalc.CF - capxAmt, yVals: yearCalcs.map(yc => yc.CF), bold: true },
-                { label: 'Tax Savings', p: projCalc.ts, a: actCalc.ts, yVals: yearCalcs.map(yc => yc.ts), bold: false },
-                { label: 'After-Tax Cash Flow', p: projCalc.at - capxProj, a: actCalc.at - capxAmt, yVals: yearCalcs.map(yc => yc.at), bold: true },
+                { label: 'Pre-Tax Cash Flow', p: projCalc.CF - capxProj, a: useCalc.CF - useCx, yVals: useYears.map(yc => yc.CF), bold: true },
+                { label: 'Tax Savings', p: projCalc.ts, a: useCalc.ts, yVals: useYears.map(yc => yc.ts), bold: false },
+                { label: 'After-Tax Cash Flow', p: projCalc.at - capxProj, a: useCalc.at - useCx, yVals: useYears.map(yc => yc.at), bold: true },
                 ...(taxDeferred > 0 ? [
                   { label: '1031 Tax Deferred', p: taxDeferred, a: taxDeferred, yVals: [0, 0, 0, 0], bold: false, amber: true, y1Only: true },
-                  { label: 'Total Year 1 Benefit', p: (projCalc.at - capxProj) + taxDeferred, a: (actCalc.at - capxAmt) + taxDeferred, yVals: [0, 0, 0, 0], bold: true, amber: true, y1Only: true },
+                  { label: 'Total Year 1 Benefit', p: (projCalc.at - capxProj) + taxDeferred, a: (useCalc.at - useCx) + taxDeferred, yVals: [0, 0, 0, 0], bold: true, amber: true, y1Only: true },
                 ] : []),
               ]
-              const y1Total = (actCalc.at - capxAmt) + taxDeferred
-              const cumulative = yearCalcs.map((yc, yi) => {
+              const y1Total = (useCalc.at - useCx) + taxDeferred
+              const cumulative = useYears.map((_yc, yi) => {
                 let total = y1Total
-                for (let j = 0; j <= yi; j++) total += yearCalcs[j].at
+                for (let j = 0; j <= yi; j++) total += useYears[j].at
                 return total
               })
 
@@ -267,15 +309,16 @@ export function DealTermsPdf({ projected, actualInputs, scenarioName, propertyNa
                 {rows.map((row, i) => {
                   const delta = row.a - row.p
                   const bg = row.amber ? '#FDF8EC' : row.noi ? '#EAF3DE' : i % 2 === 0 ? 'white' : '#FAFAF8'
+                  const y1Val = mode === 'projected' ? row.p : row.a
                   return (
                     <View key={i} style={[s.tableRow, { backgroundColor: bg }]}>
                       <Text style={{ flex: 2.2, fontSize: 8, fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica', color: row.amber ? C.amber : C.text }}>{row.label}</Text>
-                      <Text style={{ flex: 1.1, fontSize: 8, textAlign: 'right', color: C.gray }}>{fmtNeg(row.p)}</Text>
-                      <Text style={{ flex: 1.1, fontSize: 8, textAlign: 'right', fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica', color: row.amber ? C.amber : C.text }}>{fmtNeg(row.a)}</Text>
-                      <Text style={{ flex: 0.8, fontSize: 8, textAlign: 'right', fontFamily: 'Helvetica-Bold',
+                      {mode === 'full' && <Text style={{ flex: 1.1, fontSize: 8, textAlign: 'right', color: C.gray }}>{fmtNeg(row.p)}</Text>}
+                      <Text style={{ flex: 1.1, fontSize: 8, textAlign: 'right', fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica', color: row.amber ? C.amber : C.text }}>{fmtNeg(y1Val)}</Text>
+                      {mode === 'full' && <Text style={{ flex: 0.8, fontSize: 8, textAlign: 'right', fontFamily: 'Helvetica-Bold',
                         color: row.y1Only ? 'transparent' : Math.abs(delta) < 1 ? C.muted : delta > 0 ? C.green : C.red }}>
                         {row.y1Only ? '' : Math.abs(delta) < 1 ? '—' : `${delta > 0 ? '+' : '-'}${fmtD(Math.abs(delta))}`}
-                      </Text>
+                      </Text>}
                       {row.yVals.map((val, yi) => (
                         <Text key={yi} style={{ flex: 1, fontSize: 8, textAlign: 'right', color: row.y1Only ? 'transparent' : row.bold ? C.text : C.gray }}>{row.y1Only ? '' : fmtNeg(val)}</Text>
                       ))}
@@ -284,9 +327,9 @@ export function DealTermsPdf({ projected, actualInputs, scenarioName, propertyNa
                 })}
                 <View style={[s.tableRow, { backgroundColor: C.text, borderBottomWidth: 0 }]}>
                   <Text style={{ flex: 2.2, fontSize: 8, fontFamily: 'Helvetica-Bold', color: 'white' }}>Cumulative</Text>
-                  <Text style={{ flex: 1.1, fontSize: 8 }}></Text>
+                  {mode === 'full' && <Text style={{ flex: 1.1, fontSize: 8 }}></Text>}
                   <Text style={{ flex: 1.1, fontSize: 8, textAlign: 'right', fontFamily: 'Helvetica-Bold', color: 'white' }}>{fmtD(y1Total)}</Text>
-                  <Text style={{ flex: 0.8, fontSize: 8 }}></Text>
+                  {mode === 'full' && <Text style={{ flex: 0.8, fontSize: 8 }}></Text>}
                   {cumulative.map((val, yi) => (
                     <Text key={yi} style={{ flex: 1, fontSize: 8, textAlign: 'right', fontFamily: 'Helvetica-Bold', color: 'white' }}>{fmtD(val)}</Text>
                   ))}
