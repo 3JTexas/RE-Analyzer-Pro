@@ -68,6 +68,8 @@ export interface ModelInputs {
   cgRate?: number                // long-term cap gains rate % (default 20)
   reclaimRate?: number           // depreciation recapture rate % (default 25)
   applyExcessToDown?: boolean    // apply excess 1031 proceeds to additional down payment
+  // Deal-level (not used in calc engine)
+  capx?: number                  // Year 1 capital expenditures $ (Deal Terms only, pipeline-level)
 }
 
 // ── Computed outputs ──────────────────────────────────────────────────────

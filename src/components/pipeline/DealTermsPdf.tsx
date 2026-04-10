@@ -1,9 +1,9 @@
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer'
-import { calculate, fmtDollar, fmtPct, fmtX, fmtNeg } from '../../lib/calc'
+import { calculate, calc1031, fmtDollar, fmtPct, fmtX, fmtNeg } from '../../lib/calc'
 import type { ModelInputs } from '../../types'
 import type { KeyDates } from '../../types/pipeline'
 
-const C = { text: '#1a1a2e', gray: '#666', muted: '#888', accent: '#c9a84c', green: '#1D6B3E', red: '#A32D2D', border: '#E5E3DC' }
+const C = { text: '#1a1a2e', gray: '#666', muted: '#888', accent: '#c9a84c', green: '#1D6B3E', red: '#A32D2D', border: '#E5E3DC', amber: '#92700C' }
 
 const s = StyleSheet.create({
   page: { fontFamily: 'Helvetica', fontSize: 9, color: C.text, padding: '0.6in' },
@@ -21,7 +21,7 @@ const s = StyleSheet.create({
   tableHdrText: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: C.text },
   tableRow: { flexDirection: 'row', borderBottomWidth: 0.3, borderBottomColor: C.border, padding: '4 8' },
   tableRowAlt: { flexDirection: 'row', borderBottomWidth: 0.3, borderBottomColor: C.border, padding: '4 8', backgroundColor: '#FAFAF8' },
-  disclaimer: { fontSize: 7, color: C.muted, marginTop: 16, lineHeight: 1.5, borderTopWidth: 0.5, borderTopColor: C.border, paddingTop: 6 },
+  disclaimer: { fontSize: 7, color: C.muted, marginTop: 12, lineHeight: 1.5, borderTopWidth: 0.5, borderTopColor: C.border, paddingTop: 6 },
 })
 
 const fmtD = (v: number) => `$${Math.round(v).toLocaleString()}`
@@ -51,9 +51,28 @@ const FIELDS: FieldDef[] = [
   { key: 'ga', label: 'G&A', section: 'Expenses', dollar: true },
   { key: 'res', label: 'Reserves', section: 'Expenses', dollar: true, unit: '/unit/yr' },
   { key: 'pm', label: 'Prop Mgmt', section: 'Expenses', pct: true },
+  { key: 'capx', label: 'Cap X', section: 'Expenses', dollar: true },
 ]
 
 const SECTIONS = ['Income', 'Financing', 'Expenses']
+
+// Glossary definitions for the P&L line items
+const GLOSSARY: { term: string; definition: string }[] = [
+  { term: 'Gross Scheduled Rent', definition: 'Total rent if every unit were occupied at current market rent, before any vacancy deduction.' },
+  { term: 'Vacancy', definition: 'Lost rent from unoccupied units and collection loss.' },
+  { term: 'Effective Gross Income', definition: 'Collected rent after vacancy plus other income (laundry, parking, fees).' },
+  { term: 'Total Expenses', definition: 'All operating expenses: taxes, insurance, utilities, R&M, contract services, G&A, reserves, and property management.' },
+  { term: 'NOI', definition: 'Net Operating Income = EGI minus expenses. Key metric for valuation (price / NOI = cap rate). Excludes debt service and taxes.' },
+  { term: 'Debt Service', definition: 'Annual mortgage payments (principal + interest). Fixed for the life of the loan.' },
+  { term: 'Cap X', definition: 'Capital expenditures — large one-time improvements (roof, HVAC, plumbing). Year 1 only.' },
+  { term: 'Pre-Tax Cash Flow', definition: 'NOI minus debt service minus Cap X. The actual cash the property distributes before tax benefits.' },
+  { term: 'Tax Savings', definition: 'Income tax saved via depreciation. Year 1 includes bonus depreciation (cost seg). Years 2+ are straight-line only over 27.5 years.' },
+  { term: 'After-Tax Cash Flow', definition: 'Pre-tax cash flow plus tax savings. Your true annual return after all expenses, debt, and tax benefits.' },
+  { term: '1031 Tax Deferred', definition: 'Capital gains + recapture tax avoided via 1031 exchange. One-time at closing. Deferred, not forgiven — eliminated at death via stepped-up basis.' },
+  { term: 'Total Year 1 Benefit', definition: 'After-tax cash flow plus 1031 tax deferred. The complete economic value the deal delivers in Year 1.' },
+  { term: 'Rent Growth', definition: 'Annual percentage increase applied to all income (rent, other income) for projection years 2-5.' },
+  { term: 'Expense Escalation', definition: 'Annual percentage increase applied to all operating expenses for projection years 2-5. Debt service is not escalated.' },
+]
 
 interface Props {
   projected: ModelInputs
@@ -72,6 +91,38 @@ export function DealTermsPdf({ projected, actualInputs, scenarioName, propertyNa
   const projCalc = calculate(projected, !(projected.ou > 0 && projected.ou < projected.tu))
   const actCalc = calculate(effective, !(effective.ou > 0 && effective.ou < effective.tu))
   const hasActuals = Object.keys(actualInputs).filter(k => (actualInputs as any)[k] !== undefined && (actualInputs as any)[k] !== null).length > 0
+
+  // Growth rates (persisted in actualInputs)
+  const rentGrowth = (actualInputs as any)._rentGrowth ?? 2
+  const expGrowth = (actualInputs as any)._expGrowth ?? 3
+
+  // 5-year projection
+  const useOM = !(effective.ou > 0 && effective.ou < effective.tu)
+  const yearCalcs = [2, 3, 4, 5].map(year => {
+    const rg = Math.pow(1 + rentGrowth / 100, year - 1)
+    const eg = Math.pow(1 + expGrowth / 100, year - 1)
+    const scaled: ModelInputs = {
+      ...effective,
+      rent: effective.rent * rg,
+      rentRoll: effective.rentRoll?.map(u => ({ ...u, rent: (u.rent || 0) * rg })),
+      otherIncome: effective.otherIncome?.map(x => ({ ...x, amount: (x.amount || 0) * rg })),
+      tax: effective.tax * eg, ins: effective.ins * eg, rm: effective.rm * eg, res: effective.res * eg,
+      cs: effective.cs * eg, ga: effective.ga * eg, util: effective.util * eg,
+      utilElec: effective.utilElec * eg, utilWater: effective.utilWater * eg, utilTrash: effective.utilTrash * eg,
+      pmPerUnit: effective.pmPerUnit * eg,
+      otherExpenses: effective.otherExpenses?.map(x => ({ ...x, amount: (x.amount || 0) * eg })),
+      costSeg: 0, closingDate: undefined,
+    }
+    return calculate(scaled, useOM)
+  })
+
+  // Cap X and 1031
+  const capxAmt = Number(effective.capx) || 0
+  const capxProj = Number(projected.capx) || 0
+  const ex1031 = effective.is1031 ? calc1031(effective) : null
+  const deferredGain = effective.deferredGain1031 ?? 0
+  const cgRate = (effective.cgRate ?? 20) / 100
+  const taxDeferred = ex1031?.totalTaxDeferred ?? (effective.is1031 && deferredGain > 0 ? deferredGain * cgRate : 0)
 
   return (
     <Document title={`Deal Terms — ${propertyName}`}>
@@ -169,47 +220,115 @@ export function DealTermsPdf({ projected, actualInputs, scenarioName, propertyNa
           )
         })}
 
-        {/* P&L comparison */}
+        {/* P&L Impact with 5-year projection */}
         {hasActuals && (
           <View>
-            <View style={[s.sectionHdr, { marginTop: 14 }]}>
-              <Text style={s.sectionHdrText}>P&L IMPACT — PROJECTED VS ACTUAL</Text>
+            <View style={[s.sectionHdr, { marginTop: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+              <Text style={s.sectionHdrText}>P&L IMPACT — 5-YEAR HOLD PROJECTION</Text>
+              <Text style={{ fontSize: 7, color: '#999' }}>Rent growth: {rentGrowth}% · Exp escalation: {expGrowth}%</Text>
             </View>
             <View style={s.tableHdr}>
-              <Text style={[s.tableHdrText, { flex: 2.5 }]}>Line Item</Text>
-              <Text style={[s.tableHdrText, { flex: 1.5, textAlign: 'right' }]}>Projected</Text>
-              <Text style={[s.tableHdrText, { flex: 1.5, textAlign: 'right', color: C.accent }]}>Actual</Text>
-              <Text style={[s.tableHdrText, { flex: 1, textAlign: 'right' }]}>Delta</Text>
+              <Text style={[s.tableHdrText, { flex: 2.2 }]}>Line Item</Text>
+              <Text style={[s.tableHdrText, { flex: 1.1, textAlign: 'right' }]}>Projected</Text>
+              <Text style={[s.tableHdrText, { flex: 1.1, textAlign: 'right', color: C.accent }]}>Year 1</Text>
+              <Text style={[s.tableHdrText, { flex: 0.8, textAlign: 'right' }]}>Delta</Text>
+              <Text style={[s.tableHdrText, { flex: 1, textAlign: 'right' }]}>Year 2</Text>
+              <Text style={[s.tableHdrText, { flex: 1, textAlign: 'right' }]}>Year 3</Text>
+              <Text style={[s.tableHdrText, { flex: 1, textAlign: 'right' }]}>Year 4</Text>
+              <Text style={[s.tableHdrText, { flex: 1, textAlign: 'right' }]}>Year 5</Text>
             </View>
-            {[
-              { label: 'Gross Scheduled Rent', p: projCalc.GSR, a: actCalc.GSR, bold: false },
-              { label: 'Vacancy', p: -projCalc.vac, a: -actCalc.vac, bold: false },
-              { label: 'Effective Gross Income', p: projCalc.EGI, a: actCalc.EGI, bold: true },
-              { label: 'Total Expenses', p: -projCalc.exp, a: -actCalc.exp, bold: false },
-              { label: 'NOI', p: projCalc.NOI, a: actCalc.NOI, bold: true },
-              { label: 'Debt Service', p: -projCalc.ds, a: -actCalc.ds, bold: false },
-              { label: 'Pre-Tax Cash Flow', p: projCalc.CF, a: actCalc.CF, bold: true },
-              { label: 'After-Tax Cash Flow', p: projCalc.at, a: actCalc.at, bold: true },
-            ].map((row, i) => {
-              const delta = row.a - row.p
-              return (
-                <View key={i} style={row.bold && row.label === 'NOI' ? [s.tableRow, { backgroundColor: '#EAF3DE' }] : i % 2 === 0 ? s.tableRow : s.tableRowAlt}>
-                  <Text style={{ flex: 2.5, fontSize: 8.5, fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica' }}>{row.label}</Text>
-                  <Text style={{ flex: 1.5, fontSize: 8.5, textAlign: 'right', color: C.gray }}>{fmtNeg(row.p)}</Text>
-                  <Text style={{ flex: 1.5, fontSize: 8.5, textAlign: 'right', fontFamily: 'Helvetica-Bold' }}>{fmtNeg(row.a)}</Text>
-                  <Text style={{ flex: 1, fontSize: 8.5, textAlign: 'right', fontFamily: 'Helvetica-Bold',
-                    color: Math.abs(delta) < 1 ? C.muted : delta > 0 ? C.green : C.red }}>
-                    {Math.abs(delta) < 1 ? '—' : `${delta > 0 ? '+' : '-'}${fmtD(Math.abs(delta))}`}
-                  </Text>
+            {(() => {
+              const rows: { label: string; p: number; a: number; yVals: number[]; bold: boolean; noi?: boolean; amber?: boolean; y1Only?: boolean }[] = [
+                { label: 'Gross Scheduled Rent', p: projCalc.GSR, a: actCalc.GSR, yVals: yearCalcs.map(yc => yc.GSR), bold: false },
+                { label: 'Vacancy', p: -projCalc.vac, a: -actCalc.vac, yVals: yearCalcs.map(yc => -yc.vac), bold: false },
+                { label: 'Effective Gross Income', p: projCalc.EGI, a: actCalc.EGI, yVals: yearCalcs.map(yc => yc.EGI), bold: true },
+                { label: 'Total Expenses', p: -projCalc.exp, a: -actCalc.exp, yVals: yearCalcs.map(yc => -yc.exp), bold: false },
+                { label: 'NOI', p: projCalc.NOI, a: actCalc.NOI, yVals: yearCalcs.map(yc => yc.NOI), bold: true, noi: true },
+                { label: 'Debt Service', p: -projCalc.ds, a: -actCalc.ds, yVals: yearCalcs.map(yc => -yc.ds), bold: false },
+                ...(capxAmt > 0 || capxProj > 0 ? [
+                  { label: 'Cap X', p: -capxProj, a: -capxAmt, yVals: [0, 0, 0, 0], bold: false },
+                ] : []),
+                { label: 'Pre-Tax Cash Flow', p: projCalc.CF - capxProj, a: actCalc.CF - capxAmt, yVals: yearCalcs.map(yc => yc.CF), bold: true },
+                { label: 'Tax Savings', p: projCalc.ts, a: actCalc.ts, yVals: yearCalcs.map(yc => yc.ts), bold: false },
+                { label: 'After-Tax Cash Flow', p: projCalc.at - capxProj, a: actCalc.at - capxAmt, yVals: yearCalcs.map(yc => yc.at), bold: true },
+                ...(taxDeferred > 0 ? [
+                  { label: '1031 Tax Deferred', p: taxDeferred, a: taxDeferred, yVals: [0, 0, 0, 0], bold: false, amber: true, y1Only: true },
+                  { label: 'Total Year 1 Benefit', p: (projCalc.at - capxProj) + taxDeferred, a: (actCalc.at - capxAmt) + taxDeferred, yVals: [0, 0, 0, 0], bold: true, amber: true, y1Only: true },
+                ] : []),
+              ]
+              const y1Total = (actCalc.at - capxAmt) + taxDeferred
+              const cumulative = yearCalcs.map((yc, yi) => {
+                let total = y1Total
+                for (let j = 0; j <= yi; j++) total += yearCalcs[j].at
+                return total
+              })
+
+              return (<>
+                {rows.map((row, i) => {
+                  const delta = row.a - row.p
+                  const bg = row.amber ? '#FDF8EC' : row.noi ? '#EAF3DE' : i % 2 === 0 ? 'white' : '#FAFAF8'
+                  return (
+                    <View key={i} style={[s.tableRow, { backgroundColor: bg }]}>
+                      <Text style={{ flex: 2.2, fontSize: 8, fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica', color: row.amber ? C.amber : C.text }}>{row.label}</Text>
+                      <Text style={{ flex: 1.1, fontSize: 8, textAlign: 'right', color: C.gray }}>{fmtNeg(row.p)}</Text>
+                      <Text style={{ flex: 1.1, fontSize: 8, textAlign: 'right', fontFamily: row.bold ? 'Helvetica-Bold' : 'Helvetica', color: row.amber ? C.amber : C.text }}>{fmtNeg(row.a)}</Text>
+                      <Text style={{ flex: 0.8, fontSize: 8, textAlign: 'right', fontFamily: 'Helvetica-Bold',
+                        color: row.y1Only ? 'transparent' : Math.abs(delta) < 1 ? C.muted : delta > 0 ? C.green : C.red }}>
+                        {row.y1Only ? '' : Math.abs(delta) < 1 ? '—' : `${delta > 0 ? '+' : '-'}${fmtD(Math.abs(delta))}`}
+                      </Text>
+                      {row.yVals.map((val, yi) => (
+                        <Text key={yi} style={{ flex: 1, fontSize: 8, textAlign: 'right', color: row.y1Only ? 'transparent' : row.bold ? C.text : C.gray }}>{row.y1Only ? '' : fmtNeg(val)}</Text>
+                      ))}
+                    </View>
+                  )
+                })}
+                <View style={[s.tableRow, { backgroundColor: C.text, borderBottomWidth: 0 }]}>
+                  <Text style={{ flex: 2.2, fontSize: 8, fontFamily: 'Helvetica-Bold', color: 'white' }}>Cumulative</Text>
+                  <Text style={{ flex: 1.1, fontSize: 8 }}></Text>
+                  <Text style={{ flex: 1.1, fontSize: 8, textAlign: 'right', fontFamily: 'Helvetica-Bold', color: 'white' }}>{fmtD(y1Total)}</Text>
+                  <Text style={{ flex: 0.8, fontSize: 8 }}></Text>
+                  {cumulative.map((val, yi) => (
+                    <Text key={yi} style={{ flex: 1, fontSize: 8, textAlign: 'right', fontFamily: 'Helvetica-Bold', color: 'white' }}>{fmtD(val)}</Text>
+                  ))}
                 </View>
-              )
-            })}
+              </>)
+            })()}
           </View>
         )}
 
         <Text style={s.disclaimer}>
           Projected figures from underwriting scenario "{scenarioName}". Actual figures reflect quotes and terms received during due diligence.
+          Years 2-5 projected using {rentGrowth}% annual rent growth and {expGrowth}% expense escalation. Debt service held constant.
+          Tax savings reflect bonus depreciation in Year 1 and straight-line depreciation thereafter.
           All calculations are estimates and should be independently verified. Consult qualified professionals before making investment decisions.
+        </Text>
+      </Page>
+
+      {/* Page 2: Glossary */}
+      <Page size="LETTER" style={s.page}>
+        <Text style={[s.title, { fontSize: 14, marginBottom: 4 }]}>Definitions</Text>
+        <View style={s.orangeLine} />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 0 }}>
+          {GLOSSARY.map((item, i) => (
+            <View key={i} style={{
+              width: '48%',
+              marginRight: i % 2 === 0 ? '4%' : 0,
+              marginBottom: 8,
+              padding: '6 8',
+              backgroundColor: '#F8F8F8',
+              borderRadius: 3,
+              borderLeftWidth: 2,
+              borderLeftColor: C.accent,
+            }}>
+              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: C.text, marginBottom: 2 }}>{item.term}</Text>
+              <Text style={{ fontSize: 7, color: C.gray, lineHeight: 1.4 }}>{item.definition}</Text>
+            </View>
+          ))}
+        </View>
+
+        <Text style={[s.disclaimer, { marginTop: 'auto' }]}>
+          Prepared by Chai Holdings, LLC. For informational purposes only — not investment, tax, or legal advice.
+          Consult a CPA for tax strategy and a qualified attorney for legal matters. {date}
         </Text>
       </Page>
     </Document>
