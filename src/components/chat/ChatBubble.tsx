@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { MessageCircle, X, Send, Loader2, Lightbulb } from 'lucide-react'
+import { MessageCircle, X, Send, Loader2, Lightbulb, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useDealContext } from '../../hooks/useDealContext'
 import { FeatureSuggestionModal } from '../FeatureSuggestionModal'
@@ -110,9 +110,16 @@ export function ChatBubble() {
             <h2 className="text-sm font-semibold">Deal Assistant</h2>
             <p className="text-[10px] text-gray-300 truncate">{contextLabel}</p>
           </div>
-          <button onClick={() => setOpen(false)} className="p-1.5 hover:bg-white/10 rounded transition-colors">
-            <X size={16} />
-          </button>
+          <div className="flex items-center gap-1">
+            {messages.length > 0 && (
+              <button onClick={() => setMessages([])} className="p-1.5 hover:bg-white/10 rounded transition-colors" title="Clear chat">
+                <Trash2 size={14} />
+              </button>
+            )}
+            <button onClick={() => setOpen(false)} className="p-1.5 hover:bg-white/10 rounded transition-colors">
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
