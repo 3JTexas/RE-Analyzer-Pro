@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import { Link, useLocation, Outlet } from 'react-router-dom'
-import { Building2, BarChart3, Home, User, LogOut, Settings } from 'lucide-react'
+import { Building2, BarChart3, Home, User, LogOut, Settings, Lightbulb } from 'lucide-react'
 import { ChatBubble } from '../chat/ChatBubble'
 import { useAuth } from '../../hooks/useAuth'
 import { ProfileModal, getInitials } from '../ProfileModal'
@@ -36,6 +36,11 @@ function AvatarMenu({ size, textSize, onProfile, onSettings, onSignOut }: {
             className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
             <Settings size={14} className="text-gray-400" /> Settings
           </button>
+          <a href="mailto:andrew@chaiholdings.com?subject=RE%20Analyzer%20Pro%20%E2%80%94%20Feature%20Suggestion&body=Feature%20idea%3A%0A%0A"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs text-[#c9a84c] hover:bg-[#c9a84c]/5 transition-colors">
+            <Lightbulb size={14} /> Suggest a Feature
+          </a>
           <div className="border-t border-gray-100 my-1" />
           <button onClick={() => { setOpen(false); onSignOut() }}
             className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs text-red-500 hover:bg-red-50 transition-colors">

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { MessageCircle, X, Send, Loader2 } from 'lucide-react'
+import { MessageCircle, X, Send, Loader2, Lightbulb } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useDealContext } from '../../hooks/useDealContext'
 
@@ -151,6 +151,12 @@ export function ChatBubble() {
 
         {/* Input */}
         <div className="border-t border-gray-200 px-3 py-2 flex-shrink-0 bg-white">
+          <a
+            href="mailto:andrew@chaiholdings.com?subject=RE%20Analyzer%20Pro%20%E2%80%94%20Feature%20Suggestion&body=Feature%20idea%3A%0A%0A"
+            className="flex items-center gap-1.5 text-[10px] text-[#c9a84c] hover:text-[#b8963f] transition-colors mb-2 px-1"
+          >
+            <Lightbulb size={12} /> Suggest a feature
+          </a>
           <div className="flex items-end gap-2">
             <textarea
               ref={textareaRef}
