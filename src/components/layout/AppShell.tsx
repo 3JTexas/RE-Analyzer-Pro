@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { Link, useLocation, Outlet } from 'react-router-dom'
 import { Building2, BarChart3, Home, User, LogOut, Settings } from 'lucide-react'
+import { ChatBubble } from '../chat/ChatBubble'
 import { useAuth } from '../../hooks/useAuth'
 import { ProfileModal, getInitials } from '../ProfileModal'
 import { SettingsModal } from '../SettingsModal'
@@ -146,6 +147,7 @@ export function AppShell() {
 
       {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      <ChatBubble />
     </div>
   )
 }
