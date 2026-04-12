@@ -43,9 +43,9 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Send email notification to admin
-    const resendKey = Deno.env.get('RESEND_API_KEY')
-    if (resendKey) {
+    // Send email notification to admin via Postmark
+    const postmarkKey = Deno.env.get('POSTMARK_API_KEY')
+    if (postmarkKey) {
       try {
         let parsed: any = null
         try { parsed = JSON.parse(description ?? '') } catch { /* not structured JSON */ }
@@ -62,17 +62,19 @@ Deno.serve(async (req) => {
              <p style="color:#666;margin:0 0 12px"><strong>Category:</strong> ${category} &nbsp;|&nbsp; <strong>From:</strong> ${userEmail ?? 'unknown'}</p>
              <pre style="white-space:pre-wrap;font-size:13px">${description ?? ''}</pre>`
 
-        await fetch('https://api.resend.com/emails', {
+        await fetch('https://api.postmarkapp.com/email', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${resendKey}`,
+            'Accept': 'application/json',
+            'X-Postmark-Server-Token': postmarkKey,
           },
           body: JSON.stringify({
-            from: 'RE Analyzer Pro <onboarding@resend.dev>',
-            to: ['andrew@chaiholdings.com'],
-            subject: `[Feature Request] ${title}`,
-            html: htmlBody,
+            From: 'RE Analyzer Pro <andrew@chaiholdings.com>',
+            To: 'andrew@chaiholdings.com',
+            Subject: `[Feature Request] ${title}`,
+            HtmlBody: htmlBody,
+            MessageStream: 'outbound',
           }),
         })
       } catch (emailErr: any) {
