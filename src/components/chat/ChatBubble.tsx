@@ -118,11 +118,11 @@ export function ChatBubble() {
           {messages.length === 0 && (
             <div className="text-center text-gray-400 text-xs mt-8">
               <MessageCircle size={32} className="mx-auto mb-3 opacity-40" />
-              <p className="font-medium mb-1">Ask anything about this deal</p>
+              <p className="font-medium mb-1">RE Investment Assistant</p>
               <p className="text-[11px]">
                 {dealContext
-                  ? `Analyzing ${contextLabel}`
-                  : 'Navigate to a property or scenario for deal-specific answers'}
+                  ? `Deal loaded: ${contextLabel} — ask about this deal or any RE topic`
+                  : 'Ask any real estate, tax, or financing question'}
               </p>
             </div>
           )}
@@ -157,7 +157,7 @@ export function ChatBubble() {
               value={input}
               onChange={handleTextareaChange}
               onKeyDown={handleKeyDown}
-              placeholder="Ask about this deal..."
+              placeholder="Ask about this deal or any RE topic..."
               rows={1}
               className="flex-1 resize-none border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#c9a84c] focus:border-[#c9a84c]"
               style={{ maxHeight: 96 }}
