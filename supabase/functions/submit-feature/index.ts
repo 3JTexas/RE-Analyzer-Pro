@@ -43,6 +43,44 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Send email notification to admin
+    const resendKey = Deno.env.get('RESEND_API_KEY')
+    if (resendKey) {
+      try {
+        let parsed: any = null
+        try { parsed = JSON.parse(description ?? '') } catch { /* not structured JSON */ }
+
+        const htmlBody = parsed?.userStory
+          ? `<h2 style="margin:0 0 8px">${title}</h2>
+             <p style="color:#666;margin:0 0 12px"><strong>Category:</strong> ${category} &nbsp;|&nbsp; <strong>Priority:</strong> ${parsed.priority ?? 'n/a'} &nbsp;|&nbsp; <strong>From:</strong> ${userEmail ?? 'unknown'}</p>
+             <p style="margin:0 0 12px">${parsed.summary}</p>
+             <p style="color:#888;font-style:italic;margin:0 0 12px">${parsed.userStory}</p>
+             <p style="margin:0 0 4px"><strong>Acceptance Criteria:</strong></p>
+             <ul style="margin:0 0 12px;padding-left:20px">${(parsed.acceptanceCriteria ?? []).map((c: string) => `<li>${c}</li>`).join('')}</ul>
+             ${parsed.notes ? `<p style="color:#888;border-top:1px solid #eee;padding-top:8px;margin-top:12px">${parsed.notes}</p>` : ''}`
+          : `<h2 style="margin:0 0 8px">${title}</h2>
+             <p style="color:#666;margin:0 0 12px"><strong>Category:</strong> ${category} &nbsp;|&nbsp; <strong>From:</strong> ${userEmail ?? 'unknown'}</p>
+             <pre style="white-space:pre-wrap;font-size:13px">${description ?? ''}</pre>`
+
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${resendKey}`,
+          },
+          body: JSON.stringify({
+            from: 'RE Analyzer Pro <onboarding@resend.dev>',
+            to: ['andrew@chaiholdings.com'],
+            subject: `[Feature Request] ${title}`,
+            html: htmlBody,
+          }),
+        })
+      } catch (emailErr: any) {
+        // Don't fail the request if email fails — feature is already saved
+        console.error('[submit-feature] Email error:', emailErr.message)
+      }
+    }
+
     return new Response(JSON.stringify({ success: true, id: data.id }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })

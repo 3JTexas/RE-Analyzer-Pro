@@ -9,6 +9,7 @@ import { PropertyPage }   from './pages/PropertyPage'
 import { ScenarioPage }   from './pages/ScenarioPage'
 import { DemoPage }       from './pages/DemoPage'
 import { PipelinePage }   from './pages/PipelinePage'
+import { AdminFeatureRequestsPage } from './pages/AdminFeatureRequestsPage'
 import { Spinner }        from './components/ui'
 
 class ErrorBoundary extends React.Component<
@@ -71,6 +72,9 @@ export default function App() {
           } />
           <Route path="/property/:id/pipeline" element={
             <ProtectedRoute><PipelinePage /></ProtectedRoute>
+          } />
+          <Route path="/admin/features" element={
+            <ProtectedRoute><AdminFeatureRequestsPage /></ProtectedRoute>
           } />
 
           {/* Fallback */}
