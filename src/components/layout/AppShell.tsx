@@ -5,9 +5,10 @@ import { ChatBubble } from '../chat/ChatBubble'
 import { useAuth } from '../../hooks/useAuth'
 import { ProfileModal, getInitials } from '../ProfileModal'
 import { SettingsModal } from '../SettingsModal'
+import { FeatureSuggestionModal } from '../FeatureSuggestionModal'
 
-function AvatarMenu({ size, textSize, onProfile, onSettings, onSignOut }: {
-  size: string; textSize: string; onProfile: () => void; onSettings: () => void; onSignOut: () => void
+function AvatarMenu({ size, textSize, onProfile, onSettings, onSuggestFeature, onSignOut }: {
+  size: string; textSize: string; onProfile: () => void; onSettings: () => void; onSuggestFeature: () => void; onSignOut: () => void
 }) {
   const { user } = useAuth()
   const [open, setOpen] = useState(false)
@@ -36,11 +37,10 @@ function AvatarMenu({ size, textSize, onProfile, onSettings, onSignOut }: {
             className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
             <Settings size={14} className="text-gray-400" /> Settings
           </button>
-          <a href="mailto:andrew@chaiholdings.com?subject=RE%20Analyzer%20Pro%20%E2%80%94%20Feature%20Suggestion&body=Feature%20idea%3A%0A%0A"
-            onClick={() => setOpen(false)}
+          <button onClick={() => { setOpen(false); onSuggestFeature() }}
             className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs text-[#c9a84c] hover:bg-[#c9a84c]/5 transition-colors">
             <Lightbulb size={14} /> Suggest a Feature
-          </a>
+          </button>
           <div className="border-t border-gray-100 my-1" />
           <button onClick={() => { setOpen(false); onSignOut() }}
             className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs text-red-500 hover:bg-red-50 transition-colors">
@@ -57,6 +57,7 @@ export function AppShell() {
   const loc = useLocation()
   const [showProfile, setShowProfile] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showFeatureSuggestion, setShowFeatureSuggestion] = useState(false)
 
   const nav = [
     { to: '/',           icon: Building2, label: 'Properties' },
@@ -114,7 +115,7 @@ export function AppShell() {
             <Home size={16} />
           </Link>
           {user && (
-            <AvatarMenu size="w-9 h-9" textSize="text-xs" onProfile={() => setShowProfile(true)} onSettings={() => setShowSettings(true)} onSignOut={signOut} />
+            <AvatarMenu size="w-9 h-9" textSize="text-xs" onProfile={() => setShowProfile(true)} onSettings={() => setShowSettings(true)} onSuggestFeature={() => setShowFeatureSuggestion(true)} onSignOut={signOut} />
           )}
         </div>
       </header>
@@ -126,7 +127,7 @@ export function AppShell() {
         </Link>
         <span className="text-[9px] font-medium tracking-[0.12em] uppercase text-gray-400">RE Analyzer Pro</span>
         {user && (
-          <AvatarMenu size="w-8 h-8" textSize="text-[10px]" onProfile={() => setShowProfile(true)} onSettings={() => setShowSettings(true)} onSignOut={signOut} />
+          <AvatarMenu size="w-8 h-8" textSize="text-[10px]" onProfile={() => setShowProfile(true)} onSettings={() => setShowSettings(true)} onSuggestFeature={() => setShowFeatureSuggestion(true)} onSignOut={signOut} />
         )}
       </header>
 
@@ -152,6 +153,7 @@ export function AppShell() {
 
       {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showFeatureSuggestion && <FeatureSuggestionModal onClose={() => setShowFeatureSuggestion(false)} />}
       <ChatBubble />
     </div>
   )

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { MessageCircle, X, Send, Loader2, Lightbulb } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useDealContext } from '../../hooks/useDealContext'
+import { FeatureSuggestionModal } from '../FeatureSuggestionModal'
 
 interface ChatMessage {
   id: string
@@ -15,6 +16,7 @@ export function ChatBubble() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showFeatureModal, setShowFeatureModal] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { dealContext } = useDealContext()
@@ -151,12 +153,12 @@ export function ChatBubble() {
 
         {/* Input */}
         <div className="border-t border-gray-200 px-3 py-2 flex-shrink-0 bg-white">
-          <a
-            href="mailto:andrew@chaiholdings.com?subject=RE%20Analyzer%20Pro%20%E2%80%94%20Feature%20Suggestion&body=Feature%20idea%3A%0A%0A"
+          <button
+            onClick={() => setShowFeatureModal(true)}
             className="flex items-center gap-1.5 text-[10px] text-[#c9a84c] hover:text-[#b8963f] transition-colors mb-2 px-1"
           >
             <Lightbulb size={12} /> Suggest a feature
-          </a>
+          </button>
           <div className="flex items-end gap-2">
             <textarea
               ref={textareaRef}
@@ -194,6 +196,8 @@ export function ChatBubble() {
           )}
         </button>
       )}
+
+      {showFeatureModal && <FeatureSuggestionModal onClose={() => setShowFeatureModal(false)} />}
     </>
   )
 }
