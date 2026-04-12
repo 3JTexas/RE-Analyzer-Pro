@@ -21,7 +21,9 @@ Rules:
 - ALWAYS answer general real estate, tax, financing, legal, 1031, and depreciation questions — even when deal data is loaded. The deal context is supplementary, not a restriction on what topics you can discuss.
 - If a question is completely unrelated to real estate or investing, politely decline and redirect.
 - Format currency with $ and commas. Format percentages with one decimal.
-- When no deal context is provided, answer general RE questions but note you don't have a specific deal loaded.`
+- When no deal context is provided, answer general RE questions but note you don't have a specific deal loaded.
+- IMPORTANT: The deal data below includes BOTH the stabilized P&L AND the Year 1 projection with CapX. When the user asks about Year 1, cash needs, or out-of-pocket costs, use the DEAL TERMS section which accounts for CapX and actuals vs projected. The "Stabilized Cash Flow" is the ongoing annual figure BEFORE CapX. The "Year 1 Cash Flow (after CapX)" is the actual Year 1 figure.
+- When you reference numbers, always state WHERE you're getting them from (e.g. "From the stabilized P&L..." or "From the Year 1 projection including CapX...").`
 
 function buildSystemPrompt(dealContext: any): string {
   if (!dealContext) return SYSTEM_PREAMBLE
@@ -73,18 +75,58 @@ function buildSystemPrompt(dealContext: any): string {
     if (o.r1) contextBlock += `  Year 1 Total Return: ${(o.r1 || 0).toFixed(1)}%\n`
   }
 
+  if (dealContext.dealTerms) {
+    const dt = dealContext.dealTerms
+    contextBlock += `\nDEAL TERMS (Year 1 with CapX):\n`
+    if (dt.capx !== null || dt.actualCapx !== null) {
+      contextBlock += `  Year 1 CapX: $${((dt.actualCapx ?? dt.capx) || 0).toLocaleString()}`
+      if (dt.actualCapx !== null && dt.capx !== null && dt.actualCapx !== dt.capx) {
+        contextBlock += ` (projected: $${dt.capx.toLocaleString()}, actual: $${dt.actualCapx.toLocaleString()})`
+      }
+      contextBlock += '\n'
+    }
+    if (dt.year1CF !== null) {
+      contextBlock += `  Year 1 Cash Flow (after CapX): $${dt.year1CF.toLocaleString()}\n`
+    }
+    contextBlock += `  Rent Growth: ${dt.rentGrowth}%/yr | Expense Growth: ${dt.expGrowth}%/yr\n`
+
+    // Actuals vs projected differences
+    if (dt.actualInputs && Object.keys(dt.actualInputs).filter(k => !k.startsWith('_')).length > 0) {
+      contextBlock += `  Actuals Override: Yes — some fields have actual values differing from projected\n`
+    }
+
+    if (dt.fiveYearProjection?.length) {
+      contextBlock += `\n5-YEAR HOLD PROJECTION:\n`
+      contextBlock += `  Year | GSR | NOI | Cash Flow | After-Tax CF\n`
+      for (const yr of dt.fiveYearProjection) {
+        contextBlock += `  Y${yr.year}: GSR $${Math.round(yr.GSR).toLocaleString()} | NOI $${Math.round(yr.NOI).toLocaleString()} | CF $${Math.round(yr.CF).toLocaleString()} | ATCF $${Math.round(yr.afterTaxCF).toLocaleString()}\n`
+      }
+    }
+  }
+
   if (dealContext.pipeline) {
     const pl = dealContext.pipeline
     contextBlock += `\nPIPELINE STATUS:\n`
     if (pl.milestones?.length) {
-      contextBlock += `  Milestones: ${pl.milestones.filter((m: any) => m.status === 'complete').length}/${pl.milestones.length} complete\n`
+      contextBlock += `  Milestones: ${pl.milestones.filter((m: any) => m.status === 'complete' || m.status === 'completed').length}/${pl.milestones.length} complete\n`
+      for (const m of pl.milestones) {
+        contextBlock += `    - ${m.name}: ${m.status}${m.date ? ` (${m.date})` : ''}\n`
+      }
     }
     if (pl.keyDates) {
       const kd = pl.keyDates
       if (kd.closingDate) contextBlock += `  Closing Date: ${kd.closingDate}\n`
-      if (kd.inspectionDeadline) contextBlock += `  Inspection Deadline: ${kd.inspectionDeadline}\n`
-      if (kd.financingDeadline) contextBlock += `  Financing Deadline: ${kd.financingDeadline}\n`
+      if (kd.effectiveDate) contextBlock += `  Effective Date: ${kd.effectiveDate}\n`
+      if (kd.ddEndDate) contextBlock += `  DD End Date: ${kd.ddEndDate}\n`
+      if (kd.financingDeadlineDate) contextBlock += `  Financing Deadline: ${kd.financingDeadlineDate}\n`
     }
+    if (pl.repairEstimates?.length) {
+      contextBlock += `  Repair Estimates: ${pl.repairEstimates.length} items, total $${pl.repairEstimates.reduce((sum: number, r: any) => sum + (r.estimatedCost || 0), 0).toLocaleString()}\n`
+    }
+  }
+
+  if (dealContext.currentView) {
+    contextBlock += `\nUSER IS CURRENTLY VIEWING: ${dealContext.currentView} page\n`
   }
 
   return SYSTEM_PREAMBLE + contextBlock
