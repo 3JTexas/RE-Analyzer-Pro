@@ -83,15 +83,31 @@ export const DEAL_TEAM_ROLES: { id: string; label: string }[] = [
   { id: 'insurance_agent', label: 'Insurance Agent' },
 ]
 
+export type PhoneType = 'cell' | 'office' | 'main' | 'fax'
+
+export const PHONE_TYPE_LABELS: Record<PhoneType, string> = {
+  cell: 'Cell',
+  office: 'Office',
+  main: 'Main',
+  fax: 'Fax',
+}
+
+export interface PhoneEntry {
+  number: string
+  type: PhoneType
+}
+
 export interface DealTeamCandidate {
   id: string
   name: string
   company: string
-  phone: string
+  phone: string           // legacy single phone — kept for backward compat
+  phones: PhoneEntry[]    // structured phone list
   email: string
   website: string
   address: string
   notes: string
+  referredBy: string
   selected: boolean
 }
 

@@ -1,19 +1,39 @@
-import { useState } from 'react'
-import { ChevronDown, ChevronUp, Plus, Trash2, Check, Phone, Mail, User, Globe, MapPin, Pencil, Download, X } from 'lucide-react'
-import type { DealTeam, DealTeamCandidate, DealTeamRole } from '../../types/pipeline'
-import { DEAL_TEAM_ROLES } from '../../types/pipeline'
+import { useState, useRef } from 'react'
+import { ChevronDown, ChevronUp, Plus, Trash2, Check, Phone, Mail, User, Globe, MapPin, Pencil, Download, X, Upload, UserPlus } from 'lucide-react'
+import type { DealTeam, DealTeamCandidate, DealTeamRole, PhoneEntry, PhoneType } from '../../types/pipeline'
+import { DEAL_TEAM_ROLES, PHONE_TYPE_LABELS } from '../../types/pipeline'
 import type { CustomRole } from '../../hooks/useCustomRoles'
 
 interface Props {
   dealTeam: DealTeam
   onUpdate: (team: DealTeam) => void
-  limitedRoles?: DealTeamRole[]  // if set, only show these roles (for mini-pipeline Contacts tab)
+  limitedRoles?: DealTeamRole[]
   customRoles?: CustomRole[]
   onAddRole?: (label: string) => Promise<CustomRole | null>
   onRemoveRole?: (id: string) => Promise<void>
 }
 
-const emptyDraft = { name: '', company: '', phone: '', email: '', website: '', address: '', notes: '' }
+type Draft = {
+  name: string
+  company: string
+  phones: PhoneEntry[]
+  email: string
+  website: string
+  address: string
+  notes: string
+  referredBy: string
+}
+
+const emptyDraft: Draft = { name: '', company: '', phones: [{ number: '', type: 'cell' }], email: '', website: '', address: '', notes: '', referredBy: '' }
+
+// Migrate legacy single `phone` field to structured `phones` array
+function getPhones(c: DealTeamCandidate): PhoneEntry[] {
+  if (c.phones?.length > 0) return c.phones
+  if (c.phone) return [{ number: c.phone, type: 'cell' }]
+  return []
+}
+
+// ── vCard export ────────────────────────────────────────────────────────
 
 function exportVCard(c: DealTeamCandidate, roleLabel: string) {
   const nameParts = c.name.trim().split(/\s+/)
@@ -26,14 +46,17 @@ function exportVCard(c: DealTeamCandidate, roleLabel: string) {
     `FN:${c.name}`,
   ]
   if (c.company) lines.push(`ORG:${c.company}`)
-  if (c.phone) lines.push(`TEL;TYPE=WORK:${c.phone}`)
+  const phones = getPhones(c)
+  for (const p of phones) {
+    if (!p.number) continue
+    const vcardType = p.type === 'cell' ? 'CELL' : p.type === 'fax' ? 'FAX' : 'WORK'
+    lines.push(`TEL;TYPE=${vcardType}:${p.number}`)
+  }
   if (c.email) lines.push(`EMAIL;TYPE=WORK:${c.email}`)
   if (c.website) lines.push(`URL:${c.website.startsWith('http') ? c.website : `https://${c.website}`}`)
   if (c.address) lines.push(`ADR;TYPE=WORK:;;${c.address};;;;`)
-  if (c.notes || roleLabel) {
-    const note = [roleLabel ? `Role: ${roleLabel}` : '', c.notes].filter(Boolean).join(' — ')
-    lines.push(`NOTE:${note}`)
-  }
+  const noteParts = [roleLabel ? `Role: ${roleLabel}` : '', c.referredBy ? `Referred by: ${c.referredBy}` : '', c.notes].filter(Boolean)
+  if (noteParts.length) lines.push(`NOTE:${noteParts.join(' — ')}`)
   lines.push('END:VCARD')
 
   const blob = new Blob([lines.join('\r\n')], { type: 'text/vcard' })
@@ -45,13 +68,61 @@ function exportVCard(c: DealTeamCandidate, roleLabel: string) {
   URL.revokeObjectURL(url)
 }
 
+// ── vCard import / parse ────────────────────────────────────────────────
+
+function parseVCard(text: string): Partial<Draft> | null {
+  const lines = text.replace(/\r\n /g, '').split(/\r?\n/)  // unfold continuation lines
+  if (!lines.some(l => l.startsWith('BEGIN:VCARD'))) return null
+
+  let name = ''
+  let company = ''
+  const phones: PhoneEntry[] = []
+  let email = ''
+  let website = ''
+  let address = ''
+  let notes = ''
+
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (line.startsWith('FN:')) {
+      name = line.slice(3)
+    } else if (line.startsWith('ORG:')) {
+      company = line.slice(4).replace(/;+$/, '')
+    } else if (line.toUpperCase().startsWith('TEL')) {
+      const num = line.split(':').slice(1).join(':').trim()
+      const upper = line.toUpperCase()
+      let pType: PhoneType = 'office'
+      if (upper.includes('CELL') || upper.includes('MOBILE')) pType = 'cell'
+      else if (upper.includes('FAX')) pType = 'fax'
+      else if (upper.includes('MAIN')) pType = 'main'
+      if (num) phones.push({ number: num, type: pType })
+    } else if (line.toUpperCase().startsWith('EMAIL')) {
+      email = line.split(':').slice(1).join(':').trim()
+    } else if (line.startsWith('URL:')) {
+      website = line.slice(4)
+    } else if (line.toUpperCase().startsWith('ADR')) {
+      const parts = line.split(':').slice(1).join(':').split(';').filter(Boolean)
+      address = parts.join(', ')
+    } else if (line.startsWith('NOTE:')) {
+      notes = line.slice(5)
+    }
+  }
+
+  if (!name) return null
+  return { name, company, phones: phones.length > 0 ? phones : [{ number: '', type: 'cell' }], email, website, address, notes }
+}
+
+// ── Component ───────────────────────────────────────────────────────────
+
 export function DealTeamSection({ dealTeam, onUpdate, limitedRoles, customRoles = [], onAddRole, onRemoveRole }: Props) {
   const [expandedRoles, setExpandedRoles] = useState<Set<string>>(new Set())
   const [addingTo, setAddingTo] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [draft, setDraft] = useState(emptyDraft)
+  const [draft, setDraft] = useState<Draft>(emptyDraft)
   const [showAddRole, setShowAddRole] = useState(false)
   const [newRoleLabel, setNewRoleLabel] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [importRole, setImportRole] = useState<string | null>(null)
 
   const allRoles = [...DEAL_TEAM_ROLES, ...customRoles.map(r => ({ id: r.id, label: r.label }))]
   const roles = limitedRoles
@@ -64,19 +135,23 @@ export function DealTeamSection({ dealTeam, onUpdate, limitedRoles, customRoles 
   const getSelected = (role: string): DealTeamCandidate | undefined =>
     getCandidates(role).find(c => c.selected)
 
+  const buildCandidate = (d: Draft, autoSelect: boolean): DealTeamCandidate => ({
+    id: crypto.randomUUID(),
+    name: d.name.trim(),
+    company: d.company.trim(),
+    phone: d.phones[0]?.number?.trim() ?? '',
+    phones: d.phones.filter(p => p.number.trim()).map(p => ({ number: p.number.trim(), type: p.type })),
+    email: d.email.trim(),
+    website: d.website.trim(),
+    address: d.address.trim(),
+    notes: d.notes.trim(),
+    referredBy: d.referredBy.trim(),
+    selected: autoSelect,
+  })
+
   const addCandidate = (role: string) => {
     if (!draft.name.trim()) return
-    const candidate: DealTeamCandidate = {
-      id: crypto.randomUUID(),
-      name: draft.name.trim(),
-      company: draft.company.trim(),
-      phone: draft.phone.trim(),
-      email: draft.email.trim(),
-      website: draft.website.trim(),
-      address: draft.address.trim(),
-      notes: draft.notes.trim(),
-      selected: getCandidates(role).length === 0,  // auto-select first one
-    }
+    const candidate = buildCandidate(draft, getCandidates(role).length === 0)
     const updated = { ...dealTeam }
     updated[role] = { candidates: [...getCandidates(role), candidate] }
     onUpdate(updated)
@@ -90,7 +165,18 @@ export function DealTeamSection({ dealTeam, onUpdate, limitedRoles, customRoles 
     updated[role] = {
       candidates: getCandidates(role).map(c =>
         c.id === candidateId
-          ? { ...c, name: draft.name.trim(), company: draft.company.trim(), phone: draft.phone.trim(), email: draft.email.trim(), website: draft.website.trim(), address: draft.address.trim(), notes: draft.notes.trim() }
+          ? {
+              ...c,
+              name: draft.name.trim(),
+              company: draft.company.trim(),
+              phone: draft.phones[0]?.number?.trim() ?? '',
+              phones: draft.phones.filter(p => p.number.trim()).map(p => ({ number: p.number.trim(), type: p.type })),
+              email: draft.email.trim(),
+              website: draft.website.trim(),
+              address: draft.address.trim(),
+              notes: draft.notes.trim(),
+              referredBy: draft.referredBy.trim(),
+            }
           : c
       ),
     }
@@ -100,9 +186,27 @@ export function DealTeamSection({ dealTeam, onUpdate, limitedRoles, customRoles 
   }
 
   const startEdit = (c: DealTeamCandidate) => {
+    const phones = getPhones(c)
     setEditingId(c.id)
     setAddingTo(null)
-    setDraft({ name: c.name, company: c.company || '', phone: c.phone || '', email: c.email || '', website: c.website || '', address: c.address || '', notes: c.notes || '' })
+    setDraft({
+      name: c.name,
+      company: c.company || '',
+      phones: phones.length > 0 ? phones : [{ number: '', type: 'cell' }],
+      email: c.email || '',
+      website: c.website || '',
+      address: c.address || '',
+      notes: c.notes || '',
+      referredBy: c.referredBy || '',
+    })
+  }
+
+  const startNewFromCompany = (c: DealTeamCandidate, roleId: string) => {
+    setEditingId(null)
+    setAddingTo(roleId)
+    setDraft({ ...emptyDraft, company: c.company })
+    // Auto-expand the role
+    setExpandedRoles(prev => new Set([...prev, roleId]))
   }
 
   const removeCandidate = (role: string, candidateId: string) => {
@@ -122,10 +226,110 @@ export function DealTeamSection({ dealTeam, onUpdate, limitedRoles, customRoles 
     onUpdate(updated)
   }
 
+  // Phone row helpers
+  const addPhoneRow = () => setDraft(d => ({ ...d, phones: [...d.phones, { number: '', type: 'cell' }] }))
+  const removePhoneRow = (idx: number) => setDraft(d => ({ ...d, phones: d.phones.filter((_, i) => i !== idx) }))
+  const updatePhone = (idx: number, field: 'number' | 'type', val: string) =>
+    setDraft(d => ({ ...d, phones: d.phones.map((p, i) => i === idx ? { ...p, [field]: val } : p) }))
+
+  // vCard import
+  const handleVCardImport = (role: string) => {
+    setImportRole(role)
+    fileInputRef.current?.click()
+  }
+
+  const onFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !importRole) return
+    const text = await file.text()
+    const parsed = parseVCard(text)
+    if (parsed) {
+      setAddingTo(importRole)
+      setEditingId(null)
+      setDraft({ ...emptyDraft, ...parsed })
+      // Auto-expand
+      setExpandedRoles(prev => new Set([...prev, importRole]))
+    } else {
+      alert('Could not parse vCard file. Make sure it is a valid .vcf file.')
+    }
+    // Reset file input so same file can be re-selected
+    e.target.value = ''
+    setImportRole(null)
+  }
+
   const inputCls = "text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-[#c9a84c] bg-white"
+  const selectCls = "text-xs border border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:border-[#c9a84c] bg-white"
+
+  // ── Phone rows in form ──────────────────────────────────────────────
+  const renderPhoneRows = () => (
+    <div className="space-y-1.5">
+      {draft.phones.map((p, idx) => (
+        <div key={idx} className="flex gap-1.5 items-center">
+          <select value={p.type} onChange={e => updatePhone(idx, 'type', e.target.value)} className={`${selectCls} w-20 flex-shrink-0`}>
+            {(Object.keys(PHONE_TYPE_LABELS) as PhoneType[]).map(t => (
+              <option key={t} value={t}>{PHONE_TYPE_LABELS[t]}</option>
+            ))}
+          </select>
+          <input
+            value={p.number}
+            onChange={e => updatePhone(idx, 'number', e.target.value)}
+            placeholder="Phone number"
+            className={`${inputCls} flex-1`}
+          />
+          {draft.phones.length > 1 && (
+            <button onClick={() => removePhoneRow(idx)} className="p-1 text-gray-300 hover:text-red-500 transition-colors" title="Remove phone">
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      ))}
+      <button onClick={addPhoneRow} className="flex items-center gap-1 text-[10px] text-[#c9a84c] hover:text-[#b8963f] font-medium">
+        <Plus size={10} /> Add phone number
+      </button>
+    </div>
+  )
+
+  // ── Contact form (shared between add and edit) ──────────────────────
+  const renderForm = (mode: 'add' | 'edit', roleId: string, candidateId?: string) => (
+    <div className={`${mode === 'edit' ? 'bg-amber-50/50 border-[#c9a84c]' : 'bg-gray-50 border-gray-200'} border rounded-lg p-3`}>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
+        <input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
+          placeholder="Name *" className={inputCls} />
+        <input value={draft.company} onChange={e => setDraft(d => ({ ...d, company: e.target.value }))}
+          placeholder="Company" className={inputCls} />
+        <input value={draft.email} onChange={e => setDraft(d => ({ ...d, email: e.target.value }))}
+          placeholder="Email" className={inputCls} />
+        <input value={draft.website} onChange={e => setDraft(d => ({ ...d, website: e.target.value }))}
+          placeholder="Website" className={inputCls} />
+        <input value={draft.address} onChange={e => setDraft(d => ({ ...d, address: e.target.value }))}
+          placeholder="Address" className={inputCls} />
+        <input value={draft.referredBy} onChange={e => setDraft(d => ({ ...d, referredBy: e.target.value }))}
+          placeholder="Referred by" className={inputCls} />
+      </div>
+      <div className="mb-2">{renderPhoneRows()}</div>
+      <textarea value={draft.notes} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))}
+        placeholder="Notes (optional)" rows={2}
+        className={`w-full resize-none mb-2 ${inputCls}`} />
+      <div className="flex gap-2">
+        <button
+          onClick={() => mode === 'edit' && candidateId ? saveEdit(roleId, candidateId) : addCandidate(roleId)}
+          disabled={!draft.name.trim()}
+          className="flex-1 bg-[#1a1a2e] text-white text-xs font-medium py-2 rounded-lg hover:bg-[#c9a84c] hover:text-[#1a1a2e] transition-colors disabled:opacity-40">
+          {mode === 'edit' ? 'Save' : 'Add Contact'}
+        </button>
+        <button onClick={() => { mode === 'edit' ? setEditingId(null) : setAddingTo(null); setDraft(emptyDraft) }}
+          className="flex-1 bg-white border border-gray-200 text-gray-500 text-xs font-medium py-2 rounded-lg">
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
 
   return (
     <div className="space-y-2">
+      {/* Hidden file input for vCard import */}
+      <input ref={fileInputRef} type="file" accept=".vcf,text/vcard" className="hidden" onChange={onFileSelected} />
+
       {roles.map(role => {
         const candidates = getCandidates(role.id)
         const selected = getSelected(role.id)
@@ -188,40 +392,10 @@ export function DealTeamSection({ dealTeam, onUpdate, limitedRoles, customRoles 
                   <div className="space-y-2 mb-3">
                     {candidates.map(c => {
                       const isEditing = editingId === c.id
+                      const phones = getPhones(c)
 
                       if (isEditing) {
-                        return (
-                          <div key={c.id} className="bg-amber-50/50 border border-[#c9a84c] rounded-lg p-3">
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
-                              <input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
-                                placeholder="Name *" className={inputCls} />
-                              <input value={draft.company} onChange={e => setDraft(d => ({ ...d, company: e.target.value }))}
-                                placeholder="Company" className={inputCls} />
-                              <input value={draft.phone} onChange={e => setDraft(d => ({ ...d, phone: e.target.value }))}
-                                placeholder="Phone" className={inputCls} />
-                              <input value={draft.email} onChange={e => setDraft(d => ({ ...d, email: e.target.value }))}
-                                placeholder="Email" className={inputCls} />
-                              <input value={draft.website} onChange={e => setDraft(d => ({ ...d, website: e.target.value }))}
-                                placeholder="Website" className={inputCls} />
-                              <input value={draft.address} onChange={e => setDraft(d => ({ ...d, address: e.target.value }))}
-                                placeholder="Address" className={inputCls} />
-                            </div>
-                            <textarea value={draft.notes} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))}
-                              placeholder="Notes (optional)" rows={2}
-                              className={`w-full resize-none mb-2 ${inputCls}`} />
-                            <div className="flex gap-2">
-                              <button onClick={() => saveEdit(role.id, c.id)}
-                                disabled={!draft.name.trim()}
-                                className="flex-1 bg-[#1a1a2e] text-white text-xs font-medium py-2 rounded-lg hover:bg-[#c9a84c] hover:text-[#1a1a2e] transition-colors disabled:opacity-40">
-                                Save
-                              </button>
-                              <button onClick={() => { setEditingId(null); setDraft(emptyDraft) }}
-                                className="flex-1 bg-white border border-gray-200 text-gray-500 text-xs font-medium py-2 rounded-lg">
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        )
+                        return <div key={c.id}>{renderForm('edit', role.id, c.id)}</div>
                       }
 
                       return (
@@ -236,12 +410,16 @@ export function DealTeamSection({ dealTeam, onUpdate, limitedRoles, customRoles 
                               )}
                             </div>
                             {c.company && <div className="text-[10px] text-gray-500 mt-0.5">{c.company}</div>}
+                            {c.referredBy && (
+                              <div className="text-[10px] text-gray-400 mt-0.5 italic">Referred by {c.referredBy}</div>
+                            )}
                             <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                              {c.phone && (
-                                <a href={`tel:${c.phone}`} className="text-[10px] text-gray-400 hover:text-[#c9a84c] flex items-center gap-0.5">
-                                  <Phone size={9} /> {c.phone}
+                              {phones.map((p, i) => (
+                                <a key={i} href={`tel:${p.number}`} className="text-[10px] text-gray-400 hover:text-[#c9a84c] flex items-center gap-0.5">
+                                  <Phone size={9} /> {p.number}
+                                  <span className="text-[8px] text-gray-300 ml-0.5">({PHONE_TYPE_LABELS[p.type]})</span>
                                 </a>
-                              )}
+                              ))}
                               {c.email && (
                                 <a href={`mailto:${c.email}`} className="text-[10px] text-gray-400 hover:text-[#c9a84c] flex items-center gap-0.5">
                                   <Mail size={9} /> {c.email}
@@ -262,6 +440,12 @@ export function DealTeamSection({ dealTeam, onUpdate, limitedRoles, customRoles 
                             {c.notes && <div className="text-[10px] text-gray-400 mt-1 italic">{c.notes}</div>}
                           </div>
                           <div className="flex items-center gap-1 flex-shrink-0">
+                            {c.company && (
+                              <button onClick={() => startNewFromCompany(c, role.id)}
+                                className="p-1 text-gray-400 hover:text-[#c9a84c] transition-colors" title="New contact from same company">
+                                <UserPlus size={14} />
+                              </button>
+                            )}
                             <button onClick={() => exportVCard(c, role.label)}
                               className="p-1 text-gray-400 hover:text-[#c9a84c] transition-colors" title="Save to Contacts (.vcf)">
                               <Download size={14} />
@@ -288,41 +472,18 @@ export function DealTeamSection({ dealTeam, onUpdate, limitedRoles, customRoles 
 
                 {/* Add form */}
                 {addingTo === role.id ? (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
-                      <input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
-                        placeholder="Name *" className={inputCls} />
-                      <input value={draft.company} onChange={e => setDraft(d => ({ ...d, company: e.target.value }))}
-                        placeholder="Company" className={inputCls} />
-                      <input value={draft.phone} onChange={e => setDraft(d => ({ ...d, phone: e.target.value }))}
-                        placeholder="Phone" className={inputCls} />
-                      <input value={draft.email} onChange={e => setDraft(d => ({ ...d, email: e.target.value }))}
-                        placeholder="Email" className={inputCls} />
-                      <input value={draft.website} onChange={e => setDraft(d => ({ ...d, website: e.target.value }))}
-                        placeholder="Website" className={inputCls} />
-                      <input value={draft.address} onChange={e => setDraft(d => ({ ...d, address: e.target.value }))}
-                        placeholder="Address" className={inputCls} />
-                    </div>
-                    <textarea value={draft.notes} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))}
-                      placeholder="Notes (optional)" rows={2}
-                      className={`w-full resize-none mb-2 ${inputCls}`} />
-                    <div className="flex gap-2">
-                      <button onClick={() => addCandidate(role.id)}
-                        disabled={!draft.name.trim()}
-                        className="flex-1 bg-[#1a1a2e] text-white text-xs font-medium py-2 rounded-lg hover:bg-[#c9a84c] hover:text-[#1a1a2e] transition-colors disabled:opacity-40">
-                        Add Contact
-                      </button>
-                      <button onClick={() => { setAddingTo(null); setDraft(emptyDraft) }}
-                        className="flex-1 bg-white border border-gray-200 text-gray-500 text-xs font-medium py-2 rounded-lg">
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
+                  renderForm('add', role.id)
                 ) : (
-                  <button onClick={() => { setAddingTo(role.id); setEditingId(null); setDraft(emptyDraft) }}
-                    className="flex items-center gap-1.5 text-[10px] font-medium text-[#c9a84c] hover:text-[#b8963f] transition-colors">
-                    <Plus size={12} /> Add {role.label.toLowerCase()}
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => { setAddingTo(role.id); setEditingId(null); setDraft(emptyDraft) }}
+                      className="flex items-center gap-1.5 text-[10px] font-medium text-[#c9a84c] hover:text-[#b8963f] transition-colors">
+                      <Plus size={12} /> Add {role.label.toLowerCase()}
+                    </button>
+                    <button onClick={() => handleVCardImport(role.id)}
+                      className="flex items-center gap-1.5 text-[10px] font-medium text-gray-400 hover:text-[#c9a84c] transition-colors">
+                      <Upload size={11} /> Import vCard
+                    </button>
+                  </div>
                 )}
               </div>
             )}
