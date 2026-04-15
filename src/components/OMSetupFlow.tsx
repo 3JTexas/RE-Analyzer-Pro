@@ -55,6 +55,7 @@ export interface SetupConfirmMeta {
 
 type Mode = 'choose' | 'manual' | 'pdf'
 type PdfStatus = 'idle' | 'reading' | 'extracting' | 'done' | 'error'
+type PdfProgress = { current: number; total: number } | null
 
 interface Props {
   onConfirm: (inputs: ModelInputs, meta: SetupConfirmMeta) => void
@@ -71,6 +72,7 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
   const [pdfStatus, setPdfStatus] = useState<PdfStatus>('idle')
   const [pdfError, setPdfError] = useState('')
   const [pdfFiles, setPdfFiles] = useState<File[]>([])
+  const [pdfProgress, setPdfProgress] = useState<PdfProgress>(null)
   const [scenarioName, setScenarioName] = useState(defaultScenarioName)
   const [propertyName, setPropertyName] = useState('')
   const [propertyAddress, setPropertyAddress] = useState('')
@@ -145,16 +147,43 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
     if (!pdfFiles.length) return
     setPdfStatus('reading')
     setPdfError('')
+    setPdfProgress(null)
     try {
       const base64s = await Promise.all(pdfFiles.map(toBase64))
       setPdfStatus('extracting')
-      const { data, error: invokeError } = await supabase.functions.invoke('extract-om', {
-        body: { pdfs: base64s },
-      })
-      if (invokeError) throw invokeError
-      const parsed = data
-      console.log('EXTRACTION RESULT:', JSON.stringify(parsed, null, 2))
-      if (parsed.error) throw new Error(parsed.error)
+
+      // Send each PDF individually to avoid payload size limits, then merge results
+      const allResults: Record<string, any>[] = []
+      for (let i = 0; i < base64s.length; i++) {
+        setPdfProgress({ current: i + 1, total: base64s.length })
+        const { data, error: invokeError } = await supabase.functions.invoke('extract-om', {
+          body: { pdfs: [base64s[i]] },
+        })
+        if (invokeError) throw new Error(`PDF ${i + 1} (${pdfFiles[i].name}): ${invokeError.message ?? 'extraction failed'}`)
+        if (data?.error) throw new Error(`PDF ${i + 1} (${pdfFiles[i].name}): ${data.error}`)
+        console.log(`EXTRACTION RESULT (PDF ${i + 1}/${base64s.length} — ${pdfFiles[i].name}):`, JSON.stringify(data, null, 2))
+        allResults.push(data)
+      }
+
+      // Merge results — later PDFs fill in nulls from earlier ones
+      const parsed: Record<string, any> = {}
+      for (const result of allResults) {
+        for (const [k, v] of Object.entries(result)) {
+          if (v === null || v === undefined) continue
+          // For arrays, prefer the longest (most complete) version
+          if (Array.isArray(v)) {
+            const existing = parsed[k]
+            if (!Array.isArray(existing) || v.length > existing.length) {
+              parsed[k] = v
+            }
+          } else if (parsed[k] === null || parsed[k] === undefined) {
+            // First non-null value wins
+            parsed[k] = v
+          }
+        }
+      }
+
+      console.log('MERGED EXTRACTION RESULT:', JSON.stringify(parsed, null, 2))
 
       const merged: ModelInputs = { ...DEFAULT_INPUTS }
       const numericKeys = new Set(['price','tu','ou','rent','vp','lev','ir','am','tax','ins','utilElec','utilWater','utilTrash','util','rm','cs','ga','res','pm','yearBuilt'])
@@ -222,9 +251,11 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
 
       setInputs(merged)
       setPdfStatus('done')
+      setPdfProgress(null)
     } catch (e: any) {
       setPdfError(e.message ?? 'Extraction failed')
       setPdfStatus('error')
+      setPdfProgress(null)
     }
   }
 
@@ -372,7 +403,11 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
       {(pdfStatus === 'reading' || pdfStatus === 'extracting') && (
         <div className="flex items-center gap-2 py-2 text-xs text-amber-700">
           <Loader2 size={14} className="animate-spin" />
-          {pdfStatus === 'reading' ? 'Reading PDF(s)…' : 'AI extracting figures…'}
+          {pdfStatus === 'reading'
+            ? 'Reading PDF(s)…'
+            : pdfProgress && pdfProgress.total > 1
+              ? `AI extracting figures… (PDF ${pdfProgress.current} of ${pdfProgress.total})`
+              : 'AI extracting figures…'}
         </div>
       )}
       {pdfStatus === 'error' && (
