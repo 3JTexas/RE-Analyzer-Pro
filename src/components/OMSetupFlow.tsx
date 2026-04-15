@@ -156,10 +156,24 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
       const allResults: Record<string, any>[] = []
       for (let i = 0; i < base64s.length; i++) {
         setPdfProgress({ current: i + 1, total: base64s.length })
+        const b64 = base64s[i]
+        console.log(`[extract] PDF ${i + 1} "${pdfFiles[i].name}" — base64 length: ${b64.length} chars (~${Math.round(b64.length * 0.75 / 1024)}KB)`)
         const { data, error: invokeError } = await supabase.functions.invoke('extract-om', {
-          body: { pdfs: [base64s[i]] },
+          body: { pdfs: [b64] },
         })
-        if (invokeError) throw new Error(`PDF ${i + 1} (${pdfFiles[i].name}): ${invokeError.message ?? 'extraction failed'}`)
+        if (invokeError) {
+          // Try to extract the real error from the response context
+          let detail = invokeError.message ?? 'extraction failed'
+          try {
+            const ctx = (invokeError as any).context
+            if (ctx && typeof ctx.json === 'function') {
+              const body = await ctx.json()
+              if (body?.error) detail = body.error
+            }
+          } catch { /* ignore parse errors */ }
+          console.error(`[extract] PDF ${i + 1} failed:`, detail, invokeError)
+          throw new Error(`PDF ${i + 1} (${pdfFiles[i].name}): ${detail}`)
+        }
         if (data?.error) throw new Error(`PDF ${i + 1} (${pdfFiles[i].name}): ${data.error}`)
         console.log(`EXTRACTION RESULT (PDF ${i + 1}/${base64s.length} — ${pdfFiles[i].name}):`, JSON.stringify(data, null, 2))
         allResults.push(data)
