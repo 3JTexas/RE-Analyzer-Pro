@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
       source: { type: 'base64', media_type: 'application/pdf', data: cleanBase64(base64) }
     }))
 
-    const extractionPrompt = `Extract the following fields from this Offering Memorandum. Return ONLY a JSON object with these exact keys. Use null for any field you cannot find. Do not guess — only return values clearly stated in the document.
+    const extractionPrompt = `Extract the following fields from this real estate document (which may be an Offering Memorandum, rent roll, pro forma, broker flyer, operating statement, or T12). Return ONLY a JSON object with these exact keys. Use null for any field you cannot find. Do not guess — only return values clearly stated in the document.
 
 {
   "propertyName": "Name of the property (string)",
@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
   "res": "Annual capital reserves for the ENTIRE PROPERTY in dollars — this must be the annual total, NOT per-unit. Look for 'reserves', 'replacement reserves', 'capital reserves' in expenses (number)",
   "pm": "Property management fee as a percentage of income e.g. 8 not 0.08. Look for 'management', 'property management', 'mgmt fee' (number)",
   "otherIncome": "Array of other income items not included in rent. Each item: { label: string, amount: number (annual dollars) }. Look for 'laundry', 'parking', 'storage', 'other income', 'ancillary income'. Return [] if none found.",
-  "rentRoll": "Array of individual units if a rent roll table exists in the OM. Each item: { label: string (e.g. 'Unit 1'), type: string (e.g. '1bd/1ba', 'Studio'), sqft: number, rent: number (monthly rent), leaseEnd: string (MM/DD/YYYY if shown), vacant: boolean (true if shown as vacant) }. Return [] if no rent roll table — do not guess individual rents.",
+  "rentRoll": "Array of individual units if ANY unit-level rent data exists in the document. This is the HIGHEST PRIORITY field — if the document is a rent roll or contains a table listing individual units with rents, you MUST extract every unit. Each item: { label: string (e.g. 'Unit 1', 'Apt 1'), type: string (e.g. '2bd/1ba', 'Studio', '1/1'), sqft: number, rent: number (monthly rent), leaseEnd: string (MM/DD/YYYY if shown), vacant: boolean (true if shown as vacant) }. Look for columns like 'Unit', 'Apt', 'Rents', 'Rent', 'Monthly', 'Lease End', 'Renewal', 'Move-in'. Return [] ONLY if no individual unit data exists anywhere in the document.",
   "propertyImageUrl": null
 }
 
@@ -68,7 +68,9 @@ Important extraction tips:
 - If you see a pro forma or T12 operating statement, prefer the T12 (trailing 12 months) figures over pro forma projections
 - On Crexi-format OMs, financial data is often in tables labeled 'Financial Summary', 'Income & Expenses', 'Operating Statement', or 'Financials'
 - Look at ALL pages of the document — expenses and financing details are often on page 2 or 3
-- If the OM contains a rent roll table with individual unit rents, extract each unit as a separate object in the rentRoll array. If only a blended or average rent is shown, return rentRoll as [] and use the rent field instead.`
+- If the document contains a rent roll table with individual unit rents, extract each unit as a separate object in the rentRoll array. If only a blended or average rent is shown, return rentRoll as [] and use the rent field instead.
+- If the ENTIRE document is a rent roll (just a list of units and rents), still extract every unit into the rentRoll array and calculate the average for the rent field. Set other fields to null if not present — that is expected for a standalone rent roll document.
+- Rent roll tables may use column headers like: Apt, Unit, Rents, Rent, Monthly Rent, Renewal, Lease End, Move-in, Sq Ft, Type, Bed/Bath`
 
     // Diagnostic log — structure verification
     console.error(`[extract-om] Sending ${pdfContents.length} PDF document block(s), base64 lengths: ${pdfs.map((p: string) => cleanBase64(p).length).join(', ')}, prompt starts: "${extractionPrompt.slice(0, 200)}..."`)
@@ -83,7 +85,7 @@ Important extraction tips:
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 4000,
-        system: `You are a real estate underwriting data extractor. You will be given one or more pages of a commercial real estate Offering Memorandum (OM). Your job is to extract specific financial and property data and return it as a single valid JSON object with no other text, preamble, explanation, or markdown. Start your response with { and end with }.`,
+        system: `You are a real estate underwriting data extractor. You will be given one or more pages from real estate documents — these may include Offering Memorandums (OMs), rent rolls, pro formas, broker flyers, operating statements, T12s, or any combination. Your job is to extract specific financial and property data and return it as a single valid JSON object with no other text, preamble, explanation, or markdown. Start your response with { and end with }. IMPORTANT: If the document is a rent roll or contains a rent roll table listing individual units with their rents, you MUST extract each unit into the rentRoll array — this is the highest-priority extraction field.`,
         messages: [{
           role: 'user',
           content: [
