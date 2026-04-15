@@ -476,6 +476,49 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
           )}
 
           <MetaFields />
+
+          {/* Rent roll preview */}
+          {inputs.useRentRoll && inputs.rentRoll && inputs.rentRoll.length > 0 && (
+            <div className="mb-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[10px] font-semibold text-green-700 flex items-center gap-1">
+                  <CheckCircle size={10} /> Rent roll extracted — {inputs.rentRoll.length} units
+                </p>
+                <p className="text-[9px] text-gray-400">
+                  Avg ${Math.round(inputs.rentRoll.reduce((s, u) => s + u.rent, 0) / inputs.rentRoll.length).toLocaleString()}/mo
+                </p>
+              </div>
+              <div className="border border-gray-200 rounded-lg overflow-hidden max-h-40 overflow-y-auto">
+                <table className="w-full text-[10px]">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr className="text-left text-gray-500">
+                      <th className="px-2 py-1.5 font-medium">Unit</th>
+                      <th className="px-2 py-1.5 font-medium">Type</th>
+                      <th className="px-2 py-1.5 font-medium text-right">Rent</th>
+                      <th className="px-2 py-1.5 font-medium">Lease End</th>
+                      <th className="px-2 py-1.5 font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {inputs.rentRoll.map((u, i) => (
+                      <tr key={u.id || i} className={u.vacant ? 'bg-red-50' : ''}>
+                        <td className="px-2 py-1 font-medium text-gray-800">{u.label || `Unit ${i + 1}`}</td>
+                        <td className="px-2 py-1 text-gray-500">{u.type || '—'}</td>
+                        <td className="px-2 py-1 text-right text-gray-800">${u.rent.toLocaleString()}</td>
+                        <td className="px-2 py-1 text-gray-500">{u.leaseEnd || '—'}</td>
+                        <td className="px-2 py-1">
+                          {u.vacant
+                            ? <span className="text-red-600 font-medium">Vacant</span>
+                            : <span className="text-green-600">Occupied</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           <OtherIncomeSection />
           <button onClick={() => setMode('manual')}
             className="w-full mb-2 border border-amber-300 text-amber-700 text-xs font-medium py-2 rounded-lg hover:bg-amber-100">
