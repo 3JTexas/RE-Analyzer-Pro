@@ -159,6 +159,9 @@ export function PropertiesPage() {
                     <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-400">
                       {p.units && <span>{p.units} units</span>}
                       {price > 0 && <span className="font-medium text-gray-600">{fmtDollar(price)}</span>}
+                      {p.created_at && (
+                        <span>Imported {new Date(p.created_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })}</span>
+                      )}
                     </div>
                   </div>
                   <ArrowRight size={16} className="text-gray-300 group-hover:text-[#c9a84c] transition-colors flex-shrink-0" />
@@ -339,8 +342,13 @@ export function PropertiesPage() {
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-gray-900 truncate">{p.name}</div>
                         {p.address && <div className="text-xs text-gray-400 mt-0.5 truncate">{p.address}</div>}
-                        <div className="text-[11px] text-gray-300 mt-0.5 flex items-center gap-1.5">
+                        <div className="text-[11px] text-gray-300 mt-0.5 flex items-center gap-1.5 flex-wrap">
                           <span>{p.units ? `${p.units} units` : ''}{p.units && p.year_built ? ' · ' : ''}{p.year_built ? `Built ${p.year_built}` : ''}</span>
+                          {p.created_at && (
+                            <span className="text-[9px] text-gray-400 bg-gray-50 border border-gray-200 px-1.5 py-0.5 rounded-full">
+                              Imported {new Date(p.created_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })}
+                            </span>
+                          )}
                           {p.status && p.status !== 'research' && (
                             <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border
                               ${p.status === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-200' :

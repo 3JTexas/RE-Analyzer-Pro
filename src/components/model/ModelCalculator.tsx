@@ -1757,52 +1757,83 @@ export function ModelCalculator({
             })()}
             <SectionHeader title="Income & expense statement" />
             <div className="border border-gray-100 rounded-lg p-3 mb-3">
-              <PLRow label={!isPhysical ?'Gross scheduled rent (GSR)' : 'Gross potential rent (GPR)'}
-                value={fmtDollar(d.GSR)} variant="pos" />
-              <PLRow label={!isPhysical ?`Less: vacancy (${d.vp}% of GSR)` : `Less: physical vacancy (${d.tu - d.ou} unit${d.tu - d.ou !== 1 ? 's' : ''} empty)`}
-                value={`(${fmtDollar(d.pv)})`} variant="neg" indent />
-              {isPhysical && d.av > 0 && (
-                <PLRow label={`Less: turnover buffer (${d.vp}%)`} value={`(${fmtDollar(d.av)})`} variant="neg" indent />
-              )}
-              <PLRow label="Collected rental income" value={fmtDollar(d.col)} indent />
-              {(inputs.otherIncome ?? []).map((item, i) => (
-                <PLRow key={i} label={item.label} value={`$${item.amount.toLocaleString()}`} variant="pos" indent />
-              ))}
-              <PLRow label="Effective gross income" value={fmtDollar(d.EGI)} variant="total" />
-              {[
-                { label: 'Real estate taxes', v: d.taxTotal },
-                { label: 'Insurance', v: d.ins },
-                { label: 'Utilities', v: d.util },
-                { label: 'Repairs & maintenance', v: d.rm },
-                { label: 'Contract services', v: d.cs },
-                { label: 'G&A', v: d.ga },
-                { label: 'Reserves', v: d.res },
-              ].map((row, i) => (
-                <PLRow key={i} label={row.label} variant="neg" indent value={
-                  <div className="text-right">
-                    <span className="text-xs font-medium">${Math.round(row.v / 12).toLocaleString()}/mo</span>
-                    <span className="block text-[10px] text-gray-400 mt-0.5">
-                      (${row.v.toLocaleString()}/yr{d.tu > 0 ? ` · $${Math.round(row.v / d.tu).toLocaleString()}/unit` : ''})
-                    </span>
-                  </div>
-                } />
-              ))}
-              <PLRow label={`Prop. mgmt (${inputs.pmMode === 'unit' ? `$${inputs.pmPerUnit}/unit · ${d.pmPct.toFixed(1)}%` : `${d.pmPct.toFixed(1)}% EGI`})`} value={`(${fmtDollar(d.pm)})`} variant="neg" indent />
-              {(inputs.otherExpenses ?? []).map((item, i) => (
-                <PLRow key={i} label={item.label} value={`(${fmtDollar(item.amount)})`} variant="neg" indent />
-              ))}
-              <PLRow label="Total expenses" variant="total" value={
-                <div className="text-right">
-                  <span className="text-xs font-semibold">${Math.round(d.exp / 12).toLocaleString()}/mo</span>
-                  <span className="block text-[10px] text-gray-400 mt-0.5">
-                    (${d.exp.toLocaleString()}/yr{d.tu > 0 ? ` · $${Math.round(d.exp / d.tu).toLocaleString()}/unit` : ''})
-                  </span>
-                </div>
-              } />
-              <PLRow label="Net operating income" value={fmtDollar(d.NOI)} variant="noi" />
-              <PLRow label="Annual debt service" value={`(${fmtDollar(d.ds)})`} variant="neg" indent />
-              <PLRow label="Pre-tax cash flow" value={fmtNeg(d.CF)} variant="cf" />
-              <PLRow label="Cash-on-cash return" value={fmtPct(d.coc)} variant="cf" />
+              {(() => {
+                // Helper: render a currency value with $/unit/yr subtitle when units > 0
+                const withPerUnit = (val: number, opts?: { neg?: boolean; bold?: boolean }) => {
+                  const sign = opts?.neg ? '-' : ''
+                  const main = `${opts?.neg ? '(' : ''}${fmtDollar(Math.abs(val))}${opts?.neg ? ')' : ''}`
+                  return (
+                    <div className="text-right">
+                      <span className={`text-xs ${opts?.bold ? 'font-semibold' : 'font-medium'}`}>{main}</span>
+                      {d.tu > 0 && (
+                        <span className="block text-[10px] text-gray-400 mt-0.5">
+                          {sign}${Math.round(Math.abs(val) / d.tu).toLocaleString()}/unit/yr
+                        </span>
+                      )}
+                    </div>
+                  )
+                }
+                return (
+                  <>
+                    <PLRow label={!isPhysical ?'Gross scheduled rent (GSR)' : 'Gross potential rent (GPR)'}
+                      value={withPerUnit(d.GSR)} variant="pos" />
+                    <PLRow label={!isPhysical ?`Less: vacancy (${d.vp}% of GSR)` : `Less: physical vacancy (${d.tu - d.ou} unit${d.tu - d.ou !== 1 ? 's' : ''} empty)`}
+                      value={`(${fmtDollar(d.pv)})`} variant="neg" indent />
+                    {isPhysical && d.av > 0 && (
+                      <PLRow label={`Less: turnover buffer (${d.vp}%)`} value={`(${fmtDollar(d.av)})`} variant="neg" indent />
+                    )}
+                    <PLRow label="Collected rental income" value={withPerUnit(d.col)} indent />
+                    {(inputs.otherIncome ?? []).map((item, i) => (
+                      <PLRow key={i} label={item.label} value={`$${item.amount.toLocaleString()}`} variant="pos" indent />
+                    ))}
+                    <PLRow label="Effective gross income" value={withPerUnit(d.EGI, { bold: true })} variant="total" />
+                    {[
+                      { label: 'Real estate taxes', v: d.taxTotal },
+                      { label: 'Insurance', v: d.ins },
+                      { label: 'Utilities', v: d.util },
+                      { label: 'Repairs & maintenance', v: d.rm },
+                      { label: 'Contract services', v: d.cs },
+                      { label: 'G&A', v: d.ga },
+                      { label: 'Reserves', v: d.res },
+                    ].map((row, i) => (
+                      <PLRow key={i} label={row.label} variant="neg" indent value={
+                        <div className="text-right">
+                          <span className="text-xs font-medium">${Math.round(row.v / 12).toLocaleString()}/mo</span>
+                          <span className="block text-[10px] text-gray-400 mt-0.5">
+                            (${row.v.toLocaleString()}/yr{d.tu > 0 ? ` · $${Math.round(row.v / d.tu).toLocaleString()}/unit` : ''})
+                          </span>
+                        </div>
+                      } />
+                    ))}
+                    <PLRow label={`Prop. mgmt (${inputs.pmMode === 'unit' ? `$${inputs.pmPerUnit}/unit · ${d.pmPct.toFixed(1)}%` : `${d.pmPct.toFixed(1)}% EGI`})`}
+                      value={
+                        <div className="text-right">
+                          <span className="text-xs font-medium">({fmtDollar(d.pm)})</span>
+                          {d.tu > 0 && (
+                            <span className="block text-[10px] text-gray-400 mt-0.5">
+                              (${Math.round(d.pm / d.tu).toLocaleString()}/unit)
+                            </span>
+                          )}
+                        </div>
+                      } variant="neg" indent />
+                    {(inputs.otherExpenses ?? []).map((item, i) => (
+                      <PLRow key={i} label={item.label} value={`(${fmtDollar(item.amount)})`} variant="neg" indent />
+                    ))}
+                    <PLRow label="Total expenses" variant="total" value={
+                      <div className="text-right">
+                        <span className="text-xs font-semibold">${Math.round(d.exp / 12).toLocaleString()}/mo</span>
+                        <span className="block text-[10px] text-gray-400 mt-0.5">
+                          (${d.exp.toLocaleString()}/yr{d.tu > 0 ? ` · $${Math.round(d.exp / d.tu).toLocaleString()}/unit` : ''})
+                        </span>
+                      </div>
+                    } />
+                    <PLRow label="Net operating income" value={withPerUnit(d.NOI, { bold: true })} variant="noi" />
+                    <PLRow label="Annual debt service" value={withPerUnit(d.ds, { neg: true })} variant="neg" indent />
+                    <PLRow label="Pre-tax cash flow" value={withPerUnit(d.CF, { neg: d.CF < 0, bold: true })} variant="cf" />
+                    <PLRow label="Cash-on-cash return" value={fmtPct(d.coc)} variant="cf" />
+                  </>
+                )
+              })()}
             </div>
             <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-500">
               <strong>Prepayment penalty (3/2/1)</strong><br />
