@@ -71,14 +71,16 @@ export function PropertiesPage() {
 
   const handleConfirm = async (inputs: ModelInputs, meta: SetupConfirmMeta) => {
     setShowSetup(false)
-    const prop = await createProperty(
-      meta.propertyName || 'New Property',
-      meta.propertyAddress || undefined,
-      meta.propertyYearBuilt || undefined,
-      meta.propertyImageUrl || undefined
-    )
-    if (!prop) return
-    const scenario = await createScenario(prop.id, meta.scenarioName, inputs, true)
+    // If user chose to add scenario to an existing property, skip property creation
+    const propertyId = meta.addToExistingPropertyId
+      ?? (await createProperty(
+        meta.propertyName || 'New Property',
+        meta.propertyAddress || undefined,
+        meta.propertyYearBuilt || undefined,
+        meta.propertyImageUrl || undefined
+      ))?.id
+    if (!propertyId) return
+    const scenario = await createScenario(propertyId, meta.scenarioName, inputs, true)
     if (scenario) navigate(`/scenario/${scenario.id}`)
   }
 
@@ -104,6 +106,12 @@ export function PropertiesPage() {
             showPropertyFields
             onConfirm={handleConfirm}
             onCancel={() => setShowSetup(false)}
+            existingProperties={properties.map(p => ({
+              id: p.id,
+              name: p.name,
+              address: p.address,
+              scenarioCount: p.scenarios?.length ?? 0,
+            }))}
           />
         </div>
       )}

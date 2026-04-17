@@ -51,6 +51,51 @@ export interface SetupConfirmMeta {
   propertyAddress?: string
   propertyYearBuilt?: number
   propertyImageUrl?: string
+  addToExistingPropertyId?: string  // if set, add scenario to this property instead of creating new
+}
+
+export interface ExistingPropertySummary {
+  id: string
+  name: string
+  address: string | null
+  scenarioCount?: number
+}
+
+// Normalize an address or property name for fuzzy duplicate detection
+function normalizeForMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/,/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\b(street|st|avenue|ave|boulevard|blvd|road|rd|drive|dr|lane|ln|court|ct|circle|cir|way|place|pl|terrace|ter|highway|hwy|parkway|pkwy)\b\.?/g, '')
+    .replace(/\b(n|s|e|w|ne|nw|se|sw|north|south|east|west|northeast|northwest|southeast|southwest)\b\.?/g, match => match.replace(/\./g, '').toLowerCase())
+    .replace(/\b(fl|tx|ca|ny|florida|texas|california|new york)\b/g, '')
+    .replace(/\b\d{5}(-\d{4})?\b/g, '')  // strip zip codes
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+// Check if two property records likely describe the same real-world property
+function propertiesMatch(
+  newName: string, newAddress: string,
+  existing: ExistingPropertySummary,
+): boolean {
+  const nNameNorm = normalizeForMatch(newName)
+  const nAddrNorm = normalizeForMatch(newAddress)
+  const eNameNorm = normalizeForMatch(existing.name ?? '')
+  const eAddrNorm = normalizeForMatch(existing.address ?? '')
+  if (nAddrNorm && eAddrNorm) {
+    // Addresses share substantial overlap — e.g. both start with "115 9th"
+    if (nAddrNorm === eAddrNorm) return true
+    if (nAddrNorm.includes(eAddrNorm) || eAddrNorm.includes(nAddrNorm)) return true
+    // Compare first 3 tokens (street number + first two words of street name)
+    const nTokens = nAddrNorm.split(' ').filter(Boolean).slice(0, 3).join(' ')
+    const eTokens = eAddrNorm.split(' ').filter(Boolean).slice(0, 3).join(' ')
+    if (nTokens && nTokens === eTokens) return true
+  }
+  if (nNameNorm && eNameNorm && nNameNorm === eNameNorm) return true
+  return false
 }
 
 type Mode = 'choose' | 'manual' | 'pdf'
@@ -62,9 +107,10 @@ interface Props {
   onCancel: () => void
   showPropertyFields?: boolean  // true when creating a new property
   defaultScenarioName?: string
+  existingProperties?: ExistingPropertySummary[]  // for duplicate detection
 }
 
-export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, defaultScenarioName = 'As-Presented' }: Props) {
+export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, defaultScenarioName = 'As-Presented', existingProperties = [] }: Props) {
   const [mode, setMode] = useState<Mode>('choose')
   const [inputs, setInputs] = useState<ModelInputs>({ ...DEFAULT_INPUTS })
   const { loadDefaults } = useUserDefaults()
@@ -135,13 +181,48 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
     setPhotoUploading(false)
   }
 
-  const confirm = () => onConfirm(inputs, {
+  const confirm = (opts?: { addToExistingPropertyId?: string }) => onConfirm(inputs, {
     scenarioName: scenarioName.trim() || defaultScenarioName,
     propertyName: showPropertyFields ? propertyName.trim() : undefined,
     propertyAddress: showPropertyFields ? propertyAddress.trim() : undefined,
     propertyYearBuilt: showPropertyFields ? propertyYearBuilt : undefined,
     propertyImageUrl: showPropertyFields ? propertyImageUrl : undefined,
+    addToExistingPropertyId: opts?.addToExistingPropertyId,
   })
+
+  // Compute duplicate match against existing properties (only relevant when creating a new property)
+  const duplicateMatch = showPropertyFields && (propertyName.trim() || propertyAddress.trim())
+    ? existingProperties.find(p => propertiesMatch(propertyName.trim(), propertyAddress.trim(), p))
+    : undefined
+
+  const DuplicateBanner = () => duplicateMatch ? (
+    <div className="mb-2 border border-amber-300 bg-amber-50 rounded-lg p-3">
+      <div className="flex items-start gap-2 mb-2">
+        <AlertCircle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <p className="text-[11px] font-semibold text-amber-800">Possible duplicate property</p>
+          <p className="text-[10px] text-amber-700 mt-0.5">
+            <span className="font-medium">{duplicateMatch.name}</span>
+            {duplicateMatch.address ? ` — ${duplicateMatch.address}` : ''}
+            {duplicateMatch.scenarioCount != null
+              ? ` (${duplicateMatch.scenarioCount} scenario${duplicateMatch.scenarioCount === 1 ? '' : 's'})`
+              : ''}
+            {' already exists. '}
+          </p>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={() => confirm({ addToExistingPropertyId: duplicateMatch.id })}
+          className="flex-1 bg-amber-600 text-white text-[10px] font-semibold py-1.5 rounded-md hover:bg-amber-700 transition-colors">
+          Add scenario to existing
+        </button>
+        <button onClick={() => confirm()}
+          className="flex-1 bg-white border border-amber-300 text-amber-700 text-[10px] font-semibold py-1.5 rounded-md hover:bg-amber-100 transition-colors">
+          Create as new property anyway
+        </button>
+      </div>
+    </div>
+  ) : null
 
   const extractFromPdfs = async () => {
     if (!pdfFiles.length) return
@@ -533,8 +614,9 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
             className="w-full mb-2 border border-amber-300 text-amber-700 text-xs font-medium py-2 rounded-lg hover:bg-amber-100">
             Review / edit all fields
           </button>
+          <DuplicateBanner />
           <div className="relative group">
-            <button onClick={confirm}
+            <button onClick={() => confirm()}
               disabled={(showPropertyFields && !propertyName.trim()) || criticalBlocked}
               className="w-full bg-navy text-white text-xs font-semibold py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
               {showPropertyFields ? 'Create property + scenario' : 'Create scenario'}
@@ -592,8 +674,9 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
         })}
       </div>
       <OtherIncomeSection />
+      <DuplicateBanner />
       <div className="flex gap-2">
-        <button onClick={confirm}
+        <button onClick={() => confirm()}
           disabled={showPropertyFields && !propertyName.trim()}
           className="flex-1 bg-navy text-white text-xs font-semibold py-2.5 rounded-lg disabled:opacity-40">
           {showPropertyFields ? 'Create property + scenario' : 'Create scenario'}
