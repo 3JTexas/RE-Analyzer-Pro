@@ -969,7 +969,7 @@ export function ModelCalculator({
       inputs,
       propertyName,
       address: propertyAddress,
-      units: propertyUnits ?? inputs.tu,
+      units: inputs.tu || propertyUnits || 0,
       yearBuilt: propertyYearBuilt ?? 0,
       scenarioName: name,
       scenarioCols: cols,
@@ -1125,7 +1125,7 @@ export function ModelCalculator({
     const initial: LOIData = {
       propertyName,
       propertyAddress,
-      units: String(propertyUnits ?? inputs.tu ?? ''),
+      units: String(inputs.tu || propertyUnits || ''),
       purchasePrice: price > 0 ? fmtPrice(price) : '',
       purchaserName: 'Andrew Schildcrout and/or assigns',
       purchaserCounsel: "Purchaser's Counsel",
