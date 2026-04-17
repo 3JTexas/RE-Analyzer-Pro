@@ -26,6 +26,10 @@ export function PropertyPage() {
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
   const photoRef = useRef<HTMLInputElement>(null)
+  const [editingProperty, setEditingProperty] = useState(false)
+  const [propDraft, setPropDraft] = useState<{ name: string; address: string; units: string; year_built: string }>({
+    name: '', address: '', units: '', year_built: '',
+  })
 
   const [dealScenarioId, setDealScenarioId] = useState<string | null>(null)
   const [showOtherScenarios, setShowOtherScenarios] = useState(false)
@@ -105,6 +109,34 @@ export function PropertyPage() {
     setPhotoUploading(false)
   }
 
+  const openPropertyEdit = () => {
+    if (!property) return
+    setPropDraft({
+      name: property.name ?? '',
+      address: property.address ?? '',
+      units: property.units != null ? String(property.units) : '',
+      year_built: property.year_built != null ? String(property.year_built) : '',
+    })
+    setEditingProperty(true)
+  }
+
+  const savePropertyEdit = async () => {
+    if (!id) return
+    const name = propDraft.name.trim()
+    if (!name) return
+    const parsedUnits = propDraft.units.trim() === '' ? null : parseInt(propDraft.units, 10)
+    const parsedYear = propDraft.year_built.trim() === '' ? null : parseInt(propDraft.year_built, 10)
+    const payload = {
+      name,
+      address: propDraft.address.trim() || null,
+      units: Number.isFinite(parsedUnits as number) ? parsedUnits : null,
+      year_built: Number.isFinite(parsedYear as number) ? parsedYear : null,
+    }
+    await supabase.from('properties').update(payload).eq('id', id)
+    setProperty(prev => prev ? { ...prev, ...payload } as Property : prev)
+    setEditingProperty(false)
+  }
+
   const saveCrexiUrl = async (url: string) => {
     if (!id) return
     const trimmed = url.trim() || null
@@ -131,8 +163,21 @@ export function PropertyPage() {
           <span className="text-xs">Properties</span>
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-base font-semibold text-gray-900 truncate">{property?.name}</h1>
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-base font-semibold text-gray-900 truncate">{property?.name}</h1>
+            <button onClick={openPropertyEdit}
+              className="p-0.5 text-gray-300 hover:text-[#c9a84c] transition-colors flex-shrink-0" title="Edit property details">
+              <Pencil size={11} />
+            </button>
+          </div>
           {property?.address && <p className="text-xs text-gray-400 truncate">{property.address}</p>}
+          {(property?.units != null || property?.year_built != null) && (
+            <p className="text-[10px] text-gray-400 truncate">
+              {property?.units != null && <>{property.units} unit{property.units === 1 ? '' : 's'}</>}
+              {property?.units != null && property?.year_built != null && ' · '}
+              {property?.year_built != null && <>Built {property.year_built}</>}
+            </p>
+          )}
           <div className="flex items-center gap-2 mt-1">
             {editingCrexi ? (
               <div className="flex items-center gap-1">
@@ -219,6 +264,53 @@ export function PropertyPage() {
             onCancel={() => setShowSetup(false)}
             defaultScenarioName="As-Presented"
           />
+        </div>
+      )}
+
+      {editingProperty && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setEditingProperty(false)}>
+          <div onClick={e => e.stopPropagation()}
+            className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <h2 className="text-sm font-semibold text-gray-900">Edit property details</h2>
+              <button onClick={() => setEditingProperty(false)} className="p-1 text-gray-400 hover:text-gray-700"><X size={18} /></button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1">Property name *</label>
+                <input value={propDraft.name} onChange={e => setPropDraft(d => ({ ...d, name: e.target.value }))}
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-[#c9a84c] bg-white" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1">Address</label>
+                <input value={propDraft.address} onChange={e => setPropDraft(d => ({ ...d, address: e.target.value }))}
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-[#c9a84c] bg-white" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1">Total units</label>
+                  <input type="number" value={propDraft.units} onChange={e => setPropDraft(d => ({ ...d, units: e.target.value }))}
+                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-[#c9a84c] bg-white" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1">Year built</label>
+                  <input type="number" value={propDraft.year_built} onChange={e => setPropDraft(d => ({ ...d, year_built: e.target.value }))}
+                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-[#c9a84c] bg-white" />
+                </div>
+              </div>
+              <p className="text-[10px] text-gray-400 italic">These fields are stored on the property. Individual scenarios also have their own unit count that you can edit on the Inputs tab.</p>
+            </div>
+            <div className="flex gap-2 p-4 border-t border-gray-100">
+              <button onClick={savePropertyEdit} disabled={!propDraft.name.trim()}
+                className="flex-1 bg-[#1a1a2e] text-white text-xs font-semibold py-2 rounded-lg hover:bg-[#c9a84c] hover:text-[#1a1a2e] transition-colors disabled:opacity-40">
+                Save
+              </button>
+              <button onClick={() => setEditingProperty(false)}
+                className="flex-1 bg-white border border-gray-200 text-gray-500 text-xs font-medium py-2 rounded-lg">
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
