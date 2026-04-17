@@ -148,6 +148,14 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
     setPdfStatus('reading')
     setPdfError('')
     setPdfProgress(null)
+    // Full reset of all extracted fields — every import starts fresh, no bleed from prior extractions
+    setPropertyName('')
+    setPropertyAddress('')
+    setPropertyYearBuilt(undefined)
+    // Reset inputs to defaults, then re-merge user's financing defaults (IR/LTV/AM/PM from Settings)
+    const userDefaults = await loadDefaults()
+    const freshInputs: ModelInputs = { ...DEFAULT_INPUTS, ...userDefaults }
+    setInputs(freshInputs)
     try {
       const base64s = await Promise.all(pdfFiles.map(toBase64))
       setPdfStatus('extracting')
@@ -199,7 +207,8 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
 
       console.log('MERGED EXTRACTION RESULT:', JSON.stringify(parsed, null, 2))
 
-      const merged: ModelInputs = { ...DEFAULT_INPUTS }
+      // Start from DEFAULT_INPUTS + user financing defaults, then overlay extracted values
+      const merged: ModelInputs = { ...DEFAULT_INPUTS, ...userDefaults }
       const numericKeys = new Set(['price','tu','ou','rent','vp','lev','ir','am','tax','ins','utilElec','utilWater','utilTrash','util','rm','cs','ga','res','pm','yearBuilt'])
       for (const [k, v] of Object.entries(parsed)) {
         if (v !== null && v !== undefined) {
