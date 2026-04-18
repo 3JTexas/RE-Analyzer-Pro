@@ -33,7 +33,6 @@ interface FieldDef {
 }
 
 const FIELDS: FieldDef[] = [
-  { key: 'tu', label: 'Total Units', section: 'Income' },
   { key: 'ou', label: 'Occupied Units', section: 'Income' },
   { key: 'rent', label: 'Avg Rent / Unit / Mo', section: 'Income', dollar: true, isRent: true },
   { key: 'vp', label: 'Vacancy %', section: 'Income', pct: true },

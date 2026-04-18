@@ -132,11 +132,17 @@ export function useDealContext(): { dealContext: DealContext | null; loading: bo
       if (!scenario) { setDealContext(null); return }
 
       const s = scenario as Scenario
-      const outputs = calculate(s.inputs, s.is_default)
 
       const { data: prop } = await supabase
         .from('properties').select('name, address, units, year_built, status')
         .eq('id', s.property_id).single()
+
+      // property.units is the source of truth — override any stale scenario.inputs.tu
+      if (prop?.units && prop.units > 0 && s.inputs.tu !== prop.units) {
+        s.inputs = { ...s.inputs, tu: prop.units }
+      }
+
+      const outputs = calculate(s.inputs, s.is_default)
 
       const { data: pipe } = await supabase
         .from('deal_pipelines')
@@ -214,6 +220,11 @@ export function useDealContext(): { dealContext: DealContext | null; loading: bo
           .order('is_default', { ascending: false })
           .order('created_at', { ascending: true }).limit(1)
         s = scenarios?.[0] as Scenario | undefined
+      }
+
+      // property.units is the source of truth — override any stale scenario.inputs.tu
+      if (s && prop.units && prop.units > 0 && s.inputs.tu !== prop.units) {
+        s.inputs = { ...s.inputs, tu: prop.units }
       }
 
       const outputs = s ? calculate(s.inputs, s.is_default) : null

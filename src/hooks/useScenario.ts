@@ -19,7 +19,7 @@ export function useProperties() {
 
   useEffect(() => { fetch() }, [fetch])
 
-  const createProperty = async (name: string, address?: string, yearBuilt?: number, propertyImageUrl?: string) => {
+  const createProperty = async (name: string, address?: string, yearBuilt?: number, propertyImageUrl?: string, units?: number) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
     const { data, error } = await supabase
@@ -28,6 +28,7 @@ export function useProperties() {
         name, address, user_id: user.id,
         ...(yearBuilt ? { year_built: yearBuilt } : {}),
         ...(propertyImageUrl ? { property_image_url: propertyImageUrl } : {}),
+        ...(units && units > 0 ? { units } : {}),
       })
       .select()
       .single()

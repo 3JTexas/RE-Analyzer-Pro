@@ -33,7 +33,6 @@ interface FieldDef {
 
 const FIELDS: FieldDef[] = [
   // Income
-  { key: 'tu', label: 'Total Units', section: 'Income', step: 1, tip: 'Total number of rentable units in the property, including vacant ones' },
   { key: 'ou', label: 'Occupied Units', section: 'Income', step: 1, tip: 'Number of units currently leased and generating rent. When less than total units, the model uses physical vacancy instead of gross vacancy percentage' },
   { key: 'rent', label: 'Avg Rent / Unit / Mo', section: 'Income', dollar: true, step: 25, tip: 'Average monthly rent per unit. Multiplied by total units × 12 to calculate Gross Scheduled Rent. If using a rent roll, this is overridden by individual unit rents' },
   { key: 'vp', label: 'Vacancy %', section: 'Income', pct: true, step: 0.5, tip: 'Percentage of income lost to vacancy and collection loss. In gross vacancy mode, applied to scheduled rent. In physical vacancy mode, represents additional turnover buffer on top of actual empty units' },

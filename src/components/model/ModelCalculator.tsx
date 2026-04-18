@@ -790,6 +790,13 @@ export function ModelCalculator({
     pmMode: (initialInputs as any)?.pmMode ?? 'pct',
     pmPerUnit: (initialInputs as any)?.pmPerUnit ?? 0,
   })
+  // Sync scenario unit count from property.units (property is the source of truth).
+  useEffect(() => {
+    if (propertyUnits && propertyUnits > 0 && inputs.tu !== propertyUnits) {
+      setInputs(prev => ({ ...prev, tu: propertyUnits }))
+    }
+  }, [propertyUnits])
+
   const [name, setName] = useState(scenarioName)
   const [activeTab, setActiveTab] = useState<'inputs'|'pl'|'tax'|'broker'|'flags'|'compare'>('inputs')
   const [brokerLocked, setBrokerLocked] = useState(true)
@@ -1323,9 +1330,13 @@ export function ModelCalculator({
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 mb-1">
-              <InputField {...brokerBadge('tu')} label="Total units" type="number" value={inputs.tu} min={1} max={100} step={1}
-                tooltip="Total number of rentable units in the property"
-                onChange={e => { const v = +e.target.value; set('tu', v); if (inputs.useRentRoll) syncRentRoll(v) }} />
+              <div className="flex flex-col gap-0.5 px-2 py-1.5 bg-gray-50 border border-gray-200 rounded">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-gray-500 uppercase tracking-wide">Total units</span>
+                  <span className="text-[9px] text-gray-400">from property</span>
+                </div>
+                <span className="text-sm font-semibold text-gray-800">{inputs.tu || '—'}</span>
+              </div>
               {!inputs.useRentRoll && (
                 <InputField {...brokerBadge('ou')} label="Units occupied" type="number" value={inputs.ou} min={0} max={inputs.tu} step={1}
                   tooltip="Units currently occupied. If less than total units, physical vacancy is used instead of gross vacancy"
