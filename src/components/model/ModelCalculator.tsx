@@ -1664,6 +1664,10 @@ export function ModelCalculator({
           <div>
             <SectionHeader title="Key metrics" />
             <div className="grid grid-cols-2 gap-2 mb-3">
+              <MetricCard label="Purchase price" value={fmtDollar(inputs.price)}
+                sub={inputs.tu > 0 ? `${inputs.tu} units` : undefined} />
+              <MetricCard label="Price / door" value={inputs.tu > 0 ? fmtDollar(inputs.price / inputs.tu) : '—'}
+                sub={brokerScenario && brokerScenario.id !== currentScenarioId && brokerScenario.inputs.tu > 0 ? `Broker: ${fmtDollar(brokerScenario.inputs.price / brokerScenario.inputs.tu)}` : undefined} />
               <MetricCard label="NOI" value={fmtDollar(d.NOI)}
                 sub={brokerScenario && brokerScenario.id !== currentScenarioId ? `Broker: ${fmtDollar(calculate(brokerScenario.inputs, true).NOI)}` : undefined}
                 valueColor={d.NOI < 80000 ? 'text-amber-600' : 'text-blue-700'} />
@@ -1834,10 +1838,6 @@ export function ModelCalculator({
                   </>
                 )
               })()}
-            </div>
-            <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-500">
-              <strong>Prepayment penalty (3/2/1)</strong><br />
-              Yr 1: {fmtDollar(d.loan * 0.03)} · Yr 2: {fmtDollar(d.loan * 0.02)} · Yr 3: {fmtDollar(d.loan * 0.01)}
             </div>
 
             {/* Offer calculator */}

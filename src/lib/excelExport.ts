@@ -399,12 +399,6 @@ export async function exportToExcel(inputs: ModelInputs, scenarioName: string, p
   const ctcFormula = `B${ctcDownRow}+B${lfeeRow}+B${ccRow}`
   totalRow(fin, fr, 'Total cash to close', ctcFormula, dollarFmtNeg(), GOLD); fr++
 
-  fr++
-  sectionRow(fin, fr, 'Prepayment Penalty (3/2/1)'); fr++
-  labelRow(fin, fr, 'Year 1 (3%)', `B${loanRow}*0.03`); fr++
-  labelRow(fin, fr, 'Year 2 (2%)', `B${loanRow}*0.02`); fr++
-  labelRow(fin, fr, 'Year 3 (1%)', `B${loanRow}*0.01`); fr++
-
   // ════════════════════════════════════════════════════════════════════════
   // TAX SHEET
   // ════════════════════════════════════════════════════════════════════════

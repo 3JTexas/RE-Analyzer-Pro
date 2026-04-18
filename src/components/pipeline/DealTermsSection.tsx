@@ -358,8 +358,10 @@ export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, 
       })()}
 
       {/* Key metrics comparison */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5">
         {[
+          { label: 'Purchase price', proj: projectedCalc.price, act: actualCalc.price, fmt: fmtDollar, better: false },
+          { label: 'Price / door', proj: projectedCalc.tu > 0 ? projectedCalc.price / projectedCalc.tu : 0, act: actualCalc.tu > 0 ? actualCalc.price / actualCalc.tu : 0, fmt: fmtDollar, better: false },
           { label: 'NOI', proj: projectedCalc.NOI, act: actualCalc.NOI, fmt: fmtDollar, better: true },
           { label: 'Cap Rate', proj: projectedCalc.cap, act: actualCalc.cap, fmt: fmtPct, better: true },
           { label: 'DCR', proj: projectedCalc.dcr, act: actualCalc.dcr, fmt: fmtX, better: true },
