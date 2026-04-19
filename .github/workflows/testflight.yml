@@ -84,11 +84,14 @@ jobs:
           echo "Imported certificate:"
           security find-identity -v -p codesigning $KEYCHAIN_PATH
 
-      - name: Increment build number
+      - name: Increment build number and marketing version
         working-directory: ios/App
         run: |
           BUILD_NUM=$(date +%Y%m%d%H%M)
           agvtool new-version -all "$BUILD_NUM"
+          # Marketing version = 1.0.<github_run_number> so each TestFlight build
+          # shows a distinct, monotonically increasing version (e.g. 1.0.94).
+          agvtool new-marketing-version "1.0.${GITHUB_RUN_NUMBER}"
 
       - name: Archive
         working-directory: ios/App
