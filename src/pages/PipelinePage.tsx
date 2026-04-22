@@ -162,7 +162,7 @@ export function PipelinePage() {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 max-w-6xl mx-auto w-full">
+      <div className="flex-1 overflow-y-auto px-4 md:px-10 py-7 max-w-7xl mx-auto w-full">
 
         {/* ── Scenario selector (if no deal scenario picked yet) ── */}
         {!dealScenario && pipeline && (

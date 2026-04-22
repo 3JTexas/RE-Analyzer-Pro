@@ -92,7 +92,7 @@ export function AppShell() {
       />
 
       {/* Desktop header */}
-      <header className="hidden md:flex items-center justify-between bg-white/95 backdrop-blur-sm border-b border-gray-200 h-16 px-8" style={{ position: 'relative', zIndex: 10, flexShrink: 0 }}>
+      <header className="hidden md:flex items-center justify-between bg-white/95 backdrop-blur-sm border-b border-gray-100 h-16 px-10" style={{ position: 'relative', zIndex: 10, flexShrink: 0 }}>
         <div className="flex items-center min-w-0">
           <Link to="/">
             <img src={logoSrc} alt="Chai Holdings" className="h-10 w-auto" />
