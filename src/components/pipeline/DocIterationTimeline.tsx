@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react'
-import { Send, MessageSquare, FileCheck, XCircle, RefreshCw, Upload, FileText, Plus, Loader2, ChevronDown, ChevronUp, Sparkles, Edit3 } from 'lucide-react'
+import { Send, MessageSquare, FileCheck, XCircle, RefreshCw, Upload, FileText, Plus, Loader2, ChevronDown, ChevronUp, Sparkles, Edit3, Share2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { fmtDollar } from '../../lib/calc'
+import { sharePdf } from '../../lib/sharePdf'
 
 interface DocEvent {
   id: string
@@ -368,6 +369,11 @@ export function DocIterationTimeline({ title, events, onUpdate, eventTypes, extr
                                   className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-[#c9a84c] border border-[#c9a84c] rounded-lg hover:bg-[#c9a84c] hover:text-white transition-colors">
                                   <FileText size={9} /> View PDF
                                 </a>
+                                <button onClick={() => sharePdf(evt.documentUrl!, `${cfg.label}-${evt.id.slice(0, 6)}.pdf`)}
+                                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-gray-500 border border-gray-200 rounded-lg hover:border-[#c9a84c] hover:text-[#c9a84c] transition-colors"
+                                  title="Open in another app / download">
+                                  <Share2 size={9} /> Open in…
+                                </button>
                                 {onRequestEdit && (
                                   <button onClick={() => onRequestEdit(evt.documentUrl!, `${cfg.label}-${evt.id.slice(0, 6)}.pdf`)}
                                     className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-gray-500 border border-gray-200 rounded-lg hover:border-[#c9a84c] hover:text-[#c9a84c] transition-colors">

@@ -1,9 +1,10 @@
 import { useState, useRef } from 'react'
-import { Upload, FileText, Trash2, Loader2, Download, Sparkles, Send, Inbox, MessageSquare, RefreshCw, FileCheck, XCircle, Edit3 } from 'lucide-react'
+import { Upload, FileText, Trash2, Loader2, Download, Sparkles, Send, Inbox, MessageSquare, RefreshCw, FileCheck, XCircle, Edit3, Share2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useDealDocuments } from '../../hooks/usePipeline'
 import { DocIterationTimeline } from './DocIterationTimeline'
 import { PdfMarkupEditor } from './PdfMarkupEditor'
+import { sharePdf } from '../../lib/sharePdf'
 import type { DealDocType, LOITracking, PSATracking, LOIEvent, PSAEvent } from '../../types/pipeline'
 import { DOC_TYPE_LABELS } from '../../types/pipeline'
 
@@ -249,7 +250,13 @@ export function DocumentsSection({ pipelineId, loiTracking, psaTracking, onUpdat
                       <Edit3 size={9} /> Edit
                     </button>
                   )}
-                  <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="p-1 text-gray-400 hover:text-[#c9a84c]"><Download size={13} /></a>
+                  {doc.file_url && (
+                    <button onClick={() => sharePdf(doc.file_url!, doc.file_name)}
+                      className="p-1 text-gray-400 hover:text-[#c9a84c]" title="Open in another app / download">
+                      <Share2 size={13} />
+                    </button>
+                  )}
+                  <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="p-1 text-gray-400 hover:text-[#c9a84c]" title="Download"><Download size={13} /></a>
                   <button onClick={() => { if (window.confirm('Delete?')) deleteDocument(doc.id) }} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={13} /></button>
                 </div>
               </div>
