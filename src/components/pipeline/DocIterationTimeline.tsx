@@ -30,6 +30,7 @@ interface Props {
   pipelineId: string
   showPrice?: boolean
   suggestNextType?: (events: DocEvent[]) => string
+  onRequestEdit?: (fileUrl: string, fileName: string) => void
 }
 
 const toBase64 = (file: File): Promise<string> =>
@@ -42,7 +43,7 @@ const toBase64 = (file: File): Promise<string> =>
 
 const localDate = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]
 
-export function DocIterationTimeline({ title, events, onUpdate, eventTypes, extractDocType, pipelineId, showPrice, suggestNextType }: Props) {
+export function DocIterationTimeline({ title, events, onUpdate, eventTypes, extractDocType, pipelineId, showPrice, suggestNextType, onRequestEdit }: Props) {
   const [uploadMode, setUploadMode] = useState(false)
   const [manualMode, setManualMode] = useState(false)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
@@ -362,10 +363,18 @@ export function DocIterationTimeline({ title, events, onUpdate, eventTypes, extr
                           })()}
                           <div className="flex items-center gap-2">
                             {evt.documentUrl ? (
-                              <a href={evt.documentUrl} target="_blank" rel="noopener noreferrer"
-                                className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-[#c9a84c] border border-[#c9a84c] rounded-lg hover:bg-[#c9a84c] hover:text-white transition-colors">
-                                <FileText size={9} /> View PDF
-                              </a>
+                              <>
+                                <a href={evt.documentUrl} target="_blank" rel="noopener noreferrer"
+                                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-[#c9a84c] border border-[#c9a84c] rounded-lg hover:bg-[#c9a84c] hover:text-white transition-colors">
+                                  <FileText size={9} /> View PDF
+                                </a>
+                                {onRequestEdit && (
+                                  <button onClick={() => onRequestEdit(evt.documentUrl!, `${cfg.label}-${evt.id.slice(0, 6)}.pdf`)}
+                                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-gray-500 border border-gray-200 rounded-lg hover:border-[#c9a84c] hover:text-[#c9a84c] transition-colors">
+                                    <Edit3 size={9} /> Edit / Markup
+                                  </button>
+                                )}
+                              </>
                             ) : (
                               <button onClick={() => { attachTargetId.current = evt.id; attachRef.current?.click() }}
                                 disabled={extracting === evt.id}

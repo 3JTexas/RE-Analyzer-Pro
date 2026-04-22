@@ -3,8 +3,11 @@ import { Upload, FileText, Trash2, Loader2, Download, Sparkles, Send, Inbox, Mes
 import { supabase } from '../../lib/supabase'
 import { useDealDocuments } from '../../hooks/usePipeline'
 import { DocIterationTimeline } from './DocIterationTimeline'
+import { PdfMarkupEditor } from './PdfMarkupEditor'
 import type { DealDocType, LOITracking, PSATracking, LOIEvent, PSAEvent } from '../../types/pipeline'
 import { DOC_TYPE_LABELS } from '../../types/pipeline'
+
+const localDate = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]
 
 interface Props {
   pipelineId: string
@@ -66,10 +69,55 @@ export function DocumentsSection({ pipelineId, loiTracking, psaTracking, onUpdat
   const [uploading, setUploading] = useState(false)
   const [extractingId, setExtractingId] = useState<string | null>(null)
   const [selectedType, setSelectedType] = useState<DealDocType>('inspection_report')
+  const [editing, setEditing] = useState<{ url: string; name: string; kind: 'loi' | 'psa' | 'other'; docType?: DealDocType } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const loiEvents = loiTracking?.events ?? []
   const psaEvents = psaTracking?.events ?? []
+
+  const handleSaveMarkup = async (bytes: Uint8Array, newName: string) => {
+    if (!editing) return
+    const blob = new Blob([bytes.buffer as ArrayBuffer], { type: 'application/pdf' })
+    const file = new File([blob], newName, { type: 'application/pdf' })
+
+    if (editing.kind === 'other') {
+      await uploadDocument(file, editing.docType ?? 'other')
+      setEditing(null)
+      return
+    }
+
+    // PSA or LOI — upload to timeline folder and add a new event
+    const eventId = crypto.randomUUID()
+    const path = `${pipelineId}/${editing.kind}/${eventId}.pdf`
+    const { error: upErr } = await supabase.storage.from('deal-documents').upload(path, file, { upsert: false })
+    if (upErr) { alert(`Upload failed: ${upErr.message}`); return }
+    const { data: urlData } = supabase.storage.from('deal-documents').getPublicUrl(path)
+
+    if (editing.kind === 'psa') {
+      const newEvent: PSAEvent = {
+        id: eventId,
+        type: 'buyer_redlines',
+        date: localDate(),
+        notes: `Marked up from ${editing.name}`,
+        documentUrl: urlData.publicUrl,
+        extractedTerms: null,
+      }
+      onUpdatePSA({ events: [...psaEvents, newEvent] })
+    } else {
+      const newEvent: LOIEvent = {
+        id: eventId,
+        type: 'revised',
+        date: localDate(),
+        notes: `Marked up from ${editing.name}`,
+        documentUrl: urlData.publicUrl,
+        price: null,
+        extractedTerms: null,
+      }
+      onUpdateLOI({ ...loiTracking, events: [...loiEvents, newEvent] as LOIEvent[] })
+    }
+
+    setEditing(null)
+  }
 
   // Other documents (not LOI or PSA — those are in iteration timelines)
   const otherDocs = documents.filter(d => d.doc_type !== 'loi' && d.doc_type !== 'psa')
@@ -127,6 +175,7 @@ export function DocumentsSection({ pipelineId, loiTracking, psaTracking, onUpdat
         pipelineId={pipelineId}
         showPrice
         suggestNextType={loiSuggestNext}
+        onRequestEdit={(url, name) => setEditing({ url, name, kind: 'loi' })}
       />
 
       {/* PSA Iteration Timeline */}
@@ -138,6 +187,7 @@ export function DocumentsSection({ pipelineId, loiTracking, psaTracking, onUpdat
         extractDocType="psa"
         pipelineId={pipelineId}
         suggestNextType={psaSuggestNext}
+        onRequestEdit={(url, name) => setEditing({ url, name, kind: 'psa' })}
       />
 
       {/* Other Documents — inspection reports, contracts, etc. */}
@@ -191,6 +241,14 @@ export function DocumentsSection({ pipelineId, loiTracking, psaTracking, onUpdat
                       {extractingId === doc.id ? <Loader2 size={9} className="animate-spin" /> : <Sparkles size={9} />} Extract
                     </button>
                   )}
+                  {doc.file_url && doc.file_name.toLowerCase().endsWith('.pdf') && (
+                    <button
+                      onClick={() => setEditing({ url: doc.file_url!, name: doc.file_name, kind: 'other', docType: doc.doc_type as DealDocType })}
+                      className="flex items-center gap-1 px-2 py-1 text-[9px] font-medium text-gray-500 border border-gray-200 rounded-lg hover:border-[#c9a84c] hover:text-[#c9a84c] transition-colors"
+                      title="Edit / markup PDF">
+                      <Edit3 size={9} /> Edit
+                    </button>
+                  )}
                   <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="p-1 text-gray-400 hover:text-[#c9a84c]"><Download size={13} /></a>
                   <button onClick={() => { if (window.confirm('Delete?')) deleteDocument(doc.id) }} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={13} /></button>
                 </div>
@@ -199,6 +257,15 @@ export function DocumentsSection({ pipelineId, loiTracking, psaTracking, onUpdat
           </div>
         )}
       </div>
+
+      {editing && (
+        <PdfMarkupEditor
+          pdfUrl={editing.url}
+          fileName={editing.name}
+          onSave={handleSaveMarkup}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </div>
   )
 }
