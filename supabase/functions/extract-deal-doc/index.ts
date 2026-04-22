@@ -36,8 +36,12 @@ Important:
 {
   "purchasePrice": "Purchase price in dollars (number)",
   "earnestDeposit": "Earnest money deposit in dollars (number)",
+  "earnestMoneyDueDays": "Days after effective date by which the earnest money / first deposit must be delivered. If stated as 'within X days of effective date' or similar, return X. (number)",
   "additionalDeposit": "Additional deposit amount if any (number)",
+  "additionalDepositDueDays": "Days after effective date (or after DD expiration, whichever the contract specifies) by which the additional deposit is due. (number)",
   "ddPeriodDays": "Due diligence/inspection period in days (number)",
+  "titleCommitmentDays": "Days after effective date for seller to deliver the title commitment or evidence of title. (number)",
+  "surveyDeliveryDays": "Days after effective date for survey delivery. (number)",
   "closingDate": "Closing date (string, as written)",
   "closingDays": "Days to closing from effective date or DD expiration (number)",
   "financingContingency": "true if financing contingency exists (boolean)",
@@ -57,7 +61,7 @@ Important:
   "notes": "Any other notable terms or special conditions (string)"
 }
 
-Important: Extract only what is explicitly stated in the document.`,
+Important: Extract only what is explicitly stated in the document. For *Days fields, extract the number only — do not guess if the contract doesn't state a specific number of days.`,
 
   inspection_report: `Extract a structured list of findings from this inspection report. Return ONLY a JSON object with these exact keys.
 

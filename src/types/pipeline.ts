@@ -210,6 +210,9 @@ export const DEFAULT_LOI_TRACKING: LOITracking = {
 export interface KeyDates {
   effectiveDate: string | null
   earnestMoneyDueDate: string | null
+  additionalDepositDueDate: string | null
+  titleCommitmentDate: string | null
+  surveyDeadlineDate: string | null
   ddEndDate: string | null
   financingDeadlineDate: string | null
   closingDate: string | null
@@ -218,6 +221,9 @@ export interface KeyDates {
 export const EMPTY_KEY_DATES: KeyDates = {
   effectiveDate: null,
   earnestMoneyDueDate: null,
+  additionalDepositDueDate: null,
+  titleCommitmentDate: null,
+  surveyDeadlineDate: null,
   ddEndDate: null,
   financingDeadlineDate: null,
   closingDate: null,
@@ -251,19 +257,31 @@ function addDaysToDate(dateStr: string, days: number): string | null {
 
 export function deriveKeyDatesFromPSA(terms: Record<string, any>): Partial<KeyDates> {
   const effective = parseToISO(terms.effectiveDate)
-  const ddDays = terms.ddPeriodDays ? Number(terms.ddPeriodDays) : null
-  const closingDays = terms.closingDays ? Number(terms.closingDays) : null
-  const loanDays = terms.loanApprovalDays ? Number(terms.loanApprovalDays) : null
+  const num = (v: any): number | null => {
+    if (v === null || v === undefined || v === '') return null
+    const n = Number(v)
+    return Number.isFinite(n) ? n : null
+  }
+  const earnestDueDays = num(terms.earnestMoneyDueDays) ?? 3  // fall back to standard 3 days if PSA is silent
+  const addlDepositDays = num(terms.additionalDepositDueDays)
+  const ddDays = num(terms.ddPeriodDays)
+  const titleDays = num(terms.titleCommitmentDays)
+  const surveyDays = num(terms.surveyDeliveryDays)
+  const closingDays = num(terms.closingDays)
+  const loanDays = num(terms.loanApprovalDays)
   const closingDateRaw = parseToISO(terms.closingDate)
 
   return {
     effectiveDate: effective,
-    earnestMoneyDueDate: effective ? addDaysToDate(effective, 3) : null,
-    ddEndDate: effective && ddDays ? addDaysToDate(effective, ddDays) : null,
-    financingDeadlineDate: effective && loanDays ? addDaysToDate(effective, loanDays) : null,
+    earnestMoneyDueDate: effective ? addDaysToDate(effective, earnestDueDays) : null,
+    additionalDepositDueDate: effective && addlDepositDays !== null ? addDaysToDate(effective, addlDepositDays) : null,
+    titleCommitmentDate: effective && titleDays !== null ? addDaysToDate(effective, titleDays) : null,
+    surveyDeadlineDate: effective && surveyDays !== null ? addDaysToDate(effective, surveyDays) : null,
+    ddEndDate: effective && ddDays !== null ? addDaysToDate(effective, ddDays) : null,
+    financingDeadlineDate: effective && loanDays !== null ? addDaysToDate(effective, loanDays) : null,
     closingDate: closingDateRaw
       ? closingDateRaw
-      : (effective && closingDays ? addDaysToDate(effective, closingDays) : null),
+      : (effective && closingDays !== null ? addDaysToDate(effective, closingDays) : null),
   }
 }
 

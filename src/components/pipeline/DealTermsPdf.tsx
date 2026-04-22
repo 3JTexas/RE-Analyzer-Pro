@@ -138,6 +138,9 @@ export function DealTermsPdf({ projected, actualInputs, scenarioName, propertyNa
           const dateFields: { label: string; value: string | null }[] = [
             { label: 'Effective Date', value: keyDates.effectiveDate },
             { label: 'Earnest Money Due', value: keyDates.earnestMoneyDueDate },
+            { label: 'Additional Deposit Due', value: keyDates.additionalDepositDueDate },
+            { label: 'Title Commitment Deadline', value: keyDates.titleCommitmentDate },
+            { label: 'Survey Deadline', value: keyDates.surveyDeadlineDate },
             { label: 'DD Period Ends', value: keyDates.ddEndDate },
             { label: 'Financing Deadline', value: keyDates.financingDeadlineDate },
             { label: 'Closing Date', value: keyDates.closingDate },

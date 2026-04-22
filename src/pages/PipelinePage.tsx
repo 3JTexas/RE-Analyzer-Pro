@@ -17,6 +17,7 @@ import { CrimeMap } from '../components/pipeline/CrimeMap'
 import { useCustomRoles } from '../hooks/useCustomRoles'
 import type { Scenario } from '../types'
 import type { MiniPipelineTab, FullPipelineTab, LOIStatus } from '../types/pipeline'
+import { EMPTY_KEY_DATES } from '../types/pipeline'
 
 export function PipelinePage() {
   const { id } = useParams<{ id: string }>()
@@ -206,7 +207,7 @@ export function PipelinePage() {
               onChangeScenario={() => selectDealScenario(null)}
               propertyName={property?.name ?? ''}
               propertyAddress={property?.address ?? null}
-              keyDates={pipeline.key_dates ?? { effectiveDate: null, earnestMoneyDueDate: null, ddEndDate: null, financingDeadlineDate: null, closingDate: null }}
+              keyDates={pipeline.key_dates ?? EMPTY_KEY_DATES}
               onUpdateKeyDates={updateKeyDates}
               psaExtractedTerms={psaExtractedTerms}
             />
