@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Pen, Eraser, Undo2, Save, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { PDFDocument, rgb } from 'pdf-lib'
 import * as pdfjsLib from 'pdfjs-dist'
@@ -171,8 +172,8 @@ export function PdfMarkupEditor({ pdfUrl, fileName, onSave, onClose }: Props) {
     setSaving(false)
   }
 
-  return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex flex-col">
+  return createPortal((
+    <div className="fixed inset-0 bg-black/80 flex flex-col" style={{ zIndex: 9999 }}>
       <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-3 flex-wrap">
         <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded" title="Close"><X size={16} /></button>
         <div className="text-sm font-semibold text-gray-900 truncate flex-1 min-w-[120px]">{fileName}</div>
@@ -219,5 +220,5 @@ export function PdfMarkupEditor({ pdfUrl, fileName, onSave, onClose }: Props) {
         )}
       </div>
     </div>
-  )
+  ), document.body)
 }
