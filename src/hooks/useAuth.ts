@@ -27,7 +27,7 @@ export function useAuth() {
 
   const resetPassword = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://3jtexas.github.io/RE-Analyzer-Pro/reset-password',
+      redirectTo: `${window.location.origin}/reset-password`,
     })
     return { error }
   }
