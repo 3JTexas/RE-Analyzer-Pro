@@ -88,6 +88,7 @@ export interface ModelInputs {
   propertyType?: PropertyType
   // NNN-only fields (ignored when propertyType !== 'nnn'):
   buildingSqft?: number          // total building SF (replaces unit count for sizing)
+  nnnAnnualRent?: number         // current annual base rent ($)
   tenantName?: string
   tenantCreditRating?: TenantCreditRating
   leaseStart?: string            // YYYY-MM-DD
