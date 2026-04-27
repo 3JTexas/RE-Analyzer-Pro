@@ -258,7 +258,7 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
         const b64 = base64s[i]
         console.log(`[extract] PDF ${i + 1} "${pdfFiles[i].name}" — base64 length: ${b64.length} chars (~${Math.round(b64.length * 0.75 / 1024)}KB)`)
         const { data, error: invokeError } = await supabase.functions.invoke('extract-om', {
-          body: { pdfs: [b64] },
+          body: { pdfs: [b64], mode: propertyType === 'nnn' ? 'nnn' : 'mf' },
         })
         if (invokeError) {
           // Try to extract the real error from the response context
@@ -320,6 +320,28 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
       // Map boolean sub-metering flags
       if (parsed.utilElecSubmetered === true) merged.utilElecSubmetered = true
       if (parsed.utilWaterSubmetered === true) merged.utilWaterSubmetered = true
+
+      // Stamp the chosen property type so downstream calc / display uses
+      // the right branch even before the property row exists in the DB.
+      merged.propertyType = propertyType
+
+      // NNN-only extracted fields → copy through. These are no-ops for MF.
+      if (propertyType === 'nnn') {
+        const numericNNN = ['buildingSqft', 'nnnAnnualRent', 'rentEscalationPct', 'landlordReservesAnnual']
+        for (const k of numericNNN) {
+          const v = (parsed as any)[k]
+          if (v != null) {
+            const n = typeof v === 'number' ? v : parseFloat(String(v))
+            if (!isNaN(n)) (merged as any)[k] = n
+          }
+        }
+        const stringNNN = ['tenantName', 'tenantCreditRating', 'leaseStart', 'leaseEnd',
+                           'rentEscalationFreq', 'nnnType', 'guarantyType']
+        for (const k of stringNNN) {
+          const v = (parsed as any)[k]
+          if (typeof v === 'string' && v.trim()) (merged as any)[k] = v.trim()
+        }
+      }
 
       // Default ou to tu if not extracted (100% occupied assumption)
       if ((merged.ou === 0 || merged.ou === undefined) && merged.tu > 0) {

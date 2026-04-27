@@ -5,13 +5,51 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const NNN_EXTRACTION_PROMPT = `Extract the following fields from this single-tenant NNN (triple-net) real estate document (Offering Memorandum, lease summary, pro forma, broker flyer, or any combination). Return ONLY a JSON object with these exact keys. Use null for any field you cannot find. Do not guess — only return values clearly stated in the document.
+
+{
+  "propertyName": "Name of the property or center (string)",
+  "propertyAddress": "Full street address including city, state, zip (string)",
+  "yearBuilt": "Year the building was constructed (number)",
+  "price": "Asking or list price in dollars, no $ sign or commas (number)",
+  "buildingSqft": "Total building square footage (number). Look for 'Building Size', 'GLA', 'SF', 'Square Feet'.",
+  "tenantName": "Name of the single tenant or anchor tenant (string). E.g. 'Walgreens', 'FedEx', 'Dollar General', 'Chick-fil-A'.",
+  "tenantCreditRating": "S&P or Moody's credit rating of the tenant or its parent if stated. One of: 'AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'NR' (Not Rated), 'Private'. Use null if not stated.",
+  "leaseStart": "Lease commencement date in YYYY-MM-DD format (string). Look for 'Lease Start', 'Commencement', 'Term Start'.",
+  "leaseEnd": "Lease expiration date in YYYY-MM-DD format (string). Look for 'Lease End', 'Expiration', 'Term End'. If only the term is given (e.g. '15-year lease commencing 2020'), calculate.",
+  "nnnAnnualRent": "Current annual base rent in dollars, no $ sign or commas (number). This is the ANNUAL rent, not monthly. Look for 'Base Rent', 'Annual Rent', 'NOI'. If only monthly is given, multiply by 12.",
+  "rentEscalationPct": "Rent escalation percentage as a number e.g. 2 not 0.02 (number). Look for 'Escalations', 'Rent Bumps', 'CPI Adjustments', 'Annual Increases'.",
+  "rentEscalationFreq": "Frequency of rent escalations. Exactly one of: 'annual', 'every5yr', 'cpi', 'flat'. Use 'flat' if there are no escalations stated.",
+  "nnnType": "Lease structure. Exactly one of: 'NN' (double net — tenant pays taxes + insurance), 'NNN' (triple net — tenant pays taxes + insurance + CAM), 'absolute_NNN' (bondable — tenant pays everything including roof/structure), 'modified_gross' (landlord covers more). Use null if unclear.",
+  "guarantyType": "Type of lease guaranty. Exactly one of: 'corporate' (corporate parent guaranty), 'parent' (parent company guaranty), 'personal' (individual personal guaranty), 'none'. Use null if not stated.",
+  "landlordReservesAnnual": "Annual landlord-side reserves or non-recoverable landlord expenses in dollars (number). Often $0 for absolute NNN. Look for 'Landlord Reserves', 'LL Expenses', 'Roof Reserve'.",
+  "tax": "Annual real estate taxes if landlord pays (typically $0 for true NNN). Use null if tenant pays directly. (number)",
+  "ins": "Annual insurance if landlord pays (typically $0 for true NNN). Use null if tenant pays directly. (number)",
+  "lev": "Loan-to-value ratio as a percentage e.g. 65 or 70 (number). Use null if not stated.",
+  "ir": "Interest rate as a percentage e.g. 6.5 not 0.065 (number). Use null if not stated.",
+  "am": "Loan amortization in years e.g. 30 (number). Use null if not stated.",
+  "propertyImageUrl": null
+}
+
+Important extraction tips:
+- This is a single-tenant net-leased asset. There is NO unit count, NO rent roll, NO vacancy. Don't try to extract multifamily fields.
+- For absolute NNN deals, taxes/insurance are typically $0 to the landlord — explicitly use null or 0.
+- Lease summary tables usually have: Tenant / Property Type / Lease Type / Lease Start / Lease End / Rent / Escalations / Options.
+- Credit rating is typically shown as 'Tenant Credit', 'S&P Rating', or 'Investment Grade' / 'Non-Investment Grade'.
+- Many NNN OMs lead with a "Lease Abstract" or "Lease Summary" table on page 1 — extract heavily from there.
+- If escalations are described as "10% every 5 years", use rentEscalationPct: 10 and rentEscalationFreq: 'every5yr'.
+- If the lease is in option periods, extract the current rent (not future option rents).`
+
+const MF_EXTRACTION_PROMPT = `Extract the following fields from this real estate document (which may be an Offering Memorandum, rent roll, pro forma, broker flyer, operating statement, or T12). Return ONLY a JSON object with these exact keys. Use null for any field you cannot find. Do not guess — only return values clearly stated in the document.`
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { pdfs } = await req.json()
+    const { pdfs, mode } = await req.json()
+    const dealMode: 'mf' | 'nnn' = mode === 'nnn' ? 'nnn' : 'mf'
 
     if (!pdfs || !pdfs.length) {
       return new Response(JSON.stringify({ error: 'No PDFs provided' }), {
@@ -27,7 +65,7 @@ Deno.serve(async (req) => {
       source: { type: 'base64', media_type: 'application/pdf', data: cleanBase64(base64) }
     }))
 
-    const extractionPrompt = `Extract the following fields from this real estate document (which may be an Offering Memorandum, rent roll, pro forma, broker flyer, operating statement, or T12). Return ONLY a JSON object with these exact keys. Use null for any field you cannot find. Do not guess — only return values clearly stated in the document.
+    const extractionPrompt = dealMode === 'nnn' ? NNN_EXTRACTION_PROMPT : MF_EXTRACTION_PROMPT + `
 
 {
   "propertyName": "Name of the property (string)",
