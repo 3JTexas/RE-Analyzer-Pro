@@ -9,6 +9,7 @@ import { PropertyPage }   from './pages/PropertyPage'
 import { ScenarioPage }   from './pages/ScenarioPage'
 import { DemoPage }       from './pages/DemoPage'
 import { PipelinePage }   from './pages/PipelinePage'
+import { CompareDealsPage } from './pages/CompareDealsPage'
 import { AdminFeatureRequestsPage } from './pages/AdminFeatureRequestsPage'
 import { Spinner }        from './components/ui'
 
@@ -72,6 +73,9 @@ export default function App() {
           } />
           <Route path="/property/:id/pipeline" element={
             <ProtectedRoute><PipelinePage /></ProtectedRoute>
+          } />
+          <Route path="/compare" element={
+            <ProtectedRoute><CompareDealsPage /></ProtectedRoute>
           } />
           <Route path="/admin/features" element={
             <ProtectedRoute><AdminFeatureRequestsPage /></ProtectedRoute>

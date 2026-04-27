@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import { Link, useLocation, Outlet } from 'react-router-dom'
-import { Building2, BarChart3, Home, User, LogOut, Settings, Lightbulb, ClipboardList } from 'lucide-react'
+import { Building2, BarChart3, Home, User, LogOut, Settings, Lightbulb, ClipboardList, GitCompare } from 'lucide-react'
 import { ChatBubble } from '../chat/ChatBubble'
 import { useAuth } from '../../hooks/useAuth'
 import { ProfileModal, getInitials } from '../ProfileModal'
@@ -64,8 +64,9 @@ export function AppShell() {
   const [showFeatureSuggestion, setShowFeatureSuggestion] = useState(false)
 
   const nav = [
-    { to: '/',           icon: Building2, label: 'Properties' },
-    { to: '/demo',       icon: BarChart3, label: 'Quick Model' },
+    { to: '/',           icon: Building2,  label: 'Properties' },
+    { to: '/compare',    icon: GitCompare, label: 'Compare' },
+    { to: '/demo',       icon: BarChart3,  label: 'Quick Model' },
   ]
 
   const logoSrc = `${import.meta.env.BASE_URL}Chai_Logo.jpeg`
