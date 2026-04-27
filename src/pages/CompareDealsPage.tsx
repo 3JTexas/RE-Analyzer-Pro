@@ -53,7 +53,11 @@ export function CompareDealsPage() {
       const property = propsById.get(col.propertyId)
       const scenario = property?.scenarios?.find(s => s.id === col.scenarioId)
       if (!property || !scenario || !scenario.inputs) return
-      const inputs = scenario.inputs
+      // Ensure inputs reflect property-level source-of-truth fields before calc.
+      const inputs: ModelInputs = {
+        ...scenario.inputs,
+        propertyType: property.property_type ?? scenario.inputs.propertyType ?? 'multifamily',
+      }
       const useStabilized = !(inputs.ou > 0 && inputs.ou < inputs.tu) || !!scenario.is_default
       out.push({
         i,
@@ -213,21 +217,38 @@ export function CompareDealsPage() {
                         </tr>
                       )
                     })()}
-                    {/* Units row (informational) */}
+                    {/* Property type row */}
+                    <tr className="bg-white">
+                      <td className="px-3 py-1.5 text-gray-600">Type</td>
+                      {allCols.map((col, ci) => (
+                        <td key={ci} className={`px-3 py-1.5 text-right font-medium text-[10px] uppercase tracking-wide ${col.style.val}`}>
+                          {(col.property.property_type ?? 'multifamily') === 'nnn' ? 'NNN' : 'Multifamily'}
+                        </td>
+                      ))}
+                      <td />
+                    </tr>
+                    {/* Units row (MF only — NNN shows —) */}
                     {(() => {
-                      const units = allCols.map(c => c.inputs.tu)
-                      const baseUnits = units[0]
+                      const baseIsMF = (allCols[0].property.property_type ?? 'multifamily') !== 'nnn'
+                      const baseUnits = baseIsMF ? allCols[0].inputs.tu : 0
                       return (
-                        <tr className="bg-white">
+                        <tr className="bg-gray-50">
                           <td className="px-3 py-1.5 text-gray-600">Total units</td>
-                          {allCols.map((col, ci) => (
-                            <td key={ci} className={`px-3 py-1.5 text-right font-medium ${col.style.val}`}>
-                              {units[ci]}
-                            </td>
-                          ))}
+                          {allCols.map((col, ci) => {
+                            const isMF = (col.property.property_type ?? 'multifamily') !== 'nnn'
+                            return (
+                              <td key={ci} className={`px-3 py-1.5 text-right font-medium ${col.style.val}`}>
+                                {isMF ? col.inputs.tu : '—'}
+                              </td>
+                            )
+                          })}
                           <td className="px-3 py-1.5 text-right">
-                            {allCols.slice(1).map((_, ci) => {
-                              const delta = units[ci + 1] - baseUnits
+                            {allCols.slice(1).map((col, ci) => {
+                              const isMF = (col.property.property_type ?? 'multifamily') !== 'nnn'
+                              if (!isMF || !baseIsMF) {
+                                return <div key={ci} className="font-medium text-[10px] text-gray-300">—</div>
+                              }
+                              const delta = col.inputs.tu - baseUnits
                               const dColor = delta > 0 ? 'text-green-700' : delta < 0 ? 'text-red-600' : 'text-gray-400'
                               return (
                                 <div key={ci} className={`font-medium text-[10px] ${dColor}`}>
@@ -240,21 +261,84 @@ export function CompareDealsPage() {
                         </tr>
                       )
                     })()}
-                    {/* Price/door row */}
+                    {/* Building SF row (NNN only — MF shows —) */}
                     {(() => {
-                      const ppd = allCols.map(c => c.inputs.tu > 0 ? c.inputs.price / c.inputs.tu : 0)
-                      const basePpd = ppd[0]
+                      const anyNNN = allCols.some(c => (c.property.property_type ?? 'multifamily') === 'nnn')
+                      if (!anyNNN) return null
+                      const baseIsNNN = (allCols[0].property.property_type ?? 'multifamily') === 'nnn'
+                      const baseSF = baseIsNNN ? (allCols[0].inputs.buildingSqft ?? 0) : 0
+                      return (
+                        <tr className="bg-white">
+                          <td className="px-3 py-1.5 text-gray-600">Building SF</td>
+                          {allCols.map((col, ci) => {
+                            const isNNN = (col.property.property_type ?? 'multifamily') === 'nnn'
+                            return (
+                              <td key={ci} className={`px-3 py-1.5 text-right font-medium ${col.style.val}`}>
+                                {isNNN ? (col.inputs.buildingSqft ?? 0).toLocaleString() : '—'}
+                              </td>
+                            )
+                          })}
+                          <td className="px-3 py-1.5 text-right">
+                            {allCols.slice(1).map((col, ci) => {
+                              const isNNN = (col.property.property_type ?? 'multifamily') === 'nnn'
+                              if (!isNNN || !baseIsNNN) {
+                                return <div key={ci} className="font-medium text-[10px] text-gray-300">—</div>
+                              }
+                              const delta = (col.inputs.buildingSqft ?? 0) - baseSF
+                              const dColor = delta > 0 ? 'text-green-700' : delta < 0 ? 'text-red-600' : 'text-gray-400'
+                              return (
+                                <div key={ci} className={`font-medium text-[10px] ${dColor}`}>
+                                  {allCols.length > 2 && <span className="opacity-50 mr-0.5">{COL_LABELS[ci + 1]}:</span>}
+                                  {delta > 0 ? '+' : ''}{delta.toLocaleString()}
+                                </div>
+                              )
+                            })}
+                          </td>
+                        </tr>
+                      )
+                    })()}
+                    {/* Price / unit OR Price / SF row (per type) */}
+                    {(() => {
+                      const baseType = allCols[0].property.property_type ?? 'multifamily'
+                      const baseValue = (() => {
+                        if (baseType === 'nnn') {
+                          const sf = allCols[0].inputs.buildingSqft ?? 0
+                          return sf > 0 ? allCols[0].inputs.price / sf : 0
+                        }
+                        return allCols[0].inputs.tu > 0 ? allCols[0].inputs.price / allCols[0].inputs.tu : 0
+                      })()
                       return (
                         <tr className="bg-gray-50">
-                          <td className="px-3 py-1.5 text-gray-600">Price / door</td>
-                          {allCols.map((col, ci) => (
-                            <td key={ci} className={`px-3 py-1.5 text-right font-medium ${col.style.val}`}>
-                              {fmtDollar(ppd[ci])}
-                            </td>
-                          ))}
+                          <td className="px-3 py-1.5 text-gray-600">
+                            {baseType === 'nnn' ? 'Price / SF' : 'Price / door'}
+                          </td>
+                          {allCols.map((col, ci) => {
+                            const t = col.property.property_type ?? 'multifamily'
+                            const v = t === 'nnn'
+                              ? ((col.inputs.buildingSqft ?? 0) > 0 ? col.inputs.price / (col.inputs.buildingSqft ?? 1) : 0)
+                              : (col.inputs.tu > 0 ? col.inputs.price / col.inputs.tu : 0)
+                            // Show, but suffix the unit so cross-type compares are visually clear
+                            return (
+                              <td key={ci} className={`px-3 py-1.5 text-right font-medium ${col.style.val}`}>
+                                {v > 0 ? (
+                                  <>
+                                    {fmtDollar(v)}
+                                    <span className="opacity-50 text-[9px] ml-0.5">{t === 'nnn' ? '/SF' : '/door'}</span>
+                                  </>
+                                ) : '—'}
+                              </td>
+                            )
+                          })}
                           <td className="px-3 py-1.5 text-right">
-                            {allCols.slice(1).map((_, ci) => {
-                              const delta = ppd[ci + 1] - basePpd
+                            {allCols.slice(1).map((col, ci) => {
+                              const t = col.property.property_type ?? 'multifamily'
+                              if (t !== baseType) {
+                                return <div key={ci} className="font-medium text-[10px] text-gray-300">—</div>
+                              }
+                              const v = t === 'nnn'
+                                ? ((col.inputs.buildingSqft ?? 0) > 0 ? col.inputs.price / (col.inputs.buildingSqft ?? 1) : 0)
+                                : (col.inputs.tu > 0 ? col.inputs.price / col.inputs.tu : 0)
+                              const delta = v - baseValue
                               const dColor = delta > 0.005 ? 'text-red-600' : delta < -0.005 ? 'text-green-700' : 'text-gray-400'
                               return (
                                 <div key={ci} className={`font-medium text-[10px] ${dColor}`}>
@@ -267,6 +351,35 @@ export function CompareDealsPage() {
                         </tr>
                       )
                     })()}
+                    {/* NNN tenant + lease end (only renders if any column is NNN) */}
+                    {allCols.some(c => (c.property.property_type ?? 'multifamily') === 'nnn') && (
+                      <>
+                        <tr className="bg-white">
+                          <td className="px-3 py-1.5 text-gray-600">Tenant</td>
+                          {allCols.map((col, ci) => {
+                            const isNNN = (col.property.property_type ?? 'multifamily') === 'nnn'
+                            return (
+                              <td key={ci} className={`px-3 py-1.5 text-right font-medium text-[11px] ${col.style.val}`}>
+                                {isNNN ? (col.inputs.tenantName || '—') : '—'}
+                              </td>
+                            )
+                          })}
+                          <td />
+                        </tr>
+                        <tr className="bg-gray-50">
+                          <td className="px-3 py-1.5 text-gray-600">Lease end</td>
+                          {allCols.map((col, ci) => {
+                            const isNNN = (col.property.property_type ?? 'multifamily') === 'nnn'
+                            return (
+                              <td key={ci} className={`px-3 py-1.5 text-right font-medium text-[11px] ${col.style.val}`}>
+                                {isNNN ? (col.inputs.leaseEnd || '—') : '—'}
+                              </td>
+                            )
+                          })}
+                          <td />
+                        </tr>
+                      </>
+                    )}
                     {/* Standard P&L / return rows */}
                     {ROW_SPECS.map((spec, ri) => {
                       const vals = allCols.map(c => spec.get(c.data))

@@ -134,12 +134,16 @@ export function useDealContext(): { dealContext: DealContext | null; loading: bo
       const s = scenario as Scenario
 
       const { data: prop } = await supabase
-        .from('properties').select('name, address, units, year_built, status')
+        .from('properties').select('name, address, units, year_built, status, property_type')
         .eq('id', s.property_id).single()
 
       // property.units is the source of truth — override any stale scenario.inputs.tu
       if (prop?.units && prop.units > 0 && s.inputs.tu !== prop.units) {
         s.inputs = { ...s.inputs, tu: prop.units }
+      }
+      // property.property_type is the source of truth for which calc branch to run
+      if (prop?.property_type && s.inputs.propertyType !== prop.property_type) {
+        s.inputs = { ...s.inputs, propertyType: prop.property_type as any }
       }
 
       const outputs = calculate(s.inputs, s.is_default)
@@ -198,7 +202,7 @@ export function useDealContext(): { dealContext: DealContext | null; loading: bo
     setLoading(true)
     try {
       const { data: prop } = await supabase
-        .from('properties').select('name, address, units, year_built, status')
+        .from('properties').select('name, address, units, year_built, status, property_type')
         .eq('id', propertyId).single()
       if (!prop) { setDealContext(null); return }
 
@@ -225,6 +229,10 @@ export function useDealContext(): { dealContext: DealContext | null; loading: bo
       // property.units is the source of truth — override any stale scenario.inputs.tu
       if (s && prop.units && prop.units > 0 && s.inputs.tu !== prop.units) {
         s.inputs = { ...s.inputs, tu: prop.units }
+      }
+      // property.property_type is the source of truth for which calc branch to run
+      if (s && prop.property_type && s.inputs.propertyType !== prop.property_type) {
+        s.inputs = { ...s.inputs, propertyType: prop.property_type as any }
       }
 
       const outputs = s ? calculate(s.inputs, s.is_default) : null
