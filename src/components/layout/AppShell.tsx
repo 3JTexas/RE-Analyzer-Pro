@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { Link, useLocation, Outlet } from 'react-router-dom'
+import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom'
 import { Building2, BarChart3, Home, User, LogOut, Settings, Lightbulb, ClipboardList, GitCompare } from 'lucide-react'
 import { ChatBubble } from '../chat/ChatBubble'
 import { DevChatPanel } from '../chat/DevChatPanel'
@@ -62,6 +62,16 @@ export function AppShell() {
   const { user, signOut } = useAuth()
   const isAdmin = useIsAdmin()
   const loc = useLocation()
+  const navigate = useNavigate()
+
+  const goHome = () => {
+    if (loc.pathname === '/') {
+      // Already on Properties — full reload to close any open setup flows / overlays
+      window.location.href = '/'
+    } else {
+      navigate('/')
+    }
+  }
   const [showProfile, setShowProfile] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showFeatureSuggestion, setShowFeatureSuggestion] = useState(false)
@@ -119,9 +129,9 @@ export function AppShell() {
           </nav>
         </div>
         <div className="flex items-center gap-4 min-w-0">
-          <Link to="/" className="p-1.5 text-gray-400 hover:text-[#c9a84c] transition-colors" title="Home">
+          <button onClick={goHome} className="p-1.5 text-gray-400 hover:text-[#c9a84c] transition-colors" title="Home">
             <Home size={16} />
-          </Link>
+          </button>
           {user && (
             <AvatarMenu size="w-9 h-9" textSize="text-xs" onProfile={() => setShowProfile(true)} onSettings={() => setShowSettings(true)} onSuggestFeature={() => setShowFeatureSuggestion(true)} onSignOut={signOut} />
           )}
