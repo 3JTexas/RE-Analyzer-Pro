@@ -519,19 +519,9 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
   // ── Choose mode ───────────────────────────────────────────────────────
   if (mode === 'choose') return (
     <div className="mx-4 mt-3 p-4 border border-gray-200 rounded-xl bg-white shadow-sm">
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-xs font-semibold text-gray-700">
-          {showPropertyFields ? `Add new property — ${propertyType === 'nnn' ? 'NNN' : 'Multifamily'}` : 'Add scenario'}
-        </p>
-        {showPropertyFields && (
-          <button
-            onClick={() => setMode('type')}
-            className="text-[9px] text-gray-400 hover:text-gray-600"
-          >
-            change type
-          </button>
-        )}
-      </div>
+      <p className="text-xs font-semibold text-gray-700 mb-1">
+        {showPropertyFields ? `Add new property — ${propertyType === 'nnn' ? 'NNN' : 'Multifamily'}` : 'Add scenario'}
+      </p>
       <p className="text-[10px] text-gray-400 mb-3">
         {showPropertyFields ? 'Import the broker PDF or enter figures manually' : 'How do you want to enter the broker\'s figures?'}
       </p>
