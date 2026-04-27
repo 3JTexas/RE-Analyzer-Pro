@@ -134,7 +134,7 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
 
   // Reset all form state on mount — prevents stale data when component is reused
   useEffect(() => {
-    setMode('choose')
+    setMode(showPropertyFields ? 'type' : 'choose')
     setInputs({ ...DEFAULT_INPUTS })
     setPdfStatus('idle')
     setPdfError('')
