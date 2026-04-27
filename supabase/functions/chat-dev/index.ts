@@ -7,8 +7,8 @@ const corsHeaders = {
 
 const REPO = '3JTexas/RE-Analyzer-Pro'
 const DEFAULT_REF = 'design-refresh'
-const MAX_FILE_BYTES = 200_000
-const MAX_TOOL_ITERATIONS = 12
+const MAX_FILE_BYTES = 300_000
+const MAX_TOOL_ITERATIONS = 25
 
 const SYSTEM_PROMPT = `You are an embedded developer assistant inside RE Analyzer Pro — a real estate deal analysis web app built with React 18, Vite 5, TypeScript, Tailwind 3, Supabase, and Capacitor 6 (iOS via Xcode). The user is Andrew Schildcrout, the app's owner.
 
@@ -31,6 +31,13 @@ Guidelines:
 - Prefer small, surgical changes over rewrites.
 - If a request is genuinely ambiguous AFTER reading the relevant code, ask one focused question.
 - You cannot write files. Tools are read-only. The Claude Code GitHub Action does the file edits via a PR.
+
+Tool-use efficiency (IMPORTANT):
+- You have a hard cap of ${MAX_TOOL_ITERATIONS} tool-call iterations per chat turn. Budget them.
+- Plan your reads: pick the 4-6 files most likely to contain the answer, read them, then write your final answer. Do not chain dozens of small reads.
+- Use grep_repo + list_directory to locate symbols BEFORE reading large files.
+- Once you have enough to answer, STOP calling tools and produce a final text response — even if some open questions remain (call them out at the end).
+- If you do hit the iteration cap, your final turn will be re-prompted with no tools available, so make sure to track what you've learned so far.
 
 Domain context: RE Analyzer Pro analyzes multifamily real estate deals — purchase price, financing, P&L projections, 5-year hold, 1031 exchanges, cap-X, depreciation, tax benefits. Don't over-explain RE basics; Andrew is a working investor.`
 
@@ -171,7 +178,8 @@ async function executeTool(name: string, input: any): Promise<string> {
   }
 }
 
-async function callAnthropic(messages: any[]) {
+async function callAnthropic(messages: any[], opts: { withTools?: boolean } = {}) {
+  const withTools = opts.withTools ?? true
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -181,9 +189,9 @@ async function callAnthropic(messages: any[]) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: 4000,
+      max_tokens: 8000,
       system: SYSTEM_PROMPT,
-      tools: TOOLS,
+      ...(withTools ? { tools: TOOLS } : {}),
       messages,
     }),
   })
@@ -251,7 +259,24 @@ Deno.serve(async (req) => {
     }
 
     if (!finalText) {
-      finalText = '(Reached tool-use iteration limit before producing a final answer. Try narrowing the question.)'
+      // Hit iteration cap. Re-prompt without tools so Claude can summarize
+      // what it learned from the reads so far instead of returning a useless
+      // "limit reached" message.
+      messages.push({
+        role: 'user',
+        content: [{
+          type: 'text',
+          text: 'You\'ve reached the tool-use iteration cap. Stop calling tools and produce your best final answer based on what you\'ve read so far. If there are gaps you couldn\'t resolve, list them at the end so the user can clarify.',
+        }],
+      })
+      const final = await callAnthropic(messages, { withTools: false })
+      finalText = (final.content || [])
+        .filter((b: any) => b.type === 'text')
+        .map((b: any) => b.text)
+        .join('\n')
+      if (!finalText) {
+        finalText = '(Reached tool-use iteration limit and could not produce a final summary. Try narrowing the question.)'
+      }
     }
 
     return new Response(JSON.stringify({ content: finalText }), {
