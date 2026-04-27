@@ -78,7 +78,8 @@ export function PropertiesPage() {
         meta.propertyAddress || undefined,
         meta.propertyYearBuilt || undefined,
         meta.propertyImageUrl || undefined,
-        inputs.tu || undefined
+        inputs.tu || undefined,
+        meta.propertyType || undefined,
       ))?.id
     if (!propertyId) return
     const scenario = await createScenario(propertyId, meta.scenarioName, inputs, true)

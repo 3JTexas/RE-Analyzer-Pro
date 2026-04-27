@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { Upload, FileText, X, Loader2, CheckCircle, AlertCircle, Camera } from 'lucide-react'
+import { Upload, FileText, X, Loader2, CheckCircle, AlertCircle, Camera, Building2, Building } from 'lucide-react'
 import { DEFAULT_INPUTS } from '../lib/calc'
 
 import { supabase } from '../lib/supabase'
 import { useUserDefaults } from '../hooks/useUserDefaults'
-import type { ModelInputs, RentRollUnit } from '../types'
+import type { ModelInputs, RentRollUnit, PropertyType } from '../types'
 
 const FIELDS: { key: keyof ModelInputs; label: string; step: number; prefix?: string; suffix?: string }[] = [
   { key: 'price', label: 'Purchase price',       step: 10000, prefix: '$' },
@@ -51,6 +51,7 @@ export interface SetupConfirmMeta {
   propertyAddress?: string
   propertyYearBuilt?: number
   propertyImageUrl?: string
+  propertyType?: PropertyType   // chosen at Step 0; defaults to multifamily for legacy callers
   addToExistingPropertyId?: string  // if set, add scenario to this property instead of creating new
 }
 
@@ -98,7 +99,9 @@ function propertiesMatch(
   return false
 }
 
-type Mode = 'choose' | 'manual' | 'pdf'
+// Step 0 ('type') only shows when creating a new property. For "add scenario
+// to existing property" the type is already locked, so we skip straight to 'choose'.
+type Mode = 'type' | 'choose' | 'manual' | 'pdf'
 type PdfStatus = 'idle' | 'reading' | 'extracting' | 'done' | 'error'
 type PdfProgress = { current: number; total: number } | null
 
@@ -111,7 +114,10 @@ interface Props {
 }
 
 export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, defaultScenarioName = 'As-Presented', existingProperties = [] }: Props) {
-  const [mode, setMode] = useState<Mode>('choose')
+  // Show the deal-type picker only when we're creating a new property.
+  // When adding a scenario to an existing property, the type is already set.
+  const [mode, setMode] = useState<Mode>(showPropertyFields ? 'type' : 'choose')
+  const [propertyType, setPropertyType] = useState<PropertyType>('multifamily')
   const [inputs, setInputs] = useState<ModelInputs>({ ...DEFAULT_INPUTS })
   const { loadDefaults } = useUserDefaults()
 
@@ -181,14 +187,18 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
     setPhotoUploading(false)
   }
 
-  const confirm = (opts?: { addToExistingPropertyId?: string }) => onConfirm(inputs, {
-    scenarioName: scenarioName.trim() || defaultScenarioName,
-    propertyName: showPropertyFields ? propertyName.trim() : undefined,
-    propertyAddress: showPropertyFields ? propertyAddress.trim() : undefined,
-    propertyYearBuilt: showPropertyFields ? propertyYearBuilt : undefined,
-    propertyImageUrl: showPropertyFields ? propertyImageUrl : undefined,
-    addToExistingPropertyId: opts?.addToExistingPropertyId,
-  })
+  const confirm = (opts?: { addToExistingPropertyId?: string }) => onConfirm(
+    { ...inputs, propertyType },
+    {
+      scenarioName: scenarioName.trim() || defaultScenarioName,
+      propertyName: showPropertyFields ? propertyName.trim() : undefined,
+      propertyAddress: showPropertyFields ? propertyAddress.trim() : undefined,
+      propertyYearBuilt: showPropertyFields ? propertyYearBuilt : undefined,
+      propertyImageUrl: showPropertyFields ? propertyImageUrl : undefined,
+      propertyType: showPropertyFields ? propertyType : undefined,
+      addToExistingPropertyId: opts?.addToExistingPropertyId,
+    },
+  )
 
   // Compute duplicate match against existing properties (only relevant when creating a new property)
   const duplicateMatch = showPropertyFields && (propertyName.trim() || propertyAddress.trim())
@@ -446,6 +456,41 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
           placeholder="e.g. As-Presented"
           className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-navy" />
       </div>
+    </div>
+  )
+
+  // ── Step 0: deal-type picker (only when creating a new property) ─────
+  if (mode === 'type') return (
+    <div className="mx-4 mt-3 p-4 border border-gray-200 rounded-xl bg-white shadow-sm">
+      <p className="text-xs font-semibold text-gray-700 mb-1">Add new property</p>
+      <p className="text-[10px] text-gray-400 mb-3">
+        What kind of deal is this? You can add more types later.
+      </p>
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <button
+          onClick={() => { setPropertyType('multifamily'); setMode('choose') }}
+          className="flex flex-col items-center gap-2 p-4 border-2 border-gray-200 rounded-xl hover:border-navy hover:bg-blue-50 transition-colors"
+        >
+          <Building2 size={26} className="text-navy" />
+          <span className="text-[11px] font-semibold text-gray-700">Multifamily</span>
+          <span className="text-[9px] text-gray-400 text-center leading-snug">
+            Apartments, units, rent roll, vacancy, full opex
+          </span>
+        </button>
+        <button
+          onClick={() => { setPropertyType('nnn'); setMode('choose') }}
+          className="flex flex-col items-center gap-2 p-4 border-2 border-gray-200 rounded-xl hover:border-[#c9a84c] hover:bg-amber-50 transition-colors"
+        >
+          <Building size={26} className="text-[#c9a84c]" />
+          <span className="text-[11px] font-semibold text-gray-700">NNN</span>
+          <span className="text-[9px] text-gray-400 text-center leading-snug">
+            Single-tenant, triple-net lease, base rent + escalations
+          </span>
+        </button>
+      </div>
+      <button onClick={onCancel} className="w-full bg-gray-100 text-gray-600 text-xs font-medium py-2 rounded-lg">
+        Cancel
+      </button>
     </div>
   )
 
