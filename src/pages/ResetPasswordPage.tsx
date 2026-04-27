@@ -14,9 +14,16 @@ export function ResetPasswordPage() {
   const logoSrc = `${import.meta.env.BASE_URL}Chai_Logo.jpeg`
 
   useEffect(() => {
-    // Supabase auto-detects the token from the URL hash on auth state change
+    // Supabase auto-detects the token from the URL hash on auth state change.
+    // If the PASSWORD_RECOVERY event already fired (e.g., on the home route before
+    // the global handler navigated us here), there's already an active session —
+    // detect that on mount so the form shows up rather than spinning forever on
+    // "Verifying reset link…".
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) setSessionReady(true)
+    })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
+      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
         setSessionReady(true)
       }
     })

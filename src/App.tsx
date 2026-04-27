@@ -1,6 +1,7 @@
-import React from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import React, { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
+import { supabase } from './lib/supabase'
 import { AppShell } from './components/layout/AppShell'
 import { LoginPage }      from './pages/LoginPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
@@ -49,10 +50,25 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function PasswordRecoveryHandler() {
+  const navigate = useNavigate()
+  const loc = useLocation()
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY' && loc.pathname !== '/reset-password') {
+        navigate('/reset-password', { replace: true })
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [navigate, loc.pathname])
+  return null
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
     <BrowserRouter basename={import.meta.env.BASE_URL}>
+      <PasswordRecoveryHandler />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
