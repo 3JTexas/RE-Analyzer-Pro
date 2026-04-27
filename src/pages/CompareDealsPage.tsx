@@ -220,11 +220,15 @@ export function CompareDealsPage() {
                     {/* Property type row */}
                     <tr className="bg-white">
                       <td className="px-3 py-1.5 text-gray-600">Type</td>
-                      {allCols.map((col, ci) => (
-                        <td key={ci} className={`px-3 py-1.5 text-right font-medium text-[10px] uppercase tracking-wide ${col.style.val}`}>
-                          {(col.property.property_type ?? 'multifamily') === 'nnn' ? 'NNN' : 'Multifamily'}
-                        </td>
-                      ))}
+                      {allCols.map((col, ci) => {
+                        const t = col.property.property_type ?? 'multifamily'
+                        const label = t === 'nnn' ? 'NNN' : t === 'single_family' ? 'Single Family' : 'Multifamily'
+                        return (
+                          <td key={ci} className={`px-3 py-1.5 text-right font-medium text-[10px] uppercase tracking-wide ${col.style.val}`}>
+                            {label}
+                          </td>
+                        )
+                      })}
                       <td />
                     </tr>
                     {/* Units row (MF only — NNN shows —) */}

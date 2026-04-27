@@ -1,7 +1,8 @@
 // ── Property type ─────────────────────────────────────────────────────────
 // Drives which fields/forms are shown and how the calc engine evaluates a deal.
-// 'multifamily' is the legacy default; 'nnn' is single-tenant triple-net.
-export type PropertyType = 'multifamily' | 'nnn'
+// 'multifamily' is the legacy default; 'single_family' is one-unit residential
+// (uses the multifamily calc branch with tu=1); 'nnn' is single-tenant triple-net.
+export type PropertyType = 'multifamily' | 'single_family' | 'nnn'
 
 export type RentEscalationFreq = 'annual' | 'every5yr' | 'cpi' | 'flat'
 export type NNNType = 'NN' | 'NNN' | 'absolute_NNN' | 'modified_gross'

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Upload, FileText, X, Loader2, CheckCircle, AlertCircle, Camera, Building2, Building } from 'lucide-react'
+import { Upload, FileText, X, Loader2, CheckCircle, AlertCircle, Camera, Building2, Building, Home } from 'lucide-react'
 import { DEFAULT_INPUTS } from '../lib/calc'
 
 import { supabase } from '../lib/supabase'
@@ -488,25 +488,39 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
       <p className="text-[10px] text-gray-400 mb-3">
         What kind of deal is this? You can add more types later.
       </p>
-      <div className="grid grid-cols-2 gap-2 mb-3">
+      <div className="grid grid-cols-3 gap-2 mb-3">
         <button
           onClick={() => { setPropertyType('multifamily'); setMode('choose') }}
-          className="flex flex-col items-center gap-2 p-4 border-2 border-gray-200 rounded-xl hover:border-navy hover:bg-blue-50 transition-colors"
+          className="flex flex-col items-center gap-2 p-3 border-2 border-gray-200 rounded-xl hover:border-navy hover:bg-blue-50 transition-colors"
         >
-          <Building2 size={26} className="text-navy" />
+          <Building2 size={24} className="text-navy" />
           <span className="text-[11px] font-semibold text-gray-700">Multifamily</span>
           <span className="text-[9px] text-gray-400 text-center leading-snug">
-            Apartments, units, rent roll, vacancy, full opex
+            Apartments, rent roll, vacancy, full opex
+          </span>
+        </button>
+        <button
+          onClick={() => {
+            setPropertyType('single_family')
+            setInputs(prev => ({ ...prev, tu: 1, ou: 1 }))
+            setMode('choose')
+          }}
+          className="flex flex-col items-center gap-2 p-3 border-2 border-gray-200 rounded-xl hover:border-emerald-500 hover:bg-emerald-50 transition-colors"
+        >
+          <Home size={24} className="text-emerald-600" />
+          <span className="text-[11px] font-semibold text-gray-700">Single Family</span>
+          <span className="text-[9px] text-gray-400 text-center leading-snug">
+            One house, one tenant, monthly rent
           </span>
         </button>
         <button
           onClick={() => { setPropertyType('nnn'); setMode('choose') }}
-          className="flex flex-col items-center gap-2 p-4 border-2 border-gray-200 rounded-xl hover:border-[#c9a84c] hover:bg-amber-50 transition-colors"
+          className="flex flex-col items-center gap-2 p-3 border-2 border-gray-200 rounded-xl hover:border-[#c9a84c] hover:bg-amber-50 transition-colors"
         >
-          <Building size={26} className="text-[#c9a84c]" />
+          <Building size={24} className="text-[#c9a84c]" />
           <span className="text-[11px] font-semibold text-gray-700">NNN</span>
           <span className="text-[9px] text-gray-400 text-center leading-snug">
-            Single-tenant, triple-net lease, base rent + escalations
+            Single-tenant net-lease, base rent + escalations
           </span>
         </button>
       </div>
@@ -520,7 +534,9 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
   if (mode === 'choose') return (
     <div className="mx-4 mt-3 p-4 border border-gray-200 rounded-xl bg-white shadow-sm">
       <p className="text-xs font-semibold text-gray-700 mb-1">
-        {showPropertyFields ? `Add new property — ${propertyType === 'nnn' ? 'NNN' : 'Multifamily'}` : 'Add scenario'}
+        {showPropertyFields
+          ? `Add new property — ${propertyType === 'nnn' ? 'NNN' : propertyType === 'single_family' ? 'Single Family' : 'Multifamily'}`
+          : 'Add scenario'}
       </p>
       <p className="text-[10px] text-gray-400 mb-3">
         {showPropertyFields ? 'Import the broker PDF or enter figures manually' : 'How do you want to enter the broker\'s figures?'}
