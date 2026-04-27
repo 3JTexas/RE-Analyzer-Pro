@@ -113,6 +113,10 @@ Important extraction tips:
     // Diagnostic log — structure verification
     console.error(`[extract-om] Sending ${pdfContents.length} PDF document block(s), base64 lengths: ${pdfs.map((p: string) => cleanBase64(p).length).join(', ')}, prompt starts: "${extractionPrompt.slice(0, 200)}..."`)
 
+    const systemPrompt = dealMode === 'nnn'
+      ? `You are a real estate underwriting data extractor specialized in single-tenant NNN (triple-net) net-lease properties. You will be given one or more pages from an Offering Memorandum, lease abstract, lease summary, broker flyer, or related document. Return a single valid JSON object with no other text, preamble, explanation, or markdown. Start your response with { and end with }. Do not invent fields — use null for anything not clearly stated.`
+      : `You are a real estate underwriting data extractor. You will be given one or more pages from real estate documents — these may include Offering Memorandums (OMs), rent rolls, pro formas, broker flyers, operating statements, T12s, or any combination. Your job is to extract specific financial and property data and return it as a single valid JSON object with no other text, preamble, explanation, or markdown. Start your response with { and end with }. IMPORTANT: If the document is a rent roll or contains a rent roll table listing individual units with their rents, you MUST extract each unit into the rentRoll array — this is the highest-priority extraction field.`
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -121,9 +125,9 @@ Important extraction tips:
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        system: `You are a real estate underwriting data extractor. You will be given one or more pages from real estate documents — these may include Offering Memorandums (OMs), rent rolls, pro formas, broker flyers, operating statements, T12s, or any combination. Your job is to extract specific financial and property data and return it as a single valid JSON object with no other text, preamble, explanation, or markdown. Start your response with { and end with }. IMPORTANT: If the document is a rent roll or contains a rent roll table listing individual units with their rents, you MUST extract each unit into the rentRoll array — this is the highest-priority extraction field.`,
+        model: 'claude-sonnet-4-6',
+        max_tokens: 8000,
+        system: systemPrompt,
         messages: [{
           role: 'user',
           content: [
@@ -135,7 +139,18 @@ Important extraction tips:
     })
 
     const data = await response.json()
+
+    // Surface upstream API errors instead of trying to parse a missing body
+    if (data.error || !data.content) {
+      const upstreamMsg = data.error?.message ?? 'Anthropic returned no content'
+      console.error('[extract-om] upstream error:', JSON.stringify(data).slice(0, 1000))
+      return new Response(JSON.stringify({ error: upstreamMsg, mode: dealMode }), {
+        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     const text = data.content?.find((b: any) => b.type === 'text')?.text ?? ''
+    const stopReason = data.stop_reason ?? 'unknown'
 
     const extractJSON = (raw: string): string => {
       const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/)
@@ -146,7 +161,22 @@ Important extraction tips:
       return raw.trim()
     }
 
-    const parsed = JSON.parse(extractJSON(text))
+    let parsed: any
+    try {
+      parsed = JSON.parse(extractJSON(text))
+    } catch (parseErr: any) {
+      // Hand the raw response back to the caller so the user can see what
+      // went wrong (truncation, refusal, hallucinated preamble, etc.)
+      console.error('[extract-om] JSON parse failed:', parseErr.message, 'stop_reason:', stopReason, 'raw text length:', text.length)
+      return new Response(JSON.stringify({
+        error: `Extraction returned invalid JSON (${parseErr.message}). stop_reason=${stopReason}, mode=${dealMode}. First 500 chars of model output: ${text.slice(0, 500)}`,
+        mode: dealMode,
+        stopReason,
+        rawTextPreview: text.slice(0, 2000),
+      }), {
+        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
     // Image extraction from PDF is not supported via vision API — manual upload only
     parsed.propertyImageUrl = null
