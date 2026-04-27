@@ -2,7 +2,9 @@ import { useState, useRef, useCallback } from 'react'
 import { Link, useLocation, Outlet } from 'react-router-dom'
 import { Building2, BarChart3, Home, User, LogOut, Settings, Lightbulb, ClipboardList, GitCompare } from 'lucide-react'
 import { ChatBubble } from '../chat/ChatBubble'
+import { DevChatPanel } from '../chat/DevChatPanel'
 import { useAuth } from '../../hooks/useAuth'
+import { useIsAdmin } from '../../hooks/useIsAdmin'
 import { ProfileModal, getInitials } from '../ProfileModal'
 import { SettingsModal } from '../SettingsModal'
 import { FeatureSuggestionModal } from '../FeatureSuggestionModal'
@@ -58,6 +60,7 @@ function AvatarMenu({ size, textSize, onProfile, onSettings, onSuggestFeature, o
 
 export function AppShell() {
   const { user, signOut } = useAuth()
+  const isAdmin = useIsAdmin()
   const loc = useLocation()
   const [showProfile, setShowProfile] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -160,6 +163,7 @@ export function AppShell() {
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showFeatureSuggestion && <FeatureSuggestionModal onClose={() => setShowFeatureSuggestion(false)} />}
       <ChatBubble />
+      {isAdmin && <DevChatPanel />}
     </div>
   )
 }
