@@ -54,6 +54,18 @@ function PasswordRecoveryHandler() {
   const navigate = useNavigate()
   const loc = useLocation()
   useEffect(() => {
+    // Backup detection — Supabase may have already parsed the URL hash and
+    // fired PASSWORD_RECOVERY before this listener attaches (race condition
+    // observed on prod). If the URL still looks like a recovery callback,
+    // navigate immediately regardless of whether the auth event arrives.
+    const looksLikeRecovery =
+      window.location.hash.includes('type=recovery') ||
+      window.location.search.includes('type=recovery')
+    if (looksLikeRecovery && loc.pathname !== '/reset-password') {
+      navigate('/reset-password', { replace: true })
+      return
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY' && loc.pathname !== '/reset-password') {
         navigate('/reset-password', { replace: true })
