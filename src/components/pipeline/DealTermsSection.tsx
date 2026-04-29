@@ -17,6 +17,11 @@ interface Props {
   keyDates?: KeyDates
   onUpdateKeyDates?: (dates: KeyDates) => void
   psaExtractedTerms?: Record<string, any> | null
+  hideKeyDatesInline?: boolean
+  hideHeaderControls?: boolean
+  unlocked?: boolean
+  onToggleUnlock?: () => void
+  onExportPdf?: (mode: 'full' | 'projected' | 'actual') => void
 }
 
 interface FieldDef {
@@ -96,11 +101,19 @@ function fmtFieldVal(val: number | undefined, field: FieldDef): string {
   return String(val)
 }
 
-export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, onChangeScenario, propertyName, propertyAddress, keyDates: keyDatesProp, onUpdateKeyDates, psaExtractedTerms }: Props) {
+export function DealTermsSection({
+  dealScenario, actualInputs, onUpdateActuals, onChangeScenario,
+  propertyName, propertyAddress,
+  keyDates: keyDatesProp, onUpdateKeyDates, psaExtractedTerms,
+  hideKeyDatesInline, hideHeaderControls,
+  unlocked: unlockedProp, onToggleUnlock,
+}: Props) {
   const keyDates = keyDatesProp ?? EMPTY_KEY_DATES
   const projected = dealScenario.inputs
   const [generating, setGenerating] = useState(false)
-  const [unlocked, setUnlocked] = useState(false)
+  const [unlockedInternal, setUnlockedInternal] = useState(false)
+  const unlocked = unlockedProp ?? unlockedInternal
+  const toggleUnlock = onToggleUnlock ?? (() => setUnlockedInternal(v => !v))
   const [pdfDropdown, setPdfDropdown] = useState(false)
   const [rentGrowth, setRentGrowth] = useState(() => (actualInputs as any)._rentGrowth ?? 2)
   const [expGrowth, setExpGrowth] = useState(() => (actualInputs as any)._expGrowth ?? 3)
@@ -198,49 +211,51 @@ export function DealTermsSection({ dealScenario, actualInputs, onUpdateActuals, 
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900">Deal Terms — {dealScenario.name}</h3>
-          <p className="text-[10px] text-gray-400 mt-0.5">Projected from scenario · Enter actuals as quotes come in</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => setUnlocked(!unlocked)}
-            className={`flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors
-              ${unlocked ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-            {unlocked ? <><Unlock size={10} /> Editing Actuals</> : <><Lock size={10} /> Locked</>}
-          </button>
-          <button onClick={onChangeScenario}
-            className="flex items-center gap-1 text-[10px] font-medium text-gray-400 hover:text-gray-600 transition-colors">
-            <RefreshCw size={10} /> Change scenario
-          </button>
-          <div className="relative">
-            <button
-              onClick={() => setPdfDropdown(!pdfDropdown)}
-              disabled={generating}
-              className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-[#1a1a2e] text-white rounded-lg hover:bg-[#c9a84c] hover:text-[#1a1a2e] transition-colors disabled:opacity-50">
-              {generating ? 'Generating...' : <><Download size={12} /> PDF ▾</>}
+      {!hideHeaderControls && (
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Deal Terms — {dealScenario.name}</h3>
+            <p className="text-[10px] text-gray-400 mt-0.5">Projected from scenario · Enter actuals as quotes come in</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button onClick={toggleUnlock}
+              className={`flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors
+                ${unlocked ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+              {unlocked ? <><Unlock size={10} /> Editing Actuals</> : <><Lock size={10} /> Locked</>}
             </button>
-            {pdfDropdown && (
-              <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden min-w-[160px]"
-                onMouseLeave={() => setPdfDropdown(false)}>
-                <button onClick={() => { setPdfDropdown(false); generatePdf('full') }}
-                  className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                  Comparative
-                  <span className="block text-[10px] text-gray-400 font-normal">Projected vs Actual + Delta</span>
-                </button>
-                <button onClick={() => { setPdfDropdown(false); generatePdf('actual') }}
-                  className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors border-t border-gray-100">
-                  Actuals Only
-                  <span className="block text-[10px] text-gray-400 font-normal">Actual terms + 5-year projection</span>
-                </button>
-              </div>
-            )}
+            <button onClick={onChangeScenario}
+              className="flex items-center gap-1 text-[10px] font-medium text-gray-400 hover:text-gray-600 transition-colors">
+              <RefreshCw size={10} /> Change scenario
+            </button>
+            <div className="relative">
+              <button
+                onClick={() => setPdfDropdown(!pdfDropdown)}
+                disabled={generating}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-[#1a1a2e] text-white rounded-lg hover:bg-[#c9a84c] hover:text-[#1a1a2e] transition-colors disabled:opacity-50">
+                {generating ? 'Generating...' : <><Download size={12} /> PDF ▾</>}
+              </button>
+              {pdfDropdown && (
+                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden min-w-[160px]"
+                  onMouseLeave={() => setPdfDropdown(false)}>
+                  <button onClick={() => { setPdfDropdown(false); generatePdf('full') }}
+                    className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                    Comparative
+                    <span className="block text-[10px] text-gray-400 font-normal">Projected vs Actual + Delta</span>
+                  </button>
+                  <button onClick={() => { setPdfDropdown(false); generatePdf('actual') }}
+                    className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors border-t border-gray-100">
+                    Actuals Only
+                    <span className="block text-[10px] text-gray-400 font-normal">Actual terms + 5-year projection</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Key Dates */}
-      {onUpdateKeyDates && (() => {
+      {!hideKeyDatesInline && onUpdateKeyDates && (() => {
         const DATE_FIELDS: { key: keyof KeyDates; label: string }[] = [
           { key: 'effectiveDate', label: 'Effective Date' },
           { key: 'earnestMoneyDueDate', label: 'Earnest Money Due' },

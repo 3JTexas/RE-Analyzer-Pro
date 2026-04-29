@@ -1,8 +1,10 @@
 import { useState, useRef, useCallback } from 'react'
-import { Link, useLocation, Outlet } from 'react-router-dom'
-import { Building2, BarChart3, Home, User, LogOut, Settings, Lightbulb, ClipboardList } from 'lucide-react'
+import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom'
+import { Building2, BarChart3, Home, User, LogOut, Settings, Lightbulb, ClipboardList, GitCompare } from 'lucide-react'
 import { ChatBubble } from '../chat/ChatBubble'
+import { DevChatPanel } from '../chat/DevChatPanel'
 import { useAuth } from '../../hooks/useAuth'
+import { useIsAdmin } from '../../hooks/useIsAdmin'
 import { ProfileModal, getInitials } from '../ProfileModal'
 import { SettingsModal } from '../SettingsModal'
 import { FeatureSuggestionModal } from '../FeatureSuggestionModal'
@@ -58,14 +60,26 @@ function AvatarMenu({ size, textSize, onProfile, onSettings, onSuggestFeature, o
 
 export function AppShell() {
   const { user, signOut } = useAuth()
+  const isAdmin = useIsAdmin()
   const loc = useLocation()
+  const navigate = useNavigate()
+
+  const goHome = () => {
+    if (loc.pathname === '/') {
+      // Already on Properties — full reload to close any open setup flows / overlays
+      window.location.href = '/'
+    } else {
+      navigate('/')
+    }
+  }
   const [showProfile, setShowProfile] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showFeatureSuggestion, setShowFeatureSuggestion] = useState(false)
 
   const nav = [
-    { to: '/',           icon: Building2, label: 'Properties' },
-    { to: '/demo',       icon: BarChart3, label: 'Quick Model' },
+    { to: '/',           icon: Building2,  label: 'Properties' },
+    { to: '/compare',    icon: GitCompare, label: 'Compare' },
+    { to: '/demo',       icon: BarChart3,  label: 'Quick Model' },
   ]
 
   const logoSrc = `${import.meta.env.BASE_URL}Chai_Logo.jpeg`
@@ -92,7 +106,7 @@ export function AppShell() {
       />
 
       {/* Desktop header */}
-      <header className="hidden md:flex items-center justify-between bg-white/95 backdrop-blur-sm border-b border-gray-200 h-16 px-8" style={{ position: 'relative', zIndex: 10, flexShrink: 0 }}>
+      <header className="hidden md:flex items-center justify-between bg-white/95 backdrop-blur-sm border-b border-gray-100 h-16 px-10" style={{ position: 'relative', zIndex: 10, flexShrink: 0 }}>
         <div className="flex items-center min-w-0">
           <Link to="/">
             <img src={logoSrc} alt="Chai Holdings" className="h-10 w-auto" />
@@ -115,9 +129,9 @@ export function AppShell() {
           </nav>
         </div>
         <div className="flex items-center gap-4 min-w-0">
-          <Link to="/" className="p-1.5 text-gray-400 hover:text-[#c9a84c] transition-colors" title="Home">
+          <button onClick={goHome} className="p-1.5 text-gray-400 hover:text-[#c9a84c] transition-colors" title="Home">
             <Home size={16} />
-          </Link>
+          </button>
           {user && (
             <AvatarMenu size="w-9 h-9" textSize="text-xs" onProfile={() => setShowProfile(true)} onSettings={() => setShowSettings(true)} onSuggestFeature={() => setShowFeatureSuggestion(true)} onSignOut={signOut} />
           )}
@@ -159,6 +173,7 @@ export function AppShell() {
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showFeatureSuggestion && <FeatureSuggestionModal onClose={() => setShowFeatureSuggestion(false)} />}
       <ChatBubble />
+      {isAdmin && <DevChatPanel />}
     </div>
   )
 }

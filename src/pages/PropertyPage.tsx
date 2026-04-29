@@ -328,7 +328,7 @@ export function PropertyPage() {
       )}
 
       {!showSetup && !duplicating && (
-        <div className="flex-1 overflow-y-auto px-4 md:px-8 py-3 max-w-5xl mx-auto w-full">
+        <div className="flex-1 overflow-y-auto px-4 md:px-10 py-5 max-w-7xl mx-auto w-full">
           {scenarios.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <BarChart3 size={40} className="text-gray-200 mb-4" />

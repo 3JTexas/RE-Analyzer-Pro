@@ -1,3 +1,14 @@
+// ── Property type ─────────────────────────────────────────────────────────
+// Drives which fields/forms are shown and how the calc engine evaluates a deal.
+// 'multifamily' is the legacy default; 'single_family' is one-unit residential
+// (uses the multifamily calc branch with tu=1); 'nnn' is single-tenant triple-net.
+export type PropertyType = 'multifamily' | 'single_family' | 'nnn'
+
+export type RentEscalationFreq = 'annual' | 'every5yr' | 'cpi' | 'flat'
+export type NNNType = 'NN' | 'NNN' | 'absolute_NNN' | 'modified_gross'
+export type GuarantyType = 'corporate' | 'parent' | 'personal' | 'none'
+export type TenantCreditRating = 'AAA' | 'AA' | 'A' | 'BBB' | 'BB' | 'B' | 'NR' | 'Private'
+
 // ── Rent roll unit ────────────────────────────────────────────────────────
 export interface RentRollUnit {
   id: string           // uuid, generated client-side
@@ -70,6 +81,24 @@ export interface ModelInputs {
   applyExcessToDown?: boolean    // apply excess 1031 proceeds to additional down payment
   // Deal-level (not used in calc engine)
   capx?: number                  // Year 1 capital expenditures $ (Deal Terms only, pipeline-level)
+  // ── Property type & NNN-specific fields ────────────────────────────────
+  // Mirrored from property.property_type for the calc engine. When 'nnn',
+  // the calc engine uses the NNN branch (single-tenant rent + escalations,
+  // landlord reserves only, 39-yr depreciation). For multifamily this stays
+  // undefined or 'multifamily' and the legacy fields above are used.
+  propertyType?: PropertyType
+  // NNN-only fields (ignored when propertyType !== 'nnn'):
+  buildingSqft?: number          // total building SF (replaces unit count for sizing)
+  nnnAnnualRent?: number         // current annual base rent ($)
+  tenantName?: string
+  tenantCreditRating?: TenantCreditRating
+  leaseStart?: string            // YYYY-MM-DD
+  leaseEnd?: string              // YYYY-MM-DD
+  rentEscalationPct?: number     // % per escalation period
+  rentEscalationFreq?: RentEscalationFreq
+  nnnType?: NNNType
+  guarantyType?: GuarantyType
+  landlordReservesAnnual?: number // $/yr non-recoverable LL items (e.g. roof reserve)
 }
 
 // ── Computed outputs ──────────────────────────────────────────────────────
@@ -150,6 +179,7 @@ export interface Property {
   year_built: number | null
   notes: string | null
   status: 'research' | 'pending' | 'active' | 'closed'
+  property_type: PropertyType
   display_order: number
   crexi_url: string | null
   property_image_url: string | null

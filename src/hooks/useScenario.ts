@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import type { Property, Scenario, ModelInputs } from '../types'
+import type { Property, Scenario, ModelInputs, PropertyType } from '../types'
 
 export function useProperties() {
   const [properties, setProperties] = useState<Property[]>([])
@@ -19,7 +19,14 @@ export function useProperties() {
 
   useEffect(() => { fetch() }, [fetch])
 
-  const createProperty = async (name: string, address?: string, yearBuilt?: number, propertyImageUrl?: string, units?: number) => {
+  const createProperty = async (
+    name: string,
+    address?: string,
+    yearBuilt?: number,
+    propertyImageUrl?: string,
+    units?: number,
+    propertyType?: PropertyType,
+  ) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
     const { data, error } = await supabase
@@ -29,6 +36,7 @@ export function useProperties() {
         ...(yearBuilt ? { year_built: yearBuilt } : {}),
         ...(propertyImageUrl ? { property_image_url: propertyImageUrl } : {}),
         ...(units && units > 0 ? { units } : {}),
+        ...(propertyType ? { property_type: propertyType } : {}),
       })
       .select()
       .single()

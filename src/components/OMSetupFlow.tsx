@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { Upload, FileText, X, Loader2, CheckCircle, AlertCircle, Camera } from 'lucide-react'
+import { Upload, FileText, X, Loader2, CheckCircle, AlertCircle, Camera, Building2, Building, Home } from 'lucide-react'
 import { DEFAULT_INPUTS } from '../lib/calc'
 
 import { supabase } from '../lib/supabase'
 import { useUserDefaults } from '../hooks/useUserDefaults'
-import type { ModelInputs, RentRollUnit } from '../types'
+import type { ModelInputs, RentRollUnit, PropertyType } from '../types'
 
 const FIELDS: { key: keyof ModelInputs; label: string; step: number; prefix?: string; suffix?: string }[] = [
   { key: 'price', label: 'Purchase price',       step: 10000, prefix: '$' },
@@ -51,6 +51,7 @@ export interface SetupConfirmMeta {
   propertyAddress?: string
   propertyYearBuilt?: number
   propertyImageUrl?: string
+  propertyType?: PropertyType   // chosen at Step 0; defaults to multifamily for legacy callers
   addToExistingPropertyId?: string  // if set, add scenario to this property instead of creating new
 }
 
@@ -98,7 +99,9 @@ function propertiesMatch(
   return false
 }
 
-type Mode = 'choose' | 'manual' | 'pdf'
+// Step 0 ('type') only shows when creating a new property. For "add scenario
+// to existing property" the type is already locked, so we skip straight to 'choose'.
+type Mode = 'type' | 'choose' | 'manual' | 'pdf'
 type PdfStatus = 'idle' | 'reading' | 'extracting' | 'done' | 'error'
 type PdfProgress = { current: number; total: number } | null
 
@@ -111,7 +114,10 @@ interface Props {
 }
 
 export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, defaultScenarioName = 'As-Presented', existingProperties = [] }: Props) {
-  const [mode, setMode] = useState<Mode>('choose')
+  // Show the deal-type picker only when we're creating a new property.
+  // When adding a scenario to an existing property, the type is already set.
+  const [mode, setMode] = useState<Mode>(showPropertyFields ? 'type' : 'choose')
+  const [propertyType, setPropertyType] = useState<PropertyType>('multifamily')
   const [inputs, setInputs] = useState<ModelInputs>({ ...DEFAULT_INPUTS })
   const { loadDefaults } = useUserDefaults()
 
@@ -128,7 +134,7 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
 
   // Reset all form state on mount — prevents stale data when component is reused
   useEffect(() => {
-    setMode('choose')
+    setMode(showPropertyFields ? 'type' : 'choose')
     setInputs({ ...DEFAULT_INPUTS })
     setPdfStatus('idle')
     setPdfError('')
@@ -181,14 +187,18 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
     setPhotoUploading(false)
   }
 
-  const confirm = (opts?: { addToExistingPropertyId?: string }) => onConfirm(inputs, {
-    scenarioName: scenarioName.trim() || defaultScenarioName,
-    propertyName: showPropertyFields ? propertyName.trim() : undefined,
-    propertyAddress: showPropertyFields ? propertyAddress.trim() : undefined,
-    propertyYearBuilt: showPropertyFields ? propertyYearBuilt : undefined,
-    propertyImageUrl: showPropertyFields ? propertyImageUrl : undefined,
-    addToExistingPropertyId: opts?.addToExistingPropertyId,
-  })
+  const confirm = (opts?: { addToExistingPropertyId?: string }) => onConfirm(
+    { ...inputs, propertyType },
+    {
+      scenarioName: scenarioName.trim() || defaultScenarioName,
+      propertyName: showPropertyFields ? propertyName.trim() : undefined,
+      propertyAddress: showPropertyFields ? propertyAddress.trim() : undefined,
+      propertyYearBuilt: showPropertyFields ? propertyYearBuilt : undefined,
+      propertyImageUrl: showPropertyFields ? propertyImageUrl : undefined,
+      propertyType: showPropertyFields ? propertyType : undefined,
+      addToExistingPropertyId: opts?.addToExistingPropertyId,
+    },
+  )
 
   // Compute duplicate match against existing properties (only relevant when creating a new property)
   const duplicateMatch = showPropertyFields && (propertyName.trim() || propertyAddress.trim())
@@ -248,7 +258,7 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
         const b64 = base64s[i]
         console.log(`[extract] PDF ${i + 1} "${pdfFiles[i].name}" — base64 length: ${b64.length} chars (~${Math.round(b64.length * 0.75 / 1024)}KB)`)
         const { data, error: invokeError } = await supabase.functions.invoke('extract-om', {
-          body: { pdfs: [b64] },
+          body: { pdfs: [b64], mode: propertyType === 'nnn' ? 'nnn' : 'mf' },
         })
         if (invokeError) {
           // Try to extract the real error from the response context
@@ -310,6 +320,28 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
       // Map boolean sub-metering flags
       if (parsed.utilElecSubmetered === true) merged.utilElecSubmetered = true
       if (parsed.utilWaterSubmetered === true) merged.utilWaterSubmetered = true
+
+      // Stamp the chosen property type so downstream calc / display uses
+      // the right branch even before the property row exists in the DB.
+      merged.propertyType = propertyType
+
+      // NNN-only extracted fields → copy through. These are no-ops for MF.
+      if (propertyType === 'nnn') {
+        const numericNNN = ['buildingSqft', 'nnnAnnualRent', 'rentEscalationPct', 'landlordReservesAnnual']
+        for (const k of numericNNN) {
+          const v = (parsed as any)[k]
+          if (v != null) {
+            const n = typeof v === 'number' ? v : parseFloat(String(v))
+            if (!isNaN(n)) (merged as any)[k] = n
+          }
+        }
+        const stringNNN = ['tenantName', 'tenantCreditRating', 'leaseStart', 'leaseEnd',
+                           'rentEscalationFreq', 'nnnType', 'guarantyType']
+        for (const k of stringNNN) {
+          const v = (parsed as any)[k]
+          if (typeof v === 'string' && v.trim()) (merged as any)[k] = v.trim()
+        }
+      }
 
       // Default ou to tu if not extracted (100% occupied assumption)
       if ((merged.ou === 0 || merged.ou === undefined) && merged.tu > 0) {
@@ -449,11 +481,62 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
     </div>
   )
 
+  // ── Step 0: deal-type picker (only when creating a new property) ─────
+  if (mode === 'type') return (
+    <div className="mx-4 mt-3 p-4 border border-gray-200 rounded-xl bg-white shadow-sm">
+      <p className="text-xs font-semibold text-gray-700 mb-1">Add new property</p>
+      <p className="text-[10px] text-gray-400 mb-3">
+        What kind of deal is this? You can add more types later.
+      </p>
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <button
+          onClick={() => { setPropertyType('multifamily'); setMode('choose') }}
+          className="flex flex-col items-center gap-2 p-3 border-2 border-gray-200 rounded-xl hover:border-navy hover:bg-blue-50 transition-colors"
+        >
+          <Building2 size={24} className="text-navy" />
+          <span className="text-[11px] font-semibold text-gray-700">Multifamily</span>
+          <span className="text-[9px] text-gray-400 text-center leading-snug">
+            Apartments, rent roll, vacancy, full opex
+          </span>
+        </button>
+        <button
+          onClick={() => {
+            setPropertyType('single_family')
+            setInputs(prev => ({ ...prev, tu: 1, ou: 1 }))
+            setMode('choose')
+          }}
+          className="flex flex-col items-center gap-2 p-3 border-2 border-gray-200 rounded-xl hover:border-emerald-500 hover:bg-emerald-50 transition-colors"
+        >
+          <Home size={24} className="text-emerald-600" />
+          <span className="text-[11px] font-semibold text-gray-700">Single Family</span>
+          <span className="text-[9px] text-gray-400 text-center leading-snug">
+            One house, one tenant, monthly rent
+          </span>
+        </button>
+        <button
+          onClick={() => { setPropertyType('nnn'); setMode('choose') }}
+          className="flex flex-col items-center gap-2 p-3 border-2 border-gray-200 rounded-xl hover:border-[#c9a84c] hover:bg-amber-50 transition-colors"
+        >
+          <Building size={24} className="text-[#c9a84c]" />
+          <span className="text-[11px] font-semibold text-gray-700">NNN</span>
+          <span className="text-[9px] text-gray-400 text-center leading-snug">
+            Single-tenant net-lease, base rent + escalations
+          </span>
+        </button>
+      </div>
+      <button onClick={onCancel} className="w-full bg-gray-100 text-gray-600 text-xs font-medium py-2 rounded-lg">
+        Cancel
+      </button>
+    </div>
+  )
+
   // ── Choose mode ───────────────────────────────────────────────────────
   if (mode === 'choose') return (
     <div className="mx-4 mt-3 p-4 border border-gray-200 rounded-xl bg-white shadow-sm">
       <p className="text-xs font-semibold text-gray-700 mb-1">
-        {showPropertyFields ? 'Add new property' : 'Add scenario'}
+        {showPropertyFields
+          ? `Add new property — ${propertyType === 'nnn' ? 'NNN' : propertyType === 'single_family' ? 'Single Family' : 'Multifamily'}`
+          : 'Add scenario'}
       </p>
       <p className="text-[10px] text-gray-400 mb-3">
         {showPropertyFields ? 'Import the broker PDF or enter figures manually' : 'How do you want to enter the broker\'s figures?'}
@@ -463,7 +546,9 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
           className="flex flex-col items-center gap-2 p-3 border-2 border-gray-200 rounded-xl hover:border-amber-500 hover:bg-amber-50 transition-colors">
           <Upload size={22} className="text-amber-600" />
           <span className="text-[11px] font-semibold text-gray-700">Import PDF</span>
-          <span className="text-[9px] text-gray-400 text-center">AI extracts automatically</span>
+          <span className="text-[9px] text-gray-400 text-center">
+            {propertyType === 'nnn' ? 'NNN extraction (lease, tenant, escalations)' : 'AI extracts automatically'}
+          </span>
         </button>
         <button onClick={() => setMode('manual')}
           className="flex flex-col items-center gap-2 p-3 border-2 border-gray-200 rounded-xl hover:border-navy hover:bg-blue-50 transition-colors">
@@ -636,7 +721,153 @@ export function SetupFlow({ onConfirm, onCancel, showPropertyFields = false, def
     </div>
   )
 
-  // ── Manual mode ───────────────────────────────────────────────────────
+  // ── Manual mode — NNN ────────────────────────────────────────────────
+  if (mode === 'manual' && propertyType === 'nnn') {
+    const setN = <K extends keyof ModelInputs>(k: K, v: any) => setInputs(prev => ({ ...prev, [k]: v }))
+    const numField = (label: string, key: keyof ModelInputs, opts: { prefix?: string; suffix?: string; step?: number } = {}) => {
+      const v = (inputs as any)[key]
+      return (
+        <div>
+          <label className="block text-[9px] text-gray-400 mb-0.5">{label}</label>
+          <div className="relative">
+            {opts.prefix && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">{opts.prefix}</span>}
+            <input
+              type="number"
+              value={v ?? ''}
+              step={opts.step ?? 1}
+              onChange={e => setN(key, e.target.value === '' ? undefined : +e.target.value)}
+              className={`w-full text-xs border border-gray-200 rounded-md ${opts.prefix ? 'pl-5' : 'pl-2'} ${opts.suffix ? 'pr-7' : 'pr-2'} py-1.5 bg-white focus:outline-none focus:border-navy text-right`}
+            />
+            {opts.suffix && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">{opts.suffix}</span>}
+          </div>
+        </div>
+      )
+    }
+    const textField = (label: string, key: keyof ModelInputs, placeholder?: string) => (
+      <div>
+        <label className="block text-[9px] text-gray-400 mb-0.5">{label}</label>
+        <input
+          type="text"
+          value={((inputs as any)[key] as string) ?? ''}
+          placeholder={placeholder}
+          onChange={e => setN(key, e.target.value || undefined)}
+          className="w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:border-navy"
+        />
+      </div>
+    )
+    const dateField = (label: string, key: keyof ModelInputs) => (
+      <div>
+        <label className="block text-[9px] text-gray-400 mb-0.5">{label}</label>
+        <input
+          type="date"
+          value={((inputs as any)[key] as string) ?? ''}
+          onChange={e => setN(key, e.target.value || undefined)}
+          className="w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:border-navy"
+        />
+      </div>
+    )
+    const selectField = <T extends string>(label: string, key: keyof ModelInputs, options: { value: T; label: string }[]) => (
+      <div>
+        <label className="block text-[9px] text-gray-400 mb-0.5">{label}</label>
+        <select
+          value={((inputs as any)[key] as string) ?? ''}
+          onChange={e => setN(key, e.target.value || undefined)}
+          className="w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:border-navy"
+        >
+          <option value="">—</option>
+          {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </div>
+    )
+
+    return (
+      <div className="mx-4 mt-3 p-4 border border-gray-200 rounded-xl bg-white shadow-sm max-h-[calc(100dvh-8rem)] overflow-y-auto">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-gray-700">
+            {showPropertyFields ? 'New NNN property — deal terms' : 'Enter NNN deal terms'}
+          </p>
+          <button onClick={() => setMode(showPropertyFields ? 'type' : 'choose')}><X size={14} className="text-gray-400" /></button>
+        </div>
+        <MetaFields />
+
+        <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Deal & building</p>
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          {numField('Purchase price', 'price', { prefix: '$', step: 10000 })}
+          {numField('Building SF', 'buildingSqft', { step: 100 })}
+        </div>
+
+        <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Tenant & lease</p>
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          {textField('Tenant name', 'tenantName', 'e.g. Walgreens')}
+          {selectField('Credit rating', 'tenantCreditRating', [
+            { value: 'AAA', label: 'AAA' },
+            { value: 'AA', label: 'AA' },
+            { value: 'A', label: 'A' },
+            { value: 'BBB', label: 'BBB' },
+            { value: 'BB', label: 'BB' },
+            { value: 'B', label: 'B' },
+            { value: 'NR', label: 'Not Rated' },
+            { value: 'Private', label: 'Private' },
+          ])}
+          {dateField('Lease start', 'leaseStart')}
+          {dateField('Lease end', 'leaseEnd')}
+          {selectField('Lease type', 'nnnType', [
+            { value: 'NN', label: 'NN (double-net)' },
+            { value: 'NNN', label: 'NNN' },
+            { value: 'absolute_NNN', label: 'Absolute NNN' },
+            { value: 'modified_gross', label: 'Modified gross' },
+          ])}
+          {selectField('Guaranty', 'guarantyType', [
+            { value: 'corporate', label: 'Corporate' },
+            { value: 'parent', label: 'Parent' },
+            { value: 'personal', label: 'Personal' },
+            { value: 'none', label: 'None' },
+          ])}
+        </div>
+
+        <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Rent & escalations</p>
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          {numField('Annual base rent', 'nnnAnnualRent', { prefix: '$', step: 1000 })}
+          {numField('Escalation %', 'rentEscalationPct', { suffix: '%', step: 0.25 })}
+          {selectField('Escalation frequency', 'rentEscalationFreq', [
+            { value: 'annual', label: 'Annual' },
+            { value: 'every5yr', label: 'Every 5 years' },
+            { value: 'cpi', label: 'CPI-indexed' },
+            { value: 'flat', label: 'Flat (no escalations)' },
+          ])}
+          {numField('LL reserves $/yr', 'landlordReservesAnnual', { prefix: '$', step: 500 })}
+        </div>
+
+        <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Financing</p>
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          {numField('LTV %', 'lev', { suffix: '%', step: 1 })}
+          {numField('Interest rate %', 'ir', { suffix: '%', step: 0.125 })}
+          {numField('Amortization (yrs)', 'am', { step: 5 })}
+          {numField('Closing costs %', 'cc', { suffix: '%', step: 0.25 })}
+        </div>
+
+        <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Tax</p>
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          {numField('Tax bracket %', 'brk', { suffix: '%', step: 1 })}
+          {numField('Land %', 'land', { suffix: '%', step: 1 })}
+        </div>
+
+        <DuplicateBanner />
+        <button
+          onClick={() => confirm()}
+          disabled={(showPropertyFields && !propertyName.trim())}
+          className="w-full bg-navy text-white text-xs font-semibold py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {showPropertyFields ? 'Create property + scenario' : 'Create scenario'}
+        </button>
+        <button onClick={onCancel} className="w-full bg-gray-100 text-gray-600 text-xs font-medium py-2 rounded-lg mt-2">
+          Cancel
+        </button>
+      </div>
+    )
+  }
+
+  // ── Manual mode — Multifamily (default) ──────────────────────────────
   return (
     <div className="mx-4 mt-3 p-4 border border-gray-200 rounded-xl bg-white shadow-sm">
       <div className="flex items-center justify-between mb-3">

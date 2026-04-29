@@ -78,7 +78,8 @@ export function PropertiesPage() {
         meta.propertyAddress || undefined,
         meta.propertyYearBuilt || undefined,
         meta.propertyImageUrl || undefined,
-        inputs.tu || undefined
+        inputs.tu || undefined,
+        meta.propertyType || undefined,
       ))?.id
     if (!propertyId) return
     const scenario = await createScenario(propertyId, meta.scenarioName, inputs, true)
@@ -90,13 +91,14 @@ export function PropertiesPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 md:px-8 py-4 bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="flex items-center gap-4">
-          <h1 className="text-[11px] tracking-[0.2em] uppercase text-gray-400 font-medium">Dashboard</h1>
-          <p className="text-xs text-gray-400 mt-0.5">{properties.length} propert{properties.length !== 1 ? 'ies' : 'y'}</p>
+      <div className="flex items-center justify-between px-6 md:px-10 py-5 bg-white border-b border-gray-100 sticky top-0 z-10">
+        <div className="flex items-baseline gap-4">
+          <span className="eyebrow">Dashboard</span>
+          <h1 className="page-title">Properties</h1>
+          <p className="text-xs text-gray-400">{properties.length} propert{properties.length !== 1 ? 'ies' : 'y'}</p>
         </div>
         <button onClick={() => setShowSetup(true)}
-          className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium tracking-wide border border-[#c9a84c] text-[#c9a84c] rounded-sm bg-transparent hover:bg-[#c9a84c] hover:text-white transition-colors">
+          className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium tracking-wide border border-[#c9a84c] text-[#c9a84c] rounded-md bg-transparent hover:bg-[#c9a84c] hover:text-white transition-colors">
           <Plus size={13} /> New Property
         </button>
       </div>
@@ -122,7 +124,7 @@ export function PropertiesPage() {
 
       {/* ── UNIFIED VIEW — Live Deals + R&D ── */}
       {!showSetup && (
-        <div className="flex-1 overflow-y-auto px-4 md:px-8 pt-5 pb-6 max-w-5xl mx-auto w-full">
+        <div className="flex-1 overflow-y-auto px-4 md:px-10 pt-7 pb-8 max-w-7xl mx-auto w-full">
           {(() => {
             const liveDeals = properties.filter(p => p.status === 'pending' || p.status === 'active')
             const closedDeals = properties.filter(p => p.status === 'closed')
@@ -174,27 +176,27 @@ export function PropertiesPage() {
               <>
                 {/* Metrics — only show when live deals exist */}
                 {liveDeals.length > 0 && (
-                  <div className="grid grid-cols-3 gap-3 mb-5">
-                    <div className="bg-white border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <TrendingUp size={14} className="text-[#c9a84c]" />
-                        <span className="text-[10px] text-gray-500">Live Deals</span>
+                  <div className="grid grid-cols-3 gap-4 mb-8">
+                    <div className="card-soft p-5">
+                      <div className="flex items-center gap-2 mb-2">
+                        <TrendingUp size={12} className="text-[#c9a84c]" />
+                        <span className="tile-label">Live Deals</span>
                       </div>
-                      <div className="text-2xl font-bold text-gray-900">{liveDeals.length}</div>
+                      <div className="tile-number">{liveDeals.length}</div>
                     </div>
-                    <div className="bg-white border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <DollarSign size={14} className="text-green-600" />
-                        <span className="text-[10px] text-gray-500">Pipeline Value</span>
+                    <div className="card-soft p-5">
+                      <div className="flex items-center gap-2 mb-2">
+                        <DollarSign size={12} className="text-green-600" />
+                        <span className="tile-label">Pipeline Value</span>
                       </div>
-                      <div className="text-2xl font-bold text-gray-900">{fmtDollar(totalPipelineValue)}</div>
+                      <div className="tile-number">{fmtDollar(totalPipelineValue)}</div>
                     </div>
-                    <div className="bg-white border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Building2 size={14} className="text-blue-500" />
-                        <span className="text-[10px] text-gray-500">R&D</span>
+                    <div className="card-soft p-5">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Building2 size={12} className="text-blue-500" />
+                        <span className="tile-label">R&D</span>
                       </div>
-                      <div className="text-2xl font-bold text-gray-900">{research.length}</div>
+                      <div className="tile-number">{research.length}</div>
                     </div>
                   </div>
                 )}
@@ -202,7 +204,7 @@ export function PropertiesPage() {
                 {/* ── LIVE DEALS section ── */}
                 {liveDeals.length > 0 && (
                   <div className="mb-6">
-                    <h2 className="text-[11px] tracking-[0.15em] uppercase text-[#c9a84c] font-semibold mb-3 flex items-center gap-2">
+                    <h2 className="eyebrow text-[#c9a84c] mb-3 flex items-center gap-2">
                       <TrendingUp size={13} /> Live Deals
                     </h2>
                     <div className="space-y-2">
@@ -214,7 +216,7 @@ export function PropertiesPage() {
                 {/* ── CLOSED DEALS section ── */}
                 {closedDeals.length > 0 && (
                   <div className="mb-6">
-                    <h2 className="text-[11px] tracking-[0.15em] uppercase text-blue-500 font-semibold mb-3 flex items-center gap-2">
+                    <h2 className="eyebrow text-blue-500 mb-3 flex items-center gap-2">
                       <Building2 size={13} /> Closed Deals
                     </h2>
                     <div className="space-y-2">
@@ -226,7 +228,7 @@ export function PropertiesPage() {
                 {/* ── Properties I'm Selling ── */}
                 <div className="mb-6">
                   <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-[11px] tracking-[0.15em] uppercase text-purple-500 font-semibold flex items-center gap-2">
+                    <h2 className="eyebrow text-purple-500 flex items-center gap-2">
                       <Tag size={13} /> Properties I'm Selling
                     </h2>
                     {!showAddSelling && (
@@ -285,7 +287,7 @@ export function PropertiesPage() {
 
                 {/* ── R&D section ── */}
                 <div className="mb-6">
-                  <h2 className="text-[11px] tracking-[0.15em] uppercase text-gray-400 font-semibold mb-3 flex items-center gap-2">
+                  <h2 className="eyebrow text-gray-400 mb-3 flex items-center gap-2">
                     <Building2 size={13} /> Research & Development
                   </h2>
                   {research.length === 0 && properties.length === 0 ? (

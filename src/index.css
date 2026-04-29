@@ -28,8 +28,8 @@
 
   /* Wide pipeline pages can set their own max-width */
   #root.wide-layout {
-    max-width: 1280px;
-    box-shadow: 0 0 60px rgba(0,0,0,0.10);
+    max-width: 1400px;
+    box-shadow: 0 0 60px rgba(0,0,0,0.06);
   }
 
   input[type="number"]::-webkit-inner-spin-button,
@@ -48,5 +48,47 @@
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+
+  /* Design refresh — Chase/Mercury polish */
+  .eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: #9ca3af;
+  }
+  .section-title {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: #111827;
+    line-height: 1.25;
+  }
+  .page-title {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: #1a1a2e;
+    line-height: 1.2;
+  }
+  .tile-number {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #111827;
+    line-height: 1.15;
+  }
+  .tile-label {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: #6b7280;
+  }
+  .card-soft {
+    background-color: #ffffff;
+    border: 1px solid #eceae4;
+    border-radius: 10px;
   }
 }
